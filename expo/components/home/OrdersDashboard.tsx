@@ -21,13 +21,15 @@ import {
   activeFilterCount,
   attentionReasons,
   filterOrders,
+  formatISODate,
+  overdueDays,
 } from '@/utils/orderFilters';
 
 // Se conservan al volver de un pedido o al cambiar de vista
 let savedFilters: OrderFilters = { ...DEFAULT_FILTERS };
 let savedVisible = 50;
 
-type SheetKind = 'manufacturer' | 'year' | 'period' | 'sort' | null;
+type SheetKind = 'manufacturer' | 'owner' | 'year' | 'period' | 'sort' | null;
 
 export default function OrdersDashboard() {
   const router = useRouter();
@@ -36,6 +38,7 @@ export default function OrdersDashboard() {
   const { orders, manufacturers, years } = useData();
   const desktop = width >= 1024;
   const tablet = width >= 768 && !desktop;
+  const wideTable = width >= 1240;
   const [filters, setFiltersState] = useState<OrderFilters>(savedFilters);
   const [visible, setVisibleState] = useState(savedVisible);
   const [sheet, setSheet] = useState<SheetKind>(null);
@@ -81,6 +84,8 @@ export default function OrdersDashboard() {
 
   const allYears = useMemo(() => Array.from(new Set([...years, ...orders.map(o => o.year)])).sort((a, b) => b - a), [years, orders]);
   const mfName = manufacturers.find(m => m.id === filters.manufacturerId)?.name;
+  const owners = useMemo(() => Array.from(new Set(orders.map(o => o.owner?.trim()).filter(Boolean) as string[])).sort((a, b) => a.localeCompare(b, 'es')), [orders]);
+  const lateCount = useMemo(() => orders.filter(o => (overdueDays(o, now) ?? 0) > 0).length, [orders]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const open = (o: Order) => router.push(`/order-detail?orderId=${o.id}` as never);
   const newOrder = () => router.push('/order-form' as never);
@@ -93,6 +98,13 @@ export default function OrdersDashboard() {
           options: [{ value: '', label: 'Todos los fabricantes' }, ...manufacturers.map(m => ({ value: m.id, label: m.name, hint: m.code }))].map(o => ({ ...o, value: o.value || '__all' })),
           selected: filters.manufacturerId || '__all',
           onSelect: v => setFilters({ manufacturerId: v === '__all' ? '' : v }),
+        };
+      case 'owner':
+        return {
+          title: 'Responsable',
+          options: [{ value: '__all', label: 'Todos' }, { value: '__none', label: 'Sin responsable' }, ...owners.map(o => ({ value: o, label: o }))],
+          selected: filters.owner || '__all',
+          onSelect: v => setFilters({ owner: v === '__all' ? '' : v }),
         };
       case 'year':
         return {
@@ -176,7 +188,16 @@ export default function OrdersDashboard() {
 
       {/* 2. Contadores por estado */}
       <View>
-        <Text style={s.sectionTitle}>Estados · {activeOrders} en curso de {orders.length}</Text>
+        <View style={s.sectionRow}>
+          <Text style={s.sectionTitle}>Estados · {activeOrders} en curso de {orders.length}</Text>
+          {lateCount > 0 && (
+            <Pressable onPress={() => setFilters({ status: filters.status === 'overdue' ? 'all' : 'overdue' })} hitSlop={8} accessibilityRole="button" testID="filter-overdue">
+              <Text style={[s.link, { color: colors.error }]}>
+                {filters.status === 'overdue' ? 'Ver todos' : `${lateCount} con retraso`}
+              </Text>
+            </Pressable>
+          )}
+        </View>
         <ScrollView horizontal={!desktop} showsHorizontalScrollIndicator={false} contentContainerStyle={desktop ? s.countersGrid : s.countersScroll} style={!desktop ? { marginHorizontal: -20 } : undefined}>
           {STATUS_ORDER.map(st => {
             const sel = filters.status === st;
@@ -247,7 +268,7 @@ export default function OrdersDashboard() {
       <View>
         <View style={s.sectionRow}>
           <Text style={s.sectionTitle}>
-            {filters.status === 'attention' ? 'Requieren atención' : filters.status !== 'all' ? statusConfig[filters.status].label : 'Todos los pedidos'} · {list.length}
+            {filters.status === 'attention' ? 'Requieren atención' : filters.status === 'overdue' ? 'Con retraso' : filters.status !== 'all' ? statusConfig[filters.status].label : 'Todos los pedidos'} · {list.length}
           </Text>
           {nActive > 0 && (
             <Pressable onPress={() => setFilters({ ...DEFAULT_FILTERS, sort: filters.sort })} hitSlop={8} accessibilityRole="button" testID="clear-filters">
@@ -260,6 +281,7 @@ export default function OrdersDashboard() {
             <SlidersHorizontal size={16} color={colors.textSecondary} />
           </View>
           {chip('manufacturer', mfName ?? 'Fabricante', !!filters.manufacturerId)}
+          {(owners.length > 0 || !!filters.owner) && chip('owner', filters.owner === '__none' ? 'Sin responsable' : filters.owner || 'Responsable', !!filters.owner)}
           {chip('year', filters.year || 'Año', !!filters.year)}
           {chip('period', filters.period === 'all' ? 'Fecha' : PERIOD_LABELS[filters.period], filters.period !== 'all')}
           {chip('sort', SORT_LABELS[filters.sort], false)}
@@ -286,7 +308,8 @@ export default function OrdersDashboard() {
               <Text style={[s.thText, s.cMf]}>Fabricante</Text>
               <Text style={[s.thText, s.cStatus]}>Estado</Text>
               <Text style={[s.thText, s.cDate]}>Creado</Text>
-              <Text style={[s.thText, s.cDate]}>Actualizado</Text>
+              {wideTable && <Text style={[s.thText, s.cDate]}>Actualizado</Text>}
+              <Text style={[s.thText, s.cDate]}>Previsto</Text>
               <Text style={[s.thText, s.cTotal]}>Total</Text>
             </View>
             {shown.map((o, i) => (
@@ -300,18 +323,22 @@ export default function OrdersDashboard() {
               >
                 <View style={s.cRef}>
                   <Text style={s.tdStrong}>{o.reference_number}</Text>
-                  {!!o.custom_reference && <Text style={s.tdSub}>Ref. {o.custom_reference}</Text>}
+                  {!!o.custom_reference && <Text style={s.tdSub} numberOfLines={1}>Ref. {o.custom_reference}</Text>}
                 </View>
                 <View style={s.cClient}>
-                  <Text style={s.td}>{o.customer?.nombre_empresa || '—'}</Text>
+                  <Text style={s.td} numberOfLines={2}>{o.customer?.nombre_empresa || '—'}</Text>
                   {!!o.customer?.numero_referencia_pedido && <Text style={s.tdSub}>Su pedido {o.customer.numero_referencia_pedido}</Text>}
                 </View>
-                <Text style={[s.td, s.cMf]}>{o.manufacturer_name}</Text>
+                <Text style={[s.td, s.cMf]} numberOfLines={2}>{o.manufacturer_name}</Text>
                 <View style={s.cStatus}>
                   <StatusBadge status={o.status} size="sm" />
                 </View>
                 <Text style={[s.tdSub, s.cDate]}>{formatDate(o.created_at)}</Text>
-                <Text style={[s.tdSub, s.cDate]}>{formatDate(o.updated_at)}</Text>
+                {wideTable && <Text style={[s.tdSub, s.cDate]}>{formatDate(o.updated_at)}</Text>}
+                <View style={s.cDate}>
+                  <ExpectedText o={o} s={s} errorColor={colors.error} />
+                  {!!o.owner && <Text style={s.tdSub} numberOfLines={1}>{o.owner}</Text>}
+                </View>
                 <Text style={[s.tdStrong, s.cTotal]}>{formatCurrency(o.total_with_vat)}</Text>
               </Pressable>
             ))}
@@ -333,6 +360,13 @@ export default function OrdersDashboard() {
                 </View>
                 <Text style={s.oClient}>{o.customer?.nombre_empresa || 'Sin cliente'}</Text>
                 {!!o.custom_reference && <Text style={s.tdSub}>Ref. {o.custom_reference}</Text>}
+                {(!!o.expected_date || !!o.owner || !!o.next_action) && (
+                  <View style={s.follow}>
+                    {!!o.expected_date && <ExpectedText o={o} s={s} errorColor={colors.error} prefix="Previsto " />}
+                    {!!o.owner && <Text style={s.tdSub}>{o.owner}</Text>}
+                    {!!o.next_action && <Text style={[s.tdSub, { flexBasis: '100%' }]} numberOfLines={2}>→ {o.next_action}</Text>}
+                  </View>
+                )}
                 <View style={s.oBottom}>
                   <Text style={s.oMeta} numberOfLines={2}>
                     {o.manufacturer_name} · {formatDate(o.created_at)} · {o.items.length} {o.items.length === 1 ? 'producto' : 'productos'}
@@ -354,6 +388,19 @@ export default function OrdersDashboard() {
 
       {sp && <SelectSheet visible title={sp.title} options={sp.options} selected={sp.selected} onSelect={sp.onSelect} onClose={() => setSheet(null)} />}
     </View>
+  );
+}
+
+function ExpectedText({ o, s, errorColor, prefix = '' }: { o: Order; s: ReturnType<typeof makeStyles>; errorColor: string; prefix?: string }) {
+  if (!o.expected_date) return <Text style={s.tdSub}>—</Text>;
+  const late = overdueDays(o);
+  const isLate = late !== null && late > 0;
+  return (
+    <Text style={[s.tdSub, isLate && { color: errorColor, fontWeight: '600' }]} accessibilityLabel={isLate ? `Previsto ${formatISODate(o.expected_date)}, retrasado ${late} días` : undefined}>
+      {prefix}
+      {formatISODate(o.expected_date)}
+      {isLate ? ` · ${late} d de retraso` : late === 0 ? ' · hoy' : ''}
+    </Text>
   );
 }
 
@@ -400,8 +447,8 @@ function makeStyles(c: ThemeColors) {
     cClient: { flex: 1.9, minWidth: 0 },
     cMf: { flex: 1.2, minWidth: 0 },
     cStatus: { flex: 1.1, minWidth: 0 },
-    cDate: { flex: 0.9, minWidth: 0 },
-    cTotal: { flex: 1.1, minWidth: 0, textAlign: 'right' },
+    cDate: { flex: 0.95, minWidth: 0 },
+    cTotal: { flex: 1.1, minWidth: 120, textAlign: 'right' },
     cardsWrap: { gap: 10 },
     cardsWrapTablet: { flexDirection: 'row', flexWrap: 'wrap', gap: 12 },
     oCard: { backgroundColor: c.surface, borderRadius: radius.lg, padding: 16, gap: 4 },
@@ -409,6 +456,7 @@ function makeStyles(c: ThemeColors) {
     oTop: { flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between', gap: 10 },
     oRef: { flex: 1, fontSize: 16, fontWeight: '600', color: c.text, fontVariant: ['tabular-nums'] },
     oClient: { fontSize: 15, color: c.text },
+    follow: { flexDirection: 'row', flexWrap: 'wrap', columnGap: 12, rowGap: 2, marginTop: 4 },
     oBottom: { flexDirection: 'row', alignItems: 'flex-end', justifyContent: 'space-between', gap: 12, marginTop: 8, paddingTop: 10, borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: c.divider },
     oMeta: { flex: 1, fontSize: 13, color: c.textSecondary },
     oTotal: { fontSize: 18, fontWeight: '700', color: c.text, fontVariant: ['tabular-nums'], letterSpacing: -0.3 },

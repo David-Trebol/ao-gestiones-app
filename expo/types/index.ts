@@ -61,6 +61,10 @@ export interface Order {
   total_ex_vat: number;
   total_vat: number;
   total_with_vat: number;
+  /** Seguimiento (opcional): fecha prevista AAAA-MM-DD, responsable y siguiente acción */
+  expected_date: string | null;
+  owner: string;
+  next_action: string;
   created_at: string;
   updated_at: string;
 }
@@ -97,6 +101,9 @@ export interface OrderFormData {
   custom_reference: string;
   items: OrderFormItem[];
   shipping_items: ShippingFormItem[];
+  expected_date: string | null;
+  owner: string;
+  next_action: string;
 }
 
 export interface OrderFormItem {

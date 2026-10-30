@@ -106,6 +106,9 @@ export const sampleOrders: Order[] = [
     total_with_vat: 2670.47,
     created_at: '2026-01-10T14:30:00Z',
     updated_at: '2026-02-01T09:15:00Z',
+    expected_date: null,
+    owner: '',
+    next_action: '',
   },
   {
     id: 'ord-002',
@@ -158,6 +161,9 @@ export const sampleOrders: Order[] = [
     total_with_vat: 809.08,
     created_at: '2026-02-05T11:20:00Z',
     updated_at: '2026-02-05T11:20:00Z',
+    expected_date: null,
+    owner: '',
+    next_action: '',
   },
   {
     id: 'ord-003',
@@ -223,6 +229,9 @@ export const sampleOrders: Order[] = [
     total_with_vat: 1223.61,
     created_at: '2026-02-15T16:45:00Z',
     updated_at: '2026-02-15T16:45:00Z',
+    expected_date: null,
+    owner: '',
+    next_action: '',
   },
   {
     id: 'ord-004',
@@ -275,6 +284,9 @@ export const sampleOrders: Order[] = [
     total_with_vat: 145.94,
     created_at: '2025-09-20T08:30:00Z',
     updated_at: '2025-10-05T14:00:00Z',
+    expected_date: null,
+    owner: '',
+    next_action: '',
   },
   {
     id: 'ord-005',
@@ -350,6 +362,9 @@ export const sampleOrders: Order[] = [
     total_with_vat: 900.54,
     created_at: '2025-11-10T10:00:00Z',
     updated_at: '2025-12-01T16:30:00Z',
+    expected_date: null,
+    owner: '',
+    next_action: '',
   },
   {
     id: 'ord-006',
@@ -402,6 +417,9 @@ export const sampleOrders: Order[] = [
     total_with_vat: 2178,
     created_at: '2025-04-15T09:00:00Z',
     updated_at: '2025-05-01T11:00:00Z',
+    expected_date: null,
+    owner: '',
+    next_action: '',
   },
 ];
 

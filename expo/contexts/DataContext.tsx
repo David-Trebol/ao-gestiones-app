@@ -28,6 +28,9 @@ function normalizeOrder(row: any): Order {
     items: row.items ?? [],
     shipping_items: row.shipping_items ?? [],
     custom_reference: row.custom_reference ?? '',
+    expected_date: row.expected_date ?? null,
+    owner: row.owner ?? '',
+    next_action: row.next_action ?? '',
   } as Order;
 }
 
@@ -175,6 +178,9 @@ export const [DataProvider, useData] = createContextHook(() => {
       year: formData.year,
       status: formData.status,
       customer: formData.customer,
+      expected_date: formData.expected_date || null,
+      owner: (formData.owner ?? '').trim(),
+      next_action: (formData.next_action ?? '').trim(),
       ...computeTotals(formData),
       created_at: now,
       updated_at: now,
@@ -198,6 +204,9 @@ export const [DataProvider, useData] = createContextHook(() => {
       year: formData.year,
       status: formData.status,
       customer: formData.customer,
+      expected_date: formData.expected_date || null,
+      owner: (formData.owner ?? '').trim(),
+      next_action: (formData.next_action ?? '').trim(),
       ...computeTotals(formData),
     };
 
@@ -260,6 +269,9 @@ export const [DataProvider, useData] = createContextHook(() => {
       // Una copia empieza como pedido nuevo: pendiente y sin factura/recibo
       status: 'pending',
       customer: { ...original.customer, numero_factura: '', numero_recibo: '' },
+      // Se mantiene el responsable; la fecha prevista y la siguiente acción son del pedido original
+      expected_date: null,
+      next_action: '',
       created_at: now,
       updated_at: now,
     }, code, year);

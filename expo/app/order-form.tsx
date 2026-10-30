@@ -26,6 +26,9 @@ import * as DocumentPicker from 'expo-document-picker';
 import { cardShadow, webInputReset } from '@/constants/theme';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import DocumentReview from '@/components/DocumentReview';
+import DateField from '@/components/DateField';
+import { useAuth } from '@/contexts/AuthContext';
+import { formatISODate, todayISO } from '@/utils/orderFilters';
 import { DOC_READ_SUPPORTED, DocReadError, readDocument, releaseReader, type ReadInput } from '@/utils/docread/read';
 import { applyReview, buildReview, type ReviewState } from '@/utils/docread/review';
 import type { ParsedDoc, ReadResult } from '@/utils/docread/types';
@@ -105,6 +108,9 @@ export default function OrderFormScreen() {
     custom_reference: '',
     items: [{ ...emptyItem }],
     shipping_items: [],
+    expected_date: null,
+    owner: '',
+    next_action: '',
   });
 
   const [selectedManufacturerIndex, setSelectedManufacturerIndex] = useState<number>(-1);
@@ -153,6 +159,9 @@ export default function OrderFormScreen() {
         status: editingOrder.status,
         shipping_cost: editingOrder.shipping_cost,
         custom_reference: editingOrder.custom_reference,
+        expected_date: editingOrder.expected_date ?? null,
+        owner: editingOrder.owner ?? '',
+        next_action: editingOrder.next_action ?? '',
         items: editingOrder.items.map(item => ({
           product_name: item.product_name,
           quantity: item.quantity,
@@ -351,6 +360,17 @@ export default function OrderFormScreen() {
   }, [formData.customer.email]);
   const errorCount = Object.keys(errors).length;
   const err = (k: string) => (showErrors ? errors[k] : undefined);
+
+  // Responsables: usuarios de la app + nombres ya usados en otros pedidos
+  const { users, currentUser } = useAuth();
+  const ownerOptions = useMemo(() => {
+    const names = new Set<string>();
+    if (currentUser?.displayName) names.add(currentUser.displayName);
+    users.forEach(u => u.active && u.displayName && names.add(u.displayName));
+    orders.forEach(o => o.owner?.trim() && names.add(o.owner.trim()));
+    return Array.from(names).sort((a, b) => a.localeCompare(b, 'es'));
+  }, [users, currentUser, orders]);
+  const expectedLate = !!formData.expected_date && formData.expected_date < todayISO() && formData.status !== 'delivered' && formData.status !== 'cancelled';
 
   // Autocompletar cliente con pedidos anteriores
   const [empresaFocused, setEmpresaFocused] = useState(false);
@@ -574,6 +594,37 @@ export default function OrderFormScreen() {
                 </View>
               </FormSection>
 
+              <FormSection title="Seguimiento" subtitle="Opcional · sirve para avisar de pedidos retrasados en el inicio">
+                <View style={[styles.fieldRow, { flexWrap: 'wrap' }]}>
+                  <DateField
+                    label="Fecha prevista"
+                    value={formData.expected_date}
+                    onChange={d => setFormData(prev => ({ ...prev, expected_date: d }))}
+                    tone={expectedLate ? 'danger' : 'normal'}
+                    hint={expectedLate ? `Ya ha pasado (${formatISODate(formData.expected_date)}): aparecerá como retrasado.` : undefined}
+                  />
+                  <View style={{ flex: 1, minWidth: 150 }}>
+                    <FormField label="Responsable" value={formData.owner} onChangeText={v => setFormData(prev => ({ ...prev, owner: v }))} placeholder="Quién lo lleva" autoCapitalize="words" />
+                  </View>
+                </View>
+                {ownerOptions.length > 0 && (
+                  <View style={[styles.chipWrap, { marginTop: -4 }]}>
+                    {ownerOptions.slice(0, 6).map(n => (
+                      <Pressable
+                        key={n}
+                        onPress={() => setFormData(prev => ({ ...prev, owner: prev.owner === n ? '' : n }))}
+                        style={[styles.chipSmall, { backgroundColor: formData.owner === n ? colors.primarySoftAlt : colors.fill }]}
+                        accessibilityRole="button"
+                        accessibilityState={{ selected: formData.owner === n }}
+                        accessibilityLabel={`Responsable: ${n}`}
+                      >
+                        <Text style={[styles.chipSmallText, { color: formData.owner === n ? colors.primary : colors.textSecondary }]}>{n}</Text>
+                      </Pressable>
+                    ))}
+                  </View>
+                )}
+                <FormField label="Siguiente acción" value={formData.next_action} onChangeText={v => setFormData(prev => ({ ...prev, next_action: v }))} placeholder="Ej.: confirmar fecha de envío con el fabricante" multiline={formData.next_action.length > 50} />
+              </FormSection>
               {isDesktop && documentsSection}
             </View>
 
@@ -968,6 +1019,8 @@ const styles = StyleSheet.create({
   },
   legend: { fontSize: 13, marginBottom: 12, paddingHorizontal: 4 },
   chipWrap: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 14 },
+  chipSmall: { minHeight: 32, paddingHorizontal: 12, borderRadius: 999, justifyContent: 'center' },
+  chipSmallText: { fontSize: 13, fontWeight: '500' as const },
   help: { fontSize: 12, lineHeight: 16 },
   errorText: { fontSize: 12, marginTop: -8, marginBottom: 12 },
   suggestions: { position: 'absolute', top: 72, left: 0, right: 0, borderRadius: 12, borderWidth: StyleSheet.hairlineWidth, overflow: 'hidden', zIndex: 20, ...(Platform.OS === 'web' ? ({ boxShadow: '0 8px 28px rgba(0,0,0,0.14)' } as object) : { elevation: 6 }) },

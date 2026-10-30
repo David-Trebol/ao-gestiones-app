@@ -11,6 +11,7 @@ import StatusBadge, { STATUS_ORDER, statusConfig } from '@/components/StatusBadg
 import SelectSheet from '@/components/SelectSheet';
 import type { OrderStatus } from '@/types';
 import { formatCurrency, formatDate } from '@/utils/calculations';
+import { formatISODate, overdueDays } from '@/utils/orderFilters';
 
 type Sheet = 'more' | 'status' | null;
 
@@ -121,6 +122,7 @@ export default function OrderDetailScreen() {
     );
   }
 
+  const late = overdueDays(order);
   const shipLines = order.shipping_items ?? [];
   const shipTotal = shipLines.reduce((a, x) => a + (x.valor_con_iva || 0), 0);
   const profit = order.items.reduce((a, i) => a + (i.beneficio_bruto || 0), 0);
@@ -204,6 +206,22 @@ export default function OrderDetailScreen() {
         <Meta s={s} label="Año" value={String(order.year)} />
         <Meta s={s} label="Creado" value={formatDate(order.created_at)} />
         <Meta s={s} label="Última actualización" value={formatDate(order.updated_at)} />
+      </View>
+
+      <View style={[s.follow, late !== null && late > 0 && { backgroundColor: colors.errorBg, borderColor: colors.errorBorder }]}>
+        <Text style={s.caption}>Seguimiento</Text>
+        {order.expected_date || order.owner || order.next_action ? (
+          <View style={s.followGrid}>
+            <Meta s={s} label="Fecha prevista" value={order.expected_date ? `${formatISODate(order.expected_date)}${late !== null ? (late > 0 ? ` · ${late} día${late === 1 ? '' : 's'} de retraso` : ' · es hoy') : ''}` : '—'} tone={late !== null && late > 0 ? colors.error : undefined} />
+            <Meta s={s} label="Responsable" value={order.owner || '—'} />
+            <View style={[s.meta, { flexBasis: '100%' }]}>
+              <Text style={s.caption}>Siguiente acción</Text>
+              <Text style={s.metaValue}>{order.next_action || '—'}</Text>
+            </View>
+          </View>
+        ) : (
+          <Text style={[s.muted, { marginTop: 2 }]}>Sin fecha prevista, responsable ni siguiente acción. Puedes añadirlos en «Editar pedido».</Text>
+        )}
       </View>
 
       <View style={s.actions}>
@@ -402,11 +420,11 @@ export default function OrderDetailScreen() {
   );
 }
 
-function Meta({ s, label, value }: { s: Styles; label: string; value: string }) {
+function Meta({ s, label, value, tone }: { s: Styles; label: string; value: string; tone?: string }) {
   return (
     <View style={s.meta}>
       <Text style={s.caption}>{label}</Text>
-      <Text style={s.metaValue}>{value}</Text>
+      <Text style={[s.metaValue, tone ? { color: tone, fontWeight: '600' } : null]}>{value}</Text>
     </View>
   );
 }
@@ -468,6 +486,8 @@ function makeStyles(c: ThemeColors) {
     meta: { flexGrow: 1, flexBasis: 150, minWidth: 0 },
     metaValue: { fontSize: 15, color: c.text, marginTop: 2 },
     actions: { flexDirection: 'row', gap: 8, flexWrap: 'wrap' },
+    follow: { borderRadius: radius.md, padding: 12, backgroundColor: c.surfaceAlt, borderWidth: 1, borderColor: 'transparent' },
+    followGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 12, marginTop: 6 },
     btn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, minHeight: 44, paddingHorizontal: 16, borderRadius: radius.pill },
     btnSecondary: { backgroundColor: c.fill },
     btnIcon: { width: 44, paddingHorizontal: 0 },
