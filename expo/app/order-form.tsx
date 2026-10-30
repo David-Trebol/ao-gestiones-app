@@ -86,7 +86,7 @@ export default function OrderFormScreen() {
   }>();
   const router = useRouter();
   const { orders, manufacturers, addOrder, updateOrder } = useData();
-  const { width } = useWindowDimensions();
+  const { width, height } = useWindowDimensions();
   const isDesktop = width >= 1024;
   const contentMaxWidth = isDesktop ? 1040 : width;
   const insets = useSafeAreaInsets();
@@ -756,7 +756,7 @@ export default function OrderFormScreen() {
                 </Text>
               ) : (
                 <>
-                  <Text style={[styles.saveBarLabel, { color: colors.textSecondary }]}>Total con IVA</Text>
+                  {height >= 500 && <Text style={[styles.saveBarLabel, { color: colors.textSecondary }]}>Total con IVA</Text>}
                   <Text style={[styles.saveBarTotal, { color: colors.text }]}>{formatCurrency(totals.grandTotal)}</Text>
                 </>
               )}

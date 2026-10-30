@@ -222,7 +222,7 @@ export default function ManufacturersScreen() {
                     return (
                       <View
                         key={year}
-                        style={[styles.yearBadge, onlyOrders ? { backgroundColor: 'transparent', borderColor: colors.border, borderStyle: 'dashed' } : { backgroundColor: colors.primarySoft, borderColor: colors.primarySoftAlt }]}
+                        style={[styles.yearBadge, onlyOrders ? { backgroundColor: colors.fill, borderColor: colors.fill } : { backgroundColor: colors.primarySoft, borderColor: colors.primarySoftAlt }]}
                         accessibilityLabel={onlyOrders ? `${year}: tiene pedidos, sin asignar` : `${year}: asignado`}
                       >
                         <Text style={[styles.yearBadgeText, { color: onlyOrders ? colors.textSecondary : colors.primary }]}>{year}</Text>
@@ -259,7 +259,7 @@ export default function ManufacturersScreen() {
         <Animated.View style={[styles.headerBar, { opacity: headerFade, transform: [{ translateY: headerSlide }, { scale: headerScale }] }]}>
           <View style={{ flex: 1, minWidth: 0, paddingRight: 12 }}>
             <Text style={[styles.headerTitle, { color: colors.text }]}>Fabricantes</Text>
-            <Text style={[styles.headerSubtitle, { color: colors.textSecondary }]}>{manufacturers.length} fabricante{manufacturers.length !== 1 ? 's' : ''} · años en naranja: asignados; con borde discontinuo: tienen pedidos pero no están asignados</Text>
+            <Text style={[styles.headerSubtitle, { color: colors.textSecondary }]}>{manufacturers.length} fabricante{manufacturers.length !== 1 ? 's' : ''} · años en naranja: asignados · en gris: con pedidos, sin asignar</Text>
           </View>
           <Pressable
             style={({ pressed }) => [styles.createBtn, { backgroundColor: colors.primary, opacity: pressed ? 0.8 : 1 }]}
