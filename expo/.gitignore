@@ -45,3 +45,6 @@ rork-eslint.config.js
 core
 node_modules
 .expo
+# Núcleo del OCR (no confundir con volcados "core")
+!public/vendor/tesseract/core/
+!public/vendor/tesseract/core/**
