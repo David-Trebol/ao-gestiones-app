@@ -1,5 +1,6 @@
 import React, { useState, useCallback, useRef, useEffect } from 'react';
-import { NATIVE_DRIVER } from '@/constants/animation';
+import { NATIVE_DRIVER, enterAnimation, motion } from '@/constants/animation';
+import { cardShadow, radius, type, webInputReset } from '@/constants/theme';
 import {
   View,
   Text,
@@ -17,7 +18,7 @@ import {
   Easing,
 } from 'react-native';
 import { useRouter } from 'expo-router';
-import { FolderOpen, Building2, FileText, ChevronRight, Home, Plus, ChevronLeft, Copy } from 'lucide-react-native';
+import { FolderOpen, Building2, ChevronRight, Home, Plus, ChevronLeft, Copy } from 'lucide-react-native';
 import { useTheme } from '@/contexts/ThemeContext';
 import { useData } from '@/contexts/DataContext';
 import FolderCard from '@/components/FolderCard';
@@ -34,8 +35,8 @@ export default function HomeScreen() {
   const { colors, isDark } = useTheme();
   const isDesktop = width >= 1024;
   const isTablet = width >= 768 && width < 1024;
-  const contentMaxWidth = isDesktop ? 960 : isTablet ? 720 : width;
-  const gridColumns = isDesktop ? 4 : isTablet ? 3 : 2;
+  const contentMaxWidth = isDesktop ? 1120 : isTablet ? 760 : width;
+  const gridColumns = isDesktop ? 4 : isTablet ? 3 : width >= 360 ? 2 : 1;
 
   const {
     orders,
@@ -59,38 +60,29 @@ export default function HomeScreen() {
   const [yearInput, setYearInput] = useState(String(new Date().getFullYear()));
 
   const fadeAnim = useRef(new Animated.Value(0)).current;
-  const slideAnim = useRef(new Animated.Value(50)).current;
-  const fabScale = useRef(new Animated.Value(0)).current;
+  const slideAnim = useRef(new Animated.Value(12)).current;
+  const fabScale = useRef(new Animated.Value(0.9)).current;
   const fabRotate = useRef(new Animated.Value(0)).current;
   const modalScale = useRef(new Animated.Value(0.7)).current;
   const modalOpacity = useRef(new Animated.Value(0)).current;
   const modalSlide = useRef(new Animated.Value(40)).current;
   const titleScale = useRef(new Animated.Value(0.8)).current;
 
+  // Entrada suave y corta (estilo Apple): aparece y sube 12 px; el botón flotante crece desde el 90 %
   useEffect(() => {
-    Animated.stagger(100, [
-      Animated.parallel([
-        Animated.spring(fadeAnim, { toValue: 1, friction: 5, tension: 40, useNativeDriver: NATIVE_DRIVER }),
-        Animated.spring(slideAnim, { toValue: 0, friction: 6, tension: 50, useNativeDriver: NATIVE_DRIVER }),
-      ]),
-      Animated.spring(titleScale, { toValue: 1, friction: 4, tension: 60, useNativeDriver: NATIVE_DRIVER }),
-      Animated.parallel([
-        Animated.spring(fabScale, { toValue: 1, friction: 4, tension: 50, useNativeDriver: NATIVE_DRIVER }),
-        Animated.spring(fabRotate, { toValue: 1, friction: 5, tension: 60, useNativeDriver: NATIVE_DRIVER }),
-      ]),
+    titleScale.setValue(1);
+    fabRotate.setValue(1);
+    Animated.parallel([
+      enterAnimation(fadeAnim, slideAnim),
+      Animated.timing(fabScale, { toValue: 1, duration: motion.slow, delay: 150, easing: motion.easeOut, useNativeDriver: NATIVE_DRIVER }),
     ]).start();
   }, [fabRotate, fabScale, fadeAnim, slideAnim, titleScale]);
 
   const animateViewChange = useCallback(() => {
     fadeAnim.setValue(0);
-    slideAnim.setValue(40);
-    titleScale.setValue(0.85);
-    Animated.parallel([
-      Animated.spring(fadeAnim, { toValue: 1, friction: 6, tension: 50, useNativeDriver: NATIVE_DRIVER }),
-      Animated.spring(slideAnim, { toValue: 0, friction: 6, tension: 50, useNativeDriver: NATIVE_DRIVER }),
-      Animated.spring(titleScale, { toValue: 1, friction: 5, tension: 60, useNativeDriver: NATIVE_DRIVER }),
-    ]).start();
-  }, [fadeAnim, slideAnim, titleScale]);
+    slideAnim.setValue(12);
+    enterAnimation(fadeAnim, slideAnim).start();
+  }, [fadeAnim, slideAnim]);
 
   useEffect(() => {
     if (yearModalOpen) {
@@ -313,8 +305,8 @@ export default function HomeScreen() {
       <>
         <Animated.View style={{ transform: [{ scale: titleScale }] }}>
           <SectionHeader
-            title="Pedidos por Año"
-            subtitle="Selecciona un año para ver los fabricantes"
+            title="Pedidos"
+            subtitle="Elige un año para ver sus fabricantes y pedidos"
             actionLabel="Añadir"
             onAction={handleAddYear}
           />
@@ -328,11 +320,11 @@ export default function HomeScreen() {
             return (
               <AnimatedGridItem key={year} index={index} width={gridItemWidth}>
                 <FolderCard
-                  icon={<FolderOpen size={22} color={colors.primary} />}
+                  icon={<FolderOpen size={20} color={colors.primary} strokeWidth={2} />}
                   title={String(year)}
                   badges={[
                     { label: `${yearOrders.length} pedido${yearOrders.length !== 1 ? 's' : ''}`, color: colors.accent },
-                    { label: `${manufacturersForYear.length} fab.`, color: colors.primary },
+                    { label: `${manufacturersForYear.length} fabricante${manufacturersForYear.length !== 1 ? 's' : ''}`, color: colors.primary },
                   ]}
                   totalLabel="Total"
                   totalValue={formatCurrency(totalAmount)}
@@ -365,8 +357,8 @@ export default function HomeScreen() {
     return (
       <>
         <SectionHeader
-          title={`Fabricantes en ${selectedYear}`}
-          subtitle="Selecciona un fabricante para ver sus pedidos"
+          title={String(selectedYear)}
+          subtitle="Elige un fabricante para ver sus pedidos"
         />
         <View style={styles.grid}>
           {manufacturersForYear.map((manufacturer, index) => {
@@ -376,7 +368,7 @@ export default function HomeScreen() {
             return (
               <AnimatedGridItem key={manufacturer.id} index={index} width={gridItemWidth}>
                 <FolderCard
-                  icon={<Building2 size={22} color={colors.primary} />}
+                  icon={<Building2 size={20} color={colors.primary} strokeWidth={2} />}
                   title={manufacturer.name}
                   subtitle={manufacturer.code}
                   badges={[
@@ -413,8 +405,8 @@ export default function HomeScreen() {
     return (
       <>
         <SectionHeader
-          title="Pedidos"
-          subtitle="Toca un pedido para ver los detalles"
+          title={selectedManufacturer.name}
+          subtitle={`${filteredOrders.length} ${filteredOrders.length === 1 ? 'pedido' : 'pedidos'} en ${selectedYear}`}
           actionLabel="Nuevo"
           onAction={() => router.push(`/order-form?manufacturerId=${selectedManufacturer.id}&year=${selectedYear}` as any)}
         />
@@ -440,7 +432,7 @@ export default function HomeScreen() {
       {currentView !== 'years' && (
         <View style={{ maxWidth: contentMaxWidth, alignSelf: 'center' as const, width: '100%' as any }}>
           <Pressable style={({ pressed }) => [styles.backButton, { opacity: pressed ? 0.7 : 1 }]} onPress={navigateBack}>
-            <ChevronLeft size={20} color={colors.primary} />
+            <ChevronLeft size={22} color={colors.primary} strokeWidth={2.2} />
             <Text style={[styles.backButtonText, { color: colors.primary }]}>Atrás</Text>
           </Pressable>
         </View>
@@ -465,18 +457,14 @@ export default function HomeScreen() {
       {currentView === 'years' && (
         <Animated.View style={{ transform: [{ scale: fabScale }, { rotate: fabSpin }] }}>
           <Pressable
-            style={({ pressed }) => [styles.fab, { backgroundColor: colors.accent, shadowColor: colors.accent, transform: [{ scale: pressed ? 0.85 : 1 }] }, isDesktop && styles.fabDesktop]}
+            style={({ pressed }) => [styles.fab, { backgroundColor: colors.primary, opacity: pressed ? 0.85 : 1 }, isDesktop && styles.fabDesktop]}
             onPress={() => { void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium); router.push('/order-form' as any); }}
+            accessibilityRole="button"
+            accessibilityLabel="Nuevo pedido"
             testID="new-order-fab"
           >
-            {isDesktop ? (
-              <>
-                <Plus size={18} color="#FFFFFF" />
-                <Text style={styles.fabText}>Nuevo Pedido</Text>
-              </>
-            ) : (
-              <Plus size={24} color="#FFFFFF" />
-            )}
+            <Plus size={isDesktop ? 18 : 20} color="#FFFFFF" strokeWidth={2.5} />
+            <Text style={styles.fabText}>Nuevo pedido</Text>
           </Pressable>
         </Animated.View>
       )}
@@ -514,28 +502,15 @@ export default function HomeScreen() {
 }
 
 function AnimatedGridItem({ children, index, width }: { children: React.ReactNode; index: number; width: number }) {
-  const anim = useRef(new Animated.Value(0)).current;
-  const slideY = useRef(new Animated.Value(60)).current;
-  const scaleVal = useRef(new Animated.Value(0.8)).current;
-  const rotateVal = useRef(new Animated.Value(0)).current;
+  const opacity = useRef(new Animated.Value(0)).current;
+  const translateY = useRef(new Animated.Value(12)).current;
 
   useEffect(() => {
-    const delay = Math.min(index * 100, 500);
-    Animated.parallel([
-      Animated.spring(anim, { toValue: 1, friction: 5, tension: 40, delay, useNativeDriver: NATIVE_DRIVER }),
-      Animated.spring(slideY, { toValue: 0, friction: 5, tension: 40, delay, useNativeDriver: NATIVE_DRIVER }),
-      Animated.spring(scaleVal, { toValue: 1, friction: 4, tension: 50, delay, useNativeDriver: NATIVE_DRIVER }),
-      Animated.timing(rotateVal, { toValue: 1, duration: 500, delay, easing: Easing.out(Easing.back(1.5)), useNativeDriver: NATIVE_DRIVER }),
-    ]).start();
-  }, [anim, index, rotateVal, scaleVal, slideY]);
-
-  const rotate = rotateVal.interpolate({
-    inputRange: [0, 0.5, 1],
-    outputRange: ['-3deg', '1deg', '0deg'],
-  });
+    enterAnimation(opacity, translateY, index).start();
+  }, [opacity, translateY, index]);
 
   return (
-    <Animated.View style={[styles.gridItem, { width, opacity: anim, transform: [{ translateY: slideY }, { scale: scaleVal }, { rotate }] }]}>
+    <Animated.View style={[styles.gridItem, { width, opacity, transform: [{ translateY }] }]}>
       {children}
     </Animated.View>
   );
@@ -543,74 +518,57 @@ function AnimatedGridItem({ children, index, width }: { children: React.ReactNod
 
 const OrderCard = React.memo(function OrderCard({ order, onPress, onDuplicate, colors, isDark }: { order: Order; onPress: () => void; onDuplicate: () => void; colors: any; isDark: boolean }) {
   const scaleAnim = useRef(new Animated.Value(1)).current;
-  const glowAnim = useRef(new Animated.Value(0)).current;
-
-  useEffect(() => {
-    Animated.loop(
-      Animated.sequence([
-        Animated.timing(glowAnim, { toValue: 1, duration: 2000, easing: Easing.inOut(Easing.sin), useNativeDriver: NATIVE_DRIVER }),
-        Animated.timing(glowAnim, { toValue: 0, duration: 2000, easing: Easing.inOut(Easing.sin), useNativeDriver: NATIVE_DRIVER }),
-      ])
-    ).start();
-  }, [glowAnim]);
-
-  const glowOpacity = glowAnim.interpolate({
-    inputRange: [0, 1],
-    outputRange: [0.05, isDark ? 0.14 : 0.1],
-  });
+  const pressTo = (toValue: number) =>
+    Animated.timing(scaleAnim, { toValue, duration: motion.fast, easing: motion.easeOut, useNativeDriver: NATIVE_DRIVER }).start();
 
   return (
     <Animated.View style={{ transform: [{ scale: scaleAnim }] }}>
       <Pressable
         onPress={onPress}
-        onPressIn={() => Animated.spring(scaleAnim, { toValue: 0.92, friction: 5, useNativeDriver: NATIVE_DRIVER }).start()}
-        onPressOut={() => Animated.spring(scaleAnim, { toValue: 1, friction: 3, tension: 100, useNativeDriver: NATIVE_DRIVER }).start()}
+        onPressIn={() => pressTo(0.97)}
+        onPressOut={() => pressTo(1)}
         onLongPress={onDuplicate}
         delayLongPress={600}
-        style={[styles.orderCard, { backgroundColor: colors.surfaceElevated, borderColor: colors.borderLight, shadowColor: colors.cardShadow }]}
+        accessibilityRole="button"
+        accessibilityLabel={`Pedido ${order.reference_number}, ${order.customer.nombre_empresa}, ${formatCurrency(order.total_with_vat)}`}
+        style={({ hovered }: any) => [
+          styles.orderCard,
+          { backgroundColor: hovered && isDark ? colors.surfaceAlt : colors.surface },
+          cardShadow(isDark),
+          Platform.OS === 'web' && hovered && !isDark && ({ boxShadow: '0 2px 4px rgba(0,0,0,0.05), 0 12px 28px rgba(0,0,0,0.08)' } as any),
+        ]}
         testID={`order-card-${order.id}`}
       >
-        <Animated.View style={[StyleSheet.absoluteFill, { backgroundColor: colors.primary, opacity: glowOpacity, borderRadius: 18 }]} />
         <View style={styles.orderCardHeader}>
-          <View style={[styles.orderIconWrap, { backgroundColor: colors.primarySoft }]}>
-            <FileText size={17} color={colors.primary} />
-          </View>
-          <View style={styles.orderCardHeaderRight}>
-            <Pressable
-              onPress={onDuplicate}
-              hitSlop={8}
-              style={({ pressed }) => [styles.duplicateBtn, { backgroundColor: colors.primarySoft, transform: [{ scale: pressed ? 0.85 : 1 }] }]}
-            >
-              <Copy size={12} color={colors.primary} />
-            </Pressable>
-            <StatusBadge status={order.status} size="sm" />
-          </View>
+          <StatusBadge status={order.status} size="sm" />
+          <Pressable
+            onPress={onDuplicate}
+            hitSlop={8}
+            accessibilityLabel={`Duplicar pedido ${order.reference_number}`}
+            style={({ pressed }) => [styles.duplicateBtn, { backgroundColor: colors.fill, opacity: pressed ? 0.6 : 1 }]}
+          >
+            <Copy size={13} color={colors.textSecondary} />
+          </Pressable>
         </View>
 
-        <Text style={[styles.orderRefLabel, { color: colors.textTertiary }]}>Referencia</Text>
         <Text style={[styles.orderRef, { color: colors.text }]} numberOfLines={1}>{order.reference_number}</Text>
-
+        <Text style={[styles.orderCustomer, { color: colors.textSecondary }]} numberOfLines={1}>
+          {order.customer.nombre_empresa || 'Sin cliente'}
+        </Text>
         {order.custom_reference ? (
-          <View style={[styles.orderCustomRefRow, { backgroundColor: colors.primarySoft, borderLeftColor: colors.accent }]}>
-            <Text style={[styles.orderCustomRefLabel, { color: colors.textTertiary }]}>Ref. Manual</Text>
-            <Text style={[styles.orderCustomRefValue, { color: colors.primary }]} numberOfLines={1}>{order.custom_reference}</Text>
-          </View>
+          <Text style={[styles.orderCustomRefValue, { color: colors.textTertiary }]} numberOfLines={1}>
+            Ref. {order.custom_reference}
+          </Text>
         ) : null}
 
-        <Text style={[styles.orderCustomer, { color: colors.textSecondary }]} numberOfLines={1}>
-          {order.customer.nombre_empresa}
-        </Text>
-
         <View style={[styles.orderTotalRow, { borderTopColor: colors.divider }]}>
-          <Text style={[styles.orderTotalLabel, { color: colors.textTertiary }]}>Total</Text>
-          <Text style={[styles.orderTotalValue, { color: colors.text }]}>{formatCurrency(order.total_with_vat)}</Text>
-        </View>
-
-        <View style={[styles.orderFooter, { borderTopColor: colors.divider }]}>
-          <Text style={[styles.orderDate, { color: colors.textTertiary }]}>{formatDate(order.created_at)}</Text>
-          <View style={[styles.orderProductsBadge, { backgroundColor: colors.surfaceAlt }]}>
-            <Text style={[styles.orderProductsText, { color: colors.textSecondary }]}>{order.items.length} prod.</Text>
+          <View>
+            <Text style={[styles.orderTotalLabel, { color: colors.textTertiary }]}>
+              {formatDate(order.created_at)} · {order.items.length} {order.items.length === 1 ? 'producto' : 'productos'}
+            </Text>
+            <Text style={[styles.orderTotalValue, { color: colors.text }]}>{formatCurrency(order.total_with_vat)}</Text>
           </View>
+          <ChevronRight size={18} color={colors.textTertiary} />
         </View>
       </Pressable>
     </Animated.View>
@@ -628,28 +586,29 @@ const styles = StyleSheet.create({
   },
   loadingText: {
     marginTop: 12,
-    fontSize: 15,
+    ...type.callout,
   },
   backButton: {
     flexDirection: 'row',
     alignItems: 'center',
     alignSelf: 'flex-start',
-    paddingHorizontal: 20,
-    paddingTop: 12,
-    paddingBottom: 4,
-    gap: 4,
+    paddingHorizontal: 14,
+    paddingTop: 10,
+    paddingBottom: 0,
+    gap: 2,
   },
   backButtonText: {
-    fontSize: 15,
-    fontWeight: '600' as const,
+    fontSize: 17,
+    fontWeight: '400' as const,
+    letterSpacing: -0.3,
   },
   breadcrumbs: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
     paddingHorizontal: 20,
-    paddingTop: 8,
-    paddingBottom: 14,
+    paddingTop: 4,
+    paddingBottom: 4,
     flexWrap: 'wrap',
   },
   breadcrumbItem: {
@@ -658,46 +617,34 @@ const styles = StyleSheet.create({
     gap: 4,
   },
   breadcrumbText: {
-    fontSize: 13,
-    fontWeight: '500' as const,
+    ...type.footnote,
   },
   breadcrumbActiveFW: {
-    fontWeight: '700' as const,
+    fontWeight: '600' as const,
   },
   scrollView: {
     flex: 1,
   },
   scrollContent: {
     paddingHorizontal: 20,
-    paddingTop: 6,
-    paddingBottom: 100,
+    paddingTop: 16,
+    paddingBottom: 120,
   },
   grid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    alignItems: 'stretch',
     gap: 12,
   },
-  gridItem: {
-    flexGrow: 0,
-    minWidth: 155,
-  },
+  gridItem: {},
   orderCard: {
-    borderRadius: 18,
+    borderRadius: radius.xl,
     padding: 16,
-    minHeight: 188,
-    justifyContent: 'space-between',
-    borderWidth: 1,
-    shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 1,
-    shadowRadius: 16,
-    elevation: 4,
-    overflow: 'hidden',
+    ...(Platform.OS === 'web' ? ({ cursor: 'pointer', transitionProperty: 'box-shadow, background-color', transitionDuration: '200ms' } as any) : {}),
   },
   orderCardHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    alignItems: 'flex-start',
+    alignItems: 'center',
     marginBottom: 12,
   },
   orderCardHeaderRight: {
@@ -706,174 +653,139 @@ const styles = StyleSheet.create({
     gap: 6,
   },
   duplicateBtn: {
-    width: 28,
-    height: 28,
-    borderRadius: 8,
+    width: 30,
+    height: 30,
+    borderRadius: radius.pill,
     alignItems: 'center',
     justifyContent: 'center',
   },
   orderIconWrap: {
-    width: 36,
-    height: 36,
-    borderRadius: 11,
+    width: 34,
+    height: 34,
+    borderRadius: radius.sm,
     alignItems: 'center',
     justifyContent: 'center',
   },
   orderRefLabel: {
-    fontSize: 10,
-    textTransform: 'uppercase' as const,
-    letterSpacing: 0.5,
+    ...type.caption,
   },
   orderRef: {
-    fontSize: 13,
-    fontWeight: '800' as const,
-    marginBottom: 6,
-    fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace',
-  },
-  orderCustomRefRow: {
-    borderRadius: 8,
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-    marginBottom: 8,
-    borderLeftWidth: 3,
-  },
-  orderCustomRefLabel: {
-    fontSize: 9,
-    fontWeight: '600' as const,
-    textTransform: 'uppercase' as const,
-    letterSpacing: 0.5,
+    ...type.headline,
+    fontVariant: ['tabular-nums'],
     marginBottom: 2,
   },
+  orderCustomRefRow: {},
+  orderCustomRefLabel: {},
   orderCustomRefValue: {
-    fontSize: 12,
-    fontWeight: '700' as const,
+    ...type.caption,
+    marginTop: 2,
   },
   orderCustomer: {
-    fontSize: 13,
-    fontWeight: '600' as const,
-    marginBottom: 10,
+    ...type.subhead,
   },
   orderTotalRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingTop: 10,
-    borderTopWidth: 1,
+    alignItems: 'flex-end',
+    marginTop: 14,
+    paddingTop: 12,
+    borderTopWidth: StyleSheet.hairlineWidth,
   },
   orderTotalLabel: {
-    fontSize: 11,
+    ...type.caption,
+    fontWeight: '400' as const,
+    marginBottom: 2,
   },
   orderTotalValue: {
-    fontSize: 16,
-    fontWeight: '800' as const,
-    letterSpacing: -0.3,
+    ...type.title3,
+    fontVariant: ['tabular-nums'],
   },
-  orderFooter: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginTop: 12,
-    paddingTop: 10,
-    borderTopWidth: 1,
-  },
-  orderDate: {
-    fontSize: 11,
-  },
-  orderProductsBadge: {
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-    borderRadius: 6,
-  },
-  orderProductsText: {
-    fontSize: 11,
-    fontWeight: '600' as const,
-  },
+  orderFooter: {},
+  orderDate: {},
+  orderProductsBadge: {},
+  orderProductsText: {},
   fab: {
     position: 'absolute',
     right: 20,
-    bottom: 20,
-    width: 58,
-    height: 58,
-    borderRadius: 18,
-    justifyContent: 'center',
+    bottom: 24,
+    flexDirection: 'row',
     alignItems: 'center',
-    shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 0.3,
-    shadowRadius: 12,
-    elevation: 8,
+    gap: 6,
+    paddingHorizontal: 20,
+    height: 50,
+    borderRadius: radius.pill,
+    ...(Platform.OS === 'web'
+      ? ({ boxShadow: '0 8px 24px rgba(194,65,12,0.28), 0 2px 6px rgba(0,0,0,0.12)', cursor: 'pointer' } as any)
+      : { shadowColor: '#C2410C', shadowOpacity: 0.3, shadowRadius: 16, shadowOffset: { width: 0, height: 8 }, elevation: 6 }),
   },
   fabDesktop: {
-    width: 'auto' as any,
-    height: 50,
-    flexDirection: 'row',
-    gap: 8,
-    paddingHorizontal: 26,
-    borderRadius: 14,
     right: 32,
     bottom: 32,
+    height: 46,
   },
   fabText: {
     color: '#FFFFFF',
-    fontWeight: '700' as const,
-    fontSize: 15,
+    fontSize: 16,
+    fontWeight: '600' as const,
+    letterSpacing: -0.2,
   },
   modalOverlay: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
     padding: 24,
+    ...(Platform.OS === 'web' ? ({ backdropFilter: 'blur(6px)', WebkitBackdropFilter: 'blur(6px)' } as any) : {}),
   },
   modalContent: {
-    borderRadius: 24,
-    padding: 28,
-    width: '100%' as any,
+    width: '100%',
     maxWidth: 380,
+    borderRadius: radius.xl,
+    padding: 22,
   },
   modalTitle: {
-    fontSize: 21,
-    fontWeight: '800' as const,
-    marginBottom: 4,
-    letterSpacing: -0.3,
+    ...type.title3,
+    marginBottom: 6,
   },
   modalSubtitle: {
-    fontSize: 14,
-    marginBottom: 20,
+    ...type.subhead,
+    marginBottom: 16,
   },
   modalInput: {
-    borderWidth: 1,
-    borderRadius: 14,
-    paddingHorizontal: 16,
-    paddingVertical: 14,
-    fontSize: 20,
-    fontWeight: '700' as const,
+    borderRadius: radius.md,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    fontSize: 22,
+    fontWeight: '600' as const,
     textAlign: 'center' as const,
+    letterSpacing: 1,
+    borderWidth: 1,
+    marginBottom: 18,
+    ...webInputReset,
   },
   modalActions: {
     flexDirection: 'row',
-    justifyContent: 'flex-end',
-    gap: 12,
-    marginTop: 24,
-    paddingTop: 18,
-    borderTopWidth: 1,
+    gap: 10,
   },
   modalCancelBtn: {
-    paddingHorizontal: 22,
+    flex: 1,
     paddingVertical: 12,
-    borderRadius: 12,
+    borderRadius: radius.md,
+    alignItems: 'center',
     borderWidth: 1,
   },
   modalCancelText: {
-    fontSize: 14,
+    fontSize: 16,
     fontWeight: '600' as const,
   },
   modalConfirmBtn: {
-    paddingHorizontal: 22,
+    flex: 1,
     paddingVertical: 12,
-    borderRadius: 12,
+    borderRadius: radius.md,
+    alignItems: 'center',
   },
   modalConfirmText: {
-    fontSize: 14,
-    fontWeight: '700' as const,
     color: '#FFFFFF',
+    fontSize: 16,
+    fontWeight: '600' as const,
   },
 });

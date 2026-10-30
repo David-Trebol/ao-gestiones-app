@@ -35,6 +35,7 @@ import { useTheme } from '@/contexts/ThemeContext';
 import { useData } from '@/contexts/DataContext';
 import { useAuth, AppUser } from '@/contexts/AuthContext';
 import { formatCurrency } from '@/utils/calculations';
+import { webInputReset } from '@/constants/theme';
 import * as Haptics from 'expo-haptics';
 
 export default function SettingsScreen() {
@@ -276,7 +277,7 @@ export default function SettingsScreen() {
             <Pressable
               style={({ pressed }) => [
                 styles.themeOption,
-                { borderColor: themeMode === 'light' ? colors.primary : colors.border, backgroundColor: themeMode === 'light' ? colors.primarySoft : colors.surface, transform: [{ scale: pressed ? 0.96 : 1 }] },
+                { borderColor: themeMode === 'light' ? colors.primary : colors.border, backgroundColor: themeMode === 'light' ? colors.primarySoft : colors.surfaceAlt, transform: [{ scale: pressed ? 0.96 : 1 }] },
               ]}
               onPress={() => handleSetTheme('light')}
             >
@@ -288,7 +289,7 @@ export default function SettingsScreen() {
             <Pressable
               style={({ pressed }) => [
                 styles.themeOption,
-                { borderColor: themeMode === 'dark' ? colors.primary : colors.border, backgroundColor: themeMode === 'dark' ? colors.primarySoft : colors.surface, transform: [{ scale: pressed ? 0.96 : 1 }] },
+                { borderColor: themeMode === 'dark' ? colors.primary : colors.border, backgroundColor: themeMode === 'dark' ? colors.primarySoft : colors.surfaceAlt, transform: [{ scale: pressed ? 0.96 : 1 }] },
               ]}
               onPress={() => handleSetTheme('dark')}
             >
@@ -326,32 +327,32 @@ export default function SettingsScreen() {
               <Text style={[styles.sectionTitle, { color: colors.text }]}>Resumen</Text>
 
               <View style={[styles.statsGrid, isCompact && styles.statsGridCompact]}>
-                <View style={[styles.statCard, isCompact && styles.statCardCompact, { backgroundColor: colors.primarySoft }]}>
-                  <View style={[styles.statIconWrap, { backgroundColor: colors.primarySoftAlt }]}>
+                <View style={[styles.statCard, isCompact && styles.statCardCompact, { backgroundColor: colors.surfaceAlt }]}>
+                  <View style={[styles.statIconWrap, { backgroundColor: colors.surface }]}>
                     <FileText size={19} color={colors.primary} />
                   </View>
                   <Text style={[styles.statValue, { color: colors.text }]}>{totalOrders}</Text>
                   <Text style={[styles.statLabel, { color: colors.textSecondary }]}>Pedidos</Text>
                 </View>
-                <View style={[styles.statCard, isCompact && styles.statCardCompact, { backgroundColor: colors.accentSoft }]}>
-                  <View style={[styles.statIconWrap, { backgroundColor: colors.accentSoft }]}>
-                    <Building2 size={19} color={colors.accent} />
+                <View style={[styles.statCard, isCompact && styles.statCardCompact, { backgroundColor: colors.surfaceAlt }]}>
+                  <View style={[styles.statIconWrap, { backgroundColor: colors.surface }]}>
+                    <Building2 size={19} color={colors.primary} />
                   </View>
                   <Text style={[styles.statValue, { color: colors.text }]}>{totalManufacturers}</Text>
                   <Text style={[styles.statLabel, { color: colors.textSecondary }]}>Fabricantes</Text>
                 </View>
-                <View style={[styles.statCard, isCompact && styles.statCardCompact, { backgroundColor: colors.primarySoft }]}>
-                  <View style={[styles.statIconWrap, { backgroundColor: colors.primarySoftAlt }]}>
-                    <FolderOpen size={19} color={colors.primaryLight} />
+                <View style={[styles.statCard, isCompact && styles.statCardCompact, { backgroundColor: colors.surfaceAlt }]}>
+                  <View style={[styles.statIconWrap, { backgroundColor: colors.surface }]}>
+                    <FolderOpen size={19} color={colors.primary} />
                   </View>
                   <Text style={[styles.statValue, { color: colors.text }]}>{totalYears}</Text>
                   <Text style={[styles.statLabel, { color: colors.textSecondary }]}>Años</Text>
                 </View>
               </View>
 
-              <View style={[styles.totalAmountCard, { backgroundColor: isDark ? colors.surfaceElevated : colors.primaryDark, borderWidth: isDark ? 1 : 0, borderColor: colors.border }]}>
-                <Text style={[styles.totalAmountLabel, isDark && { color: colors.textTertiary }]}>Facturación Total</Text>
-                <Text style={[styles.totalAmountValue, isDark && { color: colors.primary }]}>{formatCurrency(totalAmount)}</Text>
+              <View style={[styles.totalAmountCard, { backgroundColor: colors.heroTile }]}>
+                <Text style={styles.totalAmountLabel}>Facturación Total</Text>
+                <Text style={styles.totalAmountValue}>{formatCurrency(totalAmount)}</Text>
               </View>
             </View>
           </View>
@@ -401,7 +402,7 @@ export default function SettingsScreen() {
                       {user.email}
                     </Text>
                     <View style={styles.userRowMeta}>
-                      <View style={[styles.userRolePill, { backgroundColor: user.role === 'admin' ? (isDark ? 'rgba(52, 211, 153, 0.1)' : 'rgba(27, 107, 90, 0.08)') : colors.surfaceAlt }]}>
+                      <View style={[styles.userRolePill, { backgroundColor: user.role === 'admin' ? colors.primarySoft : colors.fill }]}>
                         <Text style={[styles.rolePillText, { color: user.role === 'admin' ? colors.primary : colors.textSecondary }]}>
                           {user.role === 'admin' ? 'Admin' : 'Usuario'}
                         </Text>
@@ -432,7 +433,7 @@ export default function SettingsScreen() {
         <View style={[styles.section, { backgroundColor: colors.surface, borderColor: colors.borderLight, shadowColor: colors.cardShadow }]}>
           <Text style={[styles.sectionTitle, { color: colors.text }]}>Cuenta y datos</Text>
           <Pressable style={[styles.menuItem, { borderBottomColor: colors.divider }]} onPress={handleChangePassword} testID="change-password-btn">
-            <View style={[styles.menuIconWrap, { backgroundColor: isDark ? 'rgba(52, 211, 153, 0.08)' : 'rgba(27, 107, 90, 0.07)' }]}>
+            <View style={[styles.menuIconWrap, { backgroundColor: colors.primarySoft }]}>
               <KeyRound size={17} color={colors.primary} />
             </View>
             <View style={{ flex: 1 }}>
@@ -597,11 +598,7 @@ const styles = StyleSheet.create({
     padding: 20,
     paddingBottom: 40,
   },
-  userBanner: {
-    borderRadius: 20,
-    padding: 20,
-    marginBottom: 16,
-    borderWidth: 1,
+  userBanner: { borderRadius: 20, padding: 20, marginBottom: 16, borderWidth: 0,
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
@@ -621,22 +618,12 @@ const styles = StyleSheet.create({
     gap: 14,
     flex: 1,
   },
-  userAvatar: {
-    width: 48,
-    height: 48,
-    borderRadius: 15,
+  userAvatar: { width: 52, height: 52, borderRadius: 999,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  userBannerName: {
-    fontSize: 17,
-    fontWeight: '700' as const,
-    letterSpacing: -0.2,
-  },
-  userEmail: {
-    fontSize: 12,
-    marginTop: 2,
-  },
+  userBannerName: { fontSize: 20, fontWeight: '600' as const, letterSpacing: -0.4, },
+  userEmail: { fontSize: 14, marginTop: 2, },
   userRoleBadgeRow: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -663,23 +650,12 @@ const styles = StyleSheet.create({
     fontWeight: '600' as const,
     color: '#4285F4',
   },
-  logoutBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    paddingHorizontal: 16,
-    paddingVertical: 10,
-    borderRadius: 12,
-    borderWidth: 1,
-  },
+  logoutBtn: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 16, paddingVertical: 9, borderRadius: 999, borderWidth: 0, },
   logoutBtnCompact: {
     alignSelf: 'stretch',
     justifyContent: 'center',
   },
-  logoutBtnText: {
-    fontSize: 13,
-    fontWeight: '600' as const,
-  },
+  logoutBtnText: { fontSize: 15, fontWeight: '600' as const, },
   desktopRow: {
     flexDirection: 'row',
     gap: 16,
@@ -687,11 +663,7 @@ const styles = StyleSheet.create({
   desktopHalf: {
     flex: 1,
   },
-  section: {
-    borderRadius: 20,
-    padding: 20,
-    marginBottom: 18,
-    borderWidth: 1,
+  section: { borderRadius: 20, padding: 20, marginBottom: 18, borderWidth: 0,
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 1,
     shadowRadius: 8,
@@ -708,54 +680,26 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 9,
   },
-  sectionTitle: {
-    fontSize: 18,
-    fontWeight: '800' as const,
-    marginBottom: 0,
-    letterSpacing: -0.3,
-  },
+  sectionTitle: { fontSize: 20, fontWeight: '700' as const, marginBottom: 0, letterSpacing: -0.4, },
   themeSelector: {
     flexDirection: 'row',
     gap: 12,
     marginTop: 16,
   },
-  themeOption: {
-    flex: 1,
-    alignItems: 'center',
-    paddingVertical: 18,
-    borderRadius: 16,
-    borderWidth: 2,
-    gap: 10,
-  },
-  themeIconWrap: {
-    width: 44,
-    height: 44,
-    borderRadius: 14,
+  themeOption: { flex: 1, alignItems: 'center', paddingVertical: 16, borderRadius: 16, borderWidth: 1.5, gap: 8, },
+  themeIconWrap: { width: 40, height: 40, borderRadius: 999,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  themeOptionText: {
-    fontSize: 14,
-    fontWeight: '700' as const,
-  },
-  biometricRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    marginTop: 18,
-    paddingTop: 18,
-    borderTopWidth: 1,
-  },
+  themeOptionText: { fontSize: 15, fontWeight: '600' as const, },
+  biometricRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 18, paddingTop: 18, borderTopWidth: StyleSheet.hairlineWidth, },
   biometricLeft: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 12,
     flex: 1,
   },
-  biometricIconWrap: {
-    width: 40,
-    height: 40,
-    borderRadius: 12,
+  biometricIconWrap: { width: 36, height: 36, borderRadius: 999,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -767,67 +711,32 @@ const styles = StyleSheet.create({
     fontSize: 12,
     marginTop: 2,
   },
-  addUserBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    paddingHorizontal: 16,
-    paddingVertical: 9,
-    borderRadius: 10,
-  },
-  addUserBtnText: {
-    color: '#FFFFFF',
-    fontWeight: '600' as const,
-    fontSize: 13,
-  },
-  userRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingVertical: 14,
-    borderBottomWidth: 1,
-  },
+  addUserBtn: { flexDirection: 'row', alignItems: 'center', gap: 5, paddingHorizontal: 16, paddingVertical: 8, borderRadius: 999, },
+  addUserBtnText: { color: '#FFFFFF', fontWeight: '600' as const, fontSize: 15, },
+  userRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 14, borderBottomWidth: StyleSheet.hairlineWidth, },
   userRowLeft: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 12,
     flex: 1,
   },
-  userRowAvatar: {
-    width: 34,
-    height: 34,
-    borderRadius: 10,
+  userRowAvatar: { width: 36, height: 36, borderRadius: 999,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  userRowName: {
-    fontSize: 14,
-    fontWeight: '600' as const,
-  },
-  userRowUsername: {
-    fontSize: 12,
-    fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace',
-    marginTop: 2,
-  },
+  userRowName: { fontSize: 16, fontWeight: '500' as const, letterSpacing: -0.2, },
+  userRowUsername: { fontSize: 13, marginTop: 2, },
   userRowMeta: {
     flexDirection: 'row',
     gap: 6,
     marginTop: 5,
   },
-  userRolePill: {
-    paddingHorizontal: 9,
-    paddingVertical: 3,
-    borderRadius: 7,
-  },
+  userRolePill: { paddingHorizontal: 9, paddingVertical: 2, borderRadius: 999, },
   rolePillText: {
     fontSize: 11,
     fontWeight: '600' as const,
   },
-  inactivePill: {
-    paddingHorizontal: 9,
-    paddingVertical: 3,
-    borderRadius: 7,
-  },
+  inactivePill: { paddingHorizontal: 9, paddingVertical: 2, borderRadius: 999, },
   inactivePillText: {
     fontSize: 11,
     fontWeight: '600' as const,
@@ -849,10 +758,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     gap: 6,
   },
-  userActionBtn: {
-    padding: 8,
-    borderRadius: 9,
-  },
+  userActionBtn: { padding: 8, borderRadius: 999, },
   statsGrid: {
     flexDirection: 'row',
     gap: 10,
@@ -862,51 +768,17 @@ const styles = StyleSheet.create({
   statsGridCompact: {
     flexWrap: 'wrap',
   },
-  statCard: {
-    flex: 1,
-    alignItems: 'center',
-    paddingVertical: 16,
-    borderRadius: 16,
-    gap: 6,
-  },
-  statCardCompact: {
-    minWidth: '47%' as const,
-  },
-  statIconWrap: {
-    width: 40,
-    height: 40,
-    borderRadius: 12,
+  statCard: { flex: 1, alignItems: 'center', paddingVertical: 16, borderRadius: 16, gap: 4, },
+  statCardCompact: { minWidth: '30%' as const, },
+  statIconWrap: { width: 36, height: 36, borderRadius: 999,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  statValue: {
-    fontSize: 24,
-    fontWeight: '800' as const,
-    letterSpacing: -0.5,
-  },
-  statLabel: {
-    fontSize: 11,
-    fontWeight: '500' as const,
-  },
-  totalAmountCard: {
-    borderRadius: 16,
-    padding: 20,
-    alignItems: 'center',
-  },
-  totalAmountLabel: {
-    fontSize: 12,
-    color: 'rgba(255,255,255,0.55)',
-    marginBottom: 6,
-    textTransform: 'uppercase' as const,
-    letterSpacing: 0.8,
-    fontWeight: '600' as const,
-  },
-  totalAmountValue: {
-    fontSize: 30,
-    fontWeight: '800' as const,
-    color: '#FFFFFF',
-    letterSpacing: -0.5,
-  },
+  statValue: { fontSize: 28, fontWeight: '700' as const, letterSpacing: -0.8, fontVariant: ['tabular-nums'], },
+  statLabel: { fontSize: 13, fontWeight: '400' as const, },
+  totalAmountCard: { borderRadius: 20, paddingVertical: 24, paddingHorizontal: 20, alignItems: 'center', },
+  totalAmountLabel: { fontSize: 15, color: 'rgba(245,245,247,0.65)', marginBottom: 4, fontWeight: '500' as const, },
+  totalAmountValue: { fontSize: 40, fontWeight: '700' as const, color: '#F5F5F7', letterSpacing: -1.2, fontVariant: ['tabular-nums'], },
   statusList: {
     gap: 10,
     marginTop: 16,
@@ -916,10 +788,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 12,
   },
-  statusIndicator: {
-    width: 32,
-    height: 32,
-    borderRadius: 10,
+  statusIndicator: { width: 30, height: 30, borderRadius: 999,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -928,22 +797,9 @@ const styles = StyleSheet.create({
     height: 9,
     borderRadius: 4.5,
   },
-  statusLabel: {
-    flex: 1,
-    fontSize: 14,
-    fontWeight: '500' as const,
-  },
-  statusCountWrap: {
-    paddingHorizontal: 12,
-    paddingVertical: 5,
-    borderRadius: 9,
-    minWidth: 36,
-    alignItems: 'center',
-  },
-  statusCount: {
-    fontSize: 14,
-    fontWeight: '700' as const,
-  },
+  statusLabel: { flex: 1, fontSize: 16, fontWeight: '400' as const, letterSpacing: -0.2, },
+  statusCountWrap: { paddingHorizontal: 10, paddingVertical: 3, borderRadius: 999, minWidth: 34, alignItems: 'center', },
+  statusCount: { fontSize: 15, fontWeight: '600' as const, fontVariant: ['tabular-nums'], },
   noAdminNotice: {
     paddingVertical: 18,
     alignItems: 'center',
@@ -952,28 +808,13 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontStyle: 'italic' as const,
   },
-  menuItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 14,
-    paddingVertical: 14,
-    borderBottomWidth: 1,
-  },
-  menuIconWrap: {
-    width: 40,
-    height: 40,
-    borderRadius: 12,
+  menuItem: { flexDirection: 'row', alignItems: 'center', gap: 14, paddingVertical: 14, borderBottomWidth: StyleSheet.hairlineWidth, },
+  menuIconWrap: { width: 36, height: 36, borderRadius: 999,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  menuItemTitle: {
-    fontSize: 15,
-    fontWeight: '600' as const,
-  },
-  menuItemDescription: {
-    fontSize: 12,
-    marginTop: 2,
-  },
+  menuItemTitle: { fontSize: 16, fontWeight: '500' as const, letterSpacing: -0.2, },
+  menuItemDescription: { fontSize: 13, marginTop: 2, },
   footer: {
     alignItems: 'center',
     paddingVertical: 28,
@@ -984,10 +825,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 6,
   },
-  footerText: {
-    fontSize: 14,
-    fontWeight: '700' as const,
-  },
+  footerText: { fontSize: 13, fontWeight: '600' as const, },
   platformInfo: {
     marginTop: 14,
     borderRadius: 14,
@@ -1010,54 +848,24 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     padding: 24,
   },
-  modalContent: {
-    borderRadius: 24,
-    padding: 28,
-    width: '100%' as any,
-    maxWidth: 440,
-  },
+  modalContent: { borderRadius: 22, padding: 24, width: '100%' as any, maxWidth: 440, },
   modalHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
     marginBottom: 20,
   },
-  modalTitle: {
-    fontSize: 21,
-    fontWeight: '800' as const,
-    letterSpacing: -0.3,
-  },
+  modalTitle: { fontSize: 21, fontWeight: '700' as const, letterSpacing: -0.4, },
   modalField: {
     marginBottom: 16,
   },
-  modalLabel: {
-    fontSize: 12,
-    fontWeight: '600' as const,
-    marginBottom: 7,
-    textTransform: 'uppercase' as const,
-    letterSpacing: 0.5,
-  },
-  modalInput: {
-    borderWidth: 1,
-    borderRadius: 12,
-    paddingHorizontal: 16,
-    paddingVertical: 13,
-    fontSize: 15,
-  },
+  modalLabel: { fontSize: 13, fontWeight: '500' as const, marginBottom: 6, },
+  modalInput: { borderWidth: 1, borderRadius: 12, paddingHorizontal: 14, paddingVertical: 12, fontSize: 16, ...webInputReset, },
   roleSelector: {
     flexDirection: 'row',
     gap: 10,
   },
-  roleOption: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 7,
-    paddingVertical: 13,
-    borderRadius: 12,
-    borderWidth: 2,
-  },
+  roleOption: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 7, paddingVertical: 12, borderRadius: 12, borderWidth: 1.5, },
   roleOptionText: {
     fontSize: 14,
     fontWeight: '600' as const,
@@ -1073,32 +881,9 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '600' as const,
   },
-  modalActions: {
-    flexDirection: 'row',
-    justifyContent: 'flex-end',
-    gap: 12,
-    marginTop: 22,
-    paddingTop: 18,
-    borderTopWidth: 1,
-  },
-  modalCancelBtn: {
-    paddingHorizontal: 22,
-    paddingVertical: 12,
-    borderRadius: 12,
-    borderWidth: 1,
-  },
-  modalCancelText: {
-    fontSize: 14,
-    fontWeight: '600' as const,
-  },
-  modalConfirmBtn: {
-    paddingHorizontal: 22,
-    paddingVertical: 12,
-    borderRadius: 12,
-  },
-  modalConfirmText: {
-    fontSize: 14,
-    fontWeight: '700' as const,
-    color: '#FFFFFF',
-  },
+  modalActions: { flexDirection: 'row', justifyContent: 'flex-end', gap: 10, marginTop: 20, paddingTop: 16, borderTopWidth: StyleSheet.hairlineWidth, },
+  modalCancelBtn: { paddingHorizontal: 20, paddingVertical: 11, borderRadius: 999, borderWidth: 1, },
+  modalCancelText: { fontSize: 15, fontWeight: '600' as const, },
+  modalConfirmBtn: { paddingHorizontal: 22, paddingVertical: 11, borderRadius: 999, },
+  modalConfirmText: { fontSize: 15, fontWeight: '600' as const, color: '#FFFFFF', },
 });

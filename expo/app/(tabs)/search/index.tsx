@@ -7,7 +7,6 @@ import {
   TextInput,
   FlatList,
   Pressable,
-  Platform,
   useWindowDimensions,
   Animated,
   Easing,
@@ -15,6 +14,7 @@ import {
 import { useRouter } from 'expo-router';
 import { Search, X, FileText } from 'lucide-react-native';
 import { useTheme } from '@/contexts/ThemeContext';
+import { webInputReset } from '@/constants/theme';
 import { useSearchOrders } from '@/contexts/DataContext';
 import StatusBadge from '@/components/StatusBadge';
 import { formatCurrency } from '@/utils/calculations';
@@ -44,8 +44,8 @@ function getMatchedField(order: Order, term: string): { field: string; value: st
 
 function AnimatedResultCard({ children, index }: { children: React.ReactNode; index: number }) {
   const anim = useRef(new Animated.Value(0)).current;
-  const slideY = useRef(new Animated.Value(40)).current;
-  const scaleVal = useRef(new Animated.Value(0.9)).current;
+  const slideY = useRef(new Animated.Value(12)).current;
+  const scaleVal = useRef(new Animated.Value(0.96)).current;
 
   useEffect(() => {
     const delay = Math.min(index * 80, 400);
@@ -74,11 +74,11 @@ export default function SearchScreen() {
   const [searchTerm, setSearchTerm] = useState('');
   const results = useSearchOrders(searchTerm);
 
-  const searchBarScale = useRef(new Animated.Value(0.9)).current;
+  const searchBarScale = useRef(new Animated.Value(0.96)).current;
   const searchBarOpacity = useRef(new Animated.Value(0)).current;
   const searchBarSlide = useRef(new Animated.Value(-20)).current;
   const emptyFade = useRef(new Animated.Value(0)).current;
-  const emptyScale = useRef(new Animated.Value(0.8)).current;
+  const emptyScale = useRef(new Animated.Value(0.96)).current;
 
   useEffect(() => {
     Animated.parallel([
@@ -103,7 +103,7 @@ export default function SearchScreen() {
     return (
       <AnimatedResultCard index={index}>
         <Pressable
-          style={({ pressed }) => [styles.resultCard, { backgroundColor: colors.surfaceElevated, borderColor: colors.borderLight, shadowColor: colors.cardShadow, transform: [{ scale: pressed ? 0.96 : 1 }] }]}
+          style={({ pressed }) => [styles.resultCard, { backgroundColor: colors.surfaceElevated, borderColor: colors.borderLight, shadowColor: colors.cardShadow, opacity: pressed ? 0.85 : 1 }]}
           onPress={() => handleSelectOrder(item)}
           testID={`search-result-${item.id}`}
         >
@@ -138,7 +138,7 @@ export default function SearchScreen() {
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
       <View style={[styles.innerContainer, { maxWidth: contentMaxWidth }]}>
-        <Animated.View style={[styles.searchBar, { backgroundColor: colors.surface, borderColor: colors.border, shadowColor: colors.cardShadow, transform: [{ scale: searchBarScale }, { translateY: searchBarSlide }], opacity: searchBarOpacity }]}>
+        <Animated.View style={[styles.searchBar, { backgroundColor: colors.fill, transform: [{ scale: searchBarScale }, { translateY: searchBarSlide }], opacity: searchBarOpacity }]}>
           <Search size={18} color={colors.textTertiary} />
           <TextInput
             style={[styles.searchInput, { color: colors.text }]}
@@ -205,27 +205,8 @@ const styles = StyleSheet.create({
     flex: 1,
     width: '100%' as any,
   },
-  searchBar: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginHorizontal: 20,
-    marginTop: 14,
-    marginBottom: 10,
-    borderRadius: 16,
-    paddingHorizontal: 16,
-    paddingVertical: 13,
-    gap: 12,
-    borderWidth: 1,
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 1,
-    shadowRadius: 6,
-    elevation: 2,
-  },
-  searchInput: {
-    flex: 1,
-    fontSize: 15,
-    padding: 0,
-  },
+  searchBar: { flexDirection: 'row', alignItems: 'center', marginHorizontal: 20, marginTop: 14, marginBottom: 10, borderRadius: 12, paddingHorizontal: 12, paddingVertical: 10, gap: 8, borderWidth: 0 },
+  searchInput: { flex: 1, fontSize: 17, padding: 0, letterSpacing: -0.3, ...webInputReset },
   emptyContainer: {
     flex: 1,
     alignItems: 'center',
@@ -233,10 +214,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 40,
     paddingBottom: 80,
   },
-  emptyIconWrap: {
-    width: 80,
-    height: 80,
-    borderRadius: 22,
+  emptyIconWrap: { width: 76, height: 76, borderRadius: 999,
     alignItems: 'center',
     justifyContent: 'center',
     marginBottom: 18,
@@ -252,9 +230,7 @@ const styles = StyleSheet.create({
     textAlign: 'center' as const,
     lineHeight: 21,
   },
-  resultsCount: {
-    fontSize: 13,
-    fontWeight: '600' as const,
+  resultsCount: { fontSize: 13, fontWeight: '500' as const,
     paddingHorizontal: 20,
     paddingVertical: 8,
   },
@@ -263,13 +239,7 @@ const styles = StyleSheet.create({
     paddingBottom: 40,
     gap: 12,
   },
-  resultCard: {
-    borderRadius: 18,
-    padding: 16,
-    borderWidth: 1,
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 1,
-    shadowRadius: 6,
+  resultCard: { borderRadius: 18, padding: 16, borderWidth: 0, shadowOffset: { width: 0, height: 4 }, shadowOpacity: 1, shadowRadius: 16,
     elevation: 2,
   },
   resultHeader: {
@@ -281,13 +251,10 @@ const styles = StyleSheet.create({
   resultHeaderCompact: {
     flexDirection: 'column',
   },
-  resultRef: {
-    fontSize: 14,
-    fontWeight: '800' as const,
-    fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace',
+  resultRef: { fontSize: 16, fontWeight: '600' as const, letterSpacing: -0.2,
+    fontVariant: ['tabular-nums'],
   },
-  resultCustomer: {
-    fontSize: 14,
+  resultCustomer: { fontSize: 15,
     marginTop: 3,
   },
   resultMeta: {
@@ -296,8 +263,7 @@ const styles = StyleSheet.create({
     gap: 6,
     marginTop: 5,
   },
-  resultMetaText: {
-    fontSize: 12,
+  resultMetaText: { fontSize: 13,
   },
   metaDot: {
     width: 3,
@@ -311,15 +277,13 @@ const styles = StyleSheet.create({
     marginTop: 8,
     paddingHorizontal: 10,
     paddingVertical: 4,
-    borderRadius: 8,
+    borderRadius: 999,
     alignSelf: 'flex-start' as const,
   },
-  matchField: {
-    fontSize: 11,
+  matchField: { fontSize: 12,
     fontWeight: '600' as const,
   },
-  matchValue: {
-    fontSize: 11,
+  matchValue: { fontSize: 12,
     maxWidth: 160,
   },
   resultRight: {
@@ -337,9 +301,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
   },
-  resultTotal: {
-    fontSize: 16,
-    fontWeight: '800' as const,
-    letterSpacing: -0.3,
+  resultTotal: { fontSize: 17, fontWeight: '600' as const, letterSpacing: -0.3, fontVariant: ['tabular-nums'],
   },
 });

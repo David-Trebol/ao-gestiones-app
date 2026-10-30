@@ -1,8 +1,9 @@
-import React, { useEffect, useRef } from 'react';
-import { NATIVE_DRIVER } from '@/constants/animation';
-import { View, Text, StyleSheet, Pressable, Animated, Easing } from 'react-native';
+import React, { useRef } from 'react';
+import { View, Text, StyleSheet, Pressable, Animated, Platform } from 'react-native';
 import { ChevronRight, Copy } from 'lucide-react-native';
 import { useTheme } from '@/contexts/ThemeContext';
+import { NATIVE_DRIVER, motion } from '@/constants/animation';
+import { cardShadow, radius, type } from '@/constants/theme';
 
 interface Props {
   icon: React.ReactNode;
@@ -16,6 +17,7 @@ interface Props {
   testID?: string;
 }
 
+/** Tarjeta de carpeta (año / fabricante): blanca, sin bordes, sombra mínima y una sola llamada a la acción */
 export default React.memo(function FolderCard({
   icon,
   title,
@@ -29,91 +31,67 @@ export default React.memo(function FolderCard({
 }: Props) {
   const { colors, isDark } = useTheme();
   const scaleAnim = useRef(new Animated.Value(1)).current;
-  const shimmerAnim = useRef(new Animated.Value(0)).current;
 
-  useEffect(() => {
-    Animated.loop(
-      Animated.sequence([
-        Animated.timing(shimmerAnim, { toValue: 1, duration: 3000, easing: Easing.inOut(Easing.sin), useNativeDriver: NATIVE_DRIVER }),
-        Animated.timing(shimmerAnim, { toValue: 0, duration: 3000, easing: Easing.inOut(Easing.sin), useNativeDriver: NATIVE_DRIVER }),
-      ])
-    ).start();
-  }, [shimmerAnim]);
-
-  const shimmerOpacity = shimmerAnim.interpolate({
-    inputRange: [0, 1],
-    outputRange: [0.04, isDark ? 0.12 : 0.09],
-  });
-
-  const handlePressIn = () => {
-    Animated.spring(scaleAnim, {
-      toValue: 0.92,
-      friction: 5,
-      useNativeDriver: NATIVE_DRIVER,
-    }).start();
-  };
-
-  const handlePressOut = () => {
-    Animated.spring(scaleAnim, {
-      toValue: 1,
-      friction: 3,
-      tension: 100,
-      useNativeDriver: NATIVE_DRIVER,
-    }).start();
-  };
+  const pressTo = (toValue: number) =>
+    Animated.timing(scaleAnim, { toValue, duration: motion.fast, easing: motion.easeOut, useNativeDriver: NATIVE_DRIVER }).start();
 
   return (
     <Animated.View style={{ transform: [{ scale: scaleAnim }] }}>
       <Pressable
         onPress={onPress}
-        onPressIn={handlePressIn}
-        onPressOut={handlePressOut}
+        onPressIn={() => pressTo(0.97)}
+        onPressOut={() => pressTo(1)}
         onLongPress={onDuplicate}
         delayLongPress={600}
         testID={testID}
-        style={[styles.card, { backgroundColor: colors.surfaceElevated, borderColor: colors.borderLight, shadowColor: colors.cardShadow }]}
+        accessibilityRole="button"
+        accessibilityLabel={`${title}${subtitle ? `, ${subtitle}` : ''}${totalValue ? `, total ${totalValue}` : ''}`}
+        style={({ hovered }: any) => [
+          styles.card,
+          { backgroundColor: colors.surface },
+          cardShadow(isDark),
+          Platform.OS === 'web' && hovered && !isDark && ({ boxShadow: '0 2px 4px rgba(0,0,0,0.05), 0 12px 28px rgba(0,0,0,0.08)' } as any),
+          Platform.OS === 'web' && hovered && isDark && { backgroundColor: colors.surfaceAlt },
+        ]}
       >
-        <Animated.View style={[StyleSheet.absoluteFill, { backgroundColor: colors.primary, opacity: shimmerOpacity, borderRadius: 18 }]} />
         <View style={styles.header}>
-          <View style={[styles.iconWrap, { backgroundColor: colors.primarySoft }]}>
-            {icon}
-          </View>
+          <View style={[styles.iconWrap, { backgroundColor: colors.primarySoft }]}>{icon}</View>
           <View style={styles.headerRight}>
             {onDuplicate && (
               <Pressable
                 onPress={onDuplicate}
                 hitSlop={8}
-                style={({ pressed }) => [styles.duplicateBtn, { backgroundColor: colors.primarySoft, transform: [{ scale: pressed ? 0.8 : 1 }] }]}
+                accessibilityLabel={`Duplicar ${title}`}
+                style={({ pressed }) => [styles.duplicateBtn, { backgroundColor: colors.fill, opacity: pressed ? 0.6 : 1 }]}
               >
-                <Copy size={12} color={colors.primary} />
+                <Copy size={13} color={colors.textSecondary} />
               </Pressable>
             )}
-            <View style={styles.badgesContainer}>
-              {badges?.map((badge, i) => (
-                <View key={i} style={[styles.badge, { backgroundColor: badge.color }]}>
-                  <Text style={styles.badgeText}>{badge.label}</Text>
-                </View>
-              ))}
-            </View>
           </View>
         </View>
 
-        <Text style={[styles.title, { color: colors.text }]} numberOfLines={1}>{title}</Text>
+        <Text style={[styles.title, { color: colors.text }]} numberOfLines={2}>{title}</Text>
         {subtitle ? (
           <Text style={[styles.subtitle, { color: colors.textSecondary }]} numberOfLines={1}>{subtitle}</Text>
         ) : null}
 
-        {totalLabel && totalValue ? (
-          <View style={styles.totalRow}>
-            <Text style={[styles.totalLabel, { color: colors.textSecondary }]}>{totalLabel}</Text>
-            <Text style={[styles.totalValue, { color: colors.text }]}>{totalValue}</Text>
-          </View>
+        {badges && badges.length > 0 ? (
+          <Text style={[styles.meta, { color: colors.textSecondary }]} numberOfLines={2}>
+            {badges.map(b => b.label).join(' · ')}
+          </Text>
         ) : null}
 
-        <View style={[styles.footer, { borderTopColor: colors.divider }]}>
-          <Text style={[styles.footerText, { color: colors.primary }]}>Ver detalles</Text>
-          <ChevronRight size={13} color={colors.primary} />
-        </View>
+        {totalLabel && totalValue ? (
+          <View style={[styles.totalRow, { borderTopColor: colors.divider }]}>
+            <View>
+              <Text style={[styles.totalLabel, { color: colors.textTertiary }]}>{totalLabel}</Text>
+              <Text style={[styles.totalValue, { color: colors.text }]}>{totalValue}</Text>
+            </View>
+            <View style={[styles.chevron, { backgroundColor: colors.fill }]}>
+              <ChevronRight size={16} color={colors.textSecondary} />
+            </View>
+          </View>
+        ) : null}
       </Pressable>
     </Animated.View>
   );
@@ -121,22 +99,18 @@ export default React.memo(function FolderCard({
 
 const styles = StyleSheet.create({
   card: {
-    borderRadius: 18,
-    padding: 16,
-    minHeight: 182,
+    borderRadius: radius.xl,
+    padding: 18,
+    minHeight: 176,
     justifyContent: 'space-between',
-    borderWidth: 1,
-    shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 1,
-    shadowRadius: 16,
-    elevation: 4,
     overflow: 'hidden',
+    ...(Platform.OS === 'web' ? ({ cursor: 'pointer', transitionProperty: 'box-shadow, background-color', transitionDuration: '200ms' } as any) : {}),
   },
   header: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'flex-start',
-    marginBottom: 12,
+    marginBottom: 14,
   },
   headerRight: {
     flexDirection: 'row',
@@ -144,68 +118,51 @@ const styles = StyleSheet.create({
     gap: 6,
   },
   duplicateBtn: {
-    width: 28,
-    height: 28,
-    borderRadius: 8,
+    width: 30,
+    height: 30,
+    borderRadius: radius.pill,
     alignItems: 'center',
     justifyContent: 'center',
   },
   iconWrap: {
-    width: 44,
-    height: 44,
-    borderRadius: 13,
+    width: 40,
+    height: 40,
+    borderRadius: radius.md,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  badgesContainer: {
-    alignItems: 'flex-end',
-    gap: 5,
-  },
-  badge: {
-    paddingHorizontal: 9,
-    paddingVertical: 3,
-    borderRadius: 100,
-  },
-  badgeText: {
-    color: '#FFFFFF',
-    fontSize: 10,
-    fontWeight: '700' as const,
-    letterSpacing: 0.2,
-  },
   title: {
-    fontSize: 19,
-    fontWeight: '800' as const,
+    ...type.title2,
     marginBottom: 2,
-    letterSpacing: -0.3,
   },
   subtitle: {
-    fontSize: 12,
-    marginBottom: 6,
+    ...type.footnote,
+  },
+  meta: {
+    ...type.footnote,
+    marginTop: 4,
   },
   totalRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    alignItems: 'center',
-    marginTop: 10,
+    alignItems: 'flex-end',
+    marginTop: 16,
+    paddingTop: 12,
+    borderTopWidth: StyleSheet.hairlineWidth,
   },
   totalLabel: {
-    fontSize: 12,
+    ...type.caption,
+    marginBottom: 2,
   },
   totalValue: {
-    fontSize: 14,
-    fontWeight: '700' as const,
-    letterSpacing: -0.2,
+    ...type.title3,
+    fontVariant: ['tabular-nums'],
   },
-  footer: {
-    flexDirection: 'row',
+  chevron: {
+    width: 28,
+    height: 28,
+    borderRadius: radius.pill,
     alignItems: 'center',
-    gap: 3,
-    marginTop: 14,
-    paddingTop: 12,
-    borderTopWidth: 1,
-  },
-  footerText: {
-    fontSize: 13,
-    fontWeight: '600' as const,
+    justifyContent: 'center',
   },
 });

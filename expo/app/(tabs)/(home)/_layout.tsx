@@ -1,22 +1,18 @@
 import React from 'react';
 import { Stack } from 'expo-router';
 import { useTheme } from '@/contexts/ThemeContext';
+import { headerOptions } from '@/constants/navigation';
 
 export default function HomeLayout() {
-  const { colors, isDark } = useTheme();
+  const { colors } = useTheme();
 
   return (
     <Stack
-      screenOptions={{
-        headerStyle: { backgroundColor: isDark ? colors.surface : colors.primary },
-        headerTintColor: '#FFFFFF',
-        headerTitleStyle: { fontWeight: '700' },
-        headerBackTitle: 'Atrás',
-      }}
+      screenOptions={headerOptions(colors)}
     >
       <Stack.Screen
         name="index"
-        options={{ title: 'Gestión de Pedidos' }}
+        options={{ title: 'AO Gestiones' }}
       />
     </Stack>
   );

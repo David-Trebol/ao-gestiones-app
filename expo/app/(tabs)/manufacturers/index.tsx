@@ -9,21 +9,21 @@ import {
   Alert,
   TextInput,
   Modal,
-  Platform,
   useWindowDimensions,
   Animated,
   Easing,
 } from 'react-native';
 import { Building2, Plus, Edit3, Trash2, Calendar, Check, Copy } from 'lucide-react-native';
 import { useTheme } from '@/contexts/ThemeContext';
+import { webInputReset } from '@/constants/theme';
 import { useData } from '@/contexts/DataContext';
 import { Manufacturer } from '@/types';
 import * as Haptics from 'expo-haptics';
 
 function AnimatedManufacturerCard({ index, children }: { index: number; children: React.ReactNode }) {
   const anim = useRef(new Animated.Value(0)).current;
-  const slideX = useRef(new Animated.Value(50)).current;
-  const scaleVal = useRef(new Animated.Value(0.85)).current;
+  const slideX = useRef(new Animated.Value(12)).current;
+  const scaleVal = useRef(new Animated.Value(0.96)).current;
 
   useEffect(() => {
     const delay = Math.min(index * 90, 450);
@@ -59,10 +59,10 @@ export default function ManufacturersScreen() {
 
   const headerFade = useRef(new Animated.Value(0)).current;
   const headerSlide = useRef(new Animated.Value(-30)).current;
-  const headerScale = useRef(new Animated.Value(0.9)).current;
-  const modalScale = useRef(new Animated.Value(0.7)).current;
+  const headerScale = useRef(new Animated.Value(0.96)).current;
+  const modalScale = useRef(new Animated.Value(0.96)).current;
   const modalOpacity = useRef(new Animated.Value(0)).current;
-  const modalSlide = useRef(new Animated.Value(40)).current;
+  const modalSlide = useRef(new Animated.Value(12)).current;
 
   useEffect(() => {
     Animated.parallel([
@@ -224,8 +224,8 @@ export default function ManufacturersScreen() {
             </View>
           </View>
           <View style={styles.cardActions}>
-            <Pressable onPress={() => handleDuplicate(item)} style={({ pressed }) => [styles.actionBtn, { backgroundColor: colors.primarySoft, transform: [{ scale: pressed ? 0.8 : 1 }] }]} hitSlop={8}>
-              <Copy size={15} color={colors.primary} />
+            <Pressable onPress={() => handleDuplicate(item)} style={({ pressed }) => [styles.actionBtn, { backgroundColor: colors.fill, opacity: pressed ? 0.6 : 1 }]} hitSlop={8}>
+              <Copy size={15} color={colors.textSecondary} />
             </Pressable>
             <Pressable onPress={() => openYears(item)} style={({ pressed }) => [styles.actionBtn, { backgroundColor: colors.surfaceAlt, transform: [{ scale: pressed ? 0.8 : 1 }] }]} hitSlop={8} testID={`assign-years-${item.id}`}>
               <Calendar size={15} color={colors.primary} />
@@ -251,7 +251,7 @@ export default function ManufacturersScreen() {
             <Text style={[styles.headerSubtitle, { color: colors.textSecondary }]}>{manufacturers.length} fabricante{manufacturers.length !== 1 ? 's' : ''}</Text>
           </View>
           <Pressable
-            style={({ pressed }) => [styles.createBtn, { backgroundColor: colors.accent, transform: [{ scale: pressed ? 0.9 : 1 }] }]}
+            style={({ pressed }) => [styles.createBtn, { backgroundColor: colors.primary, opacity: pressed ? 0.8 : 1 }]}
             onPress={() => { setFormName(''); setFormCode(''); setCreateDialogOpen(true); setTimeout(animateModal, 10); }}
             testID="create-manufacturer-btn"
           >
@@ -380,47 +380,27 @@ const styles = StyleSheet.create({
     paddingTop: 18,
     paddingBottom: 14,
   },
-  headerTitle: {
-    fontSize: 24,
-    fontWeight: '800' as const,
-    letterSpacing: -0.5,
-  },
-  headerSubtitle: {
-    fontSize: 14,
+  headerTitle: { fontSize: 32, fontWeight: '700' as const, letterSpacing: -0.6 },
+  headerSubtitle: { fontSize: 15,
     marginTop: 2,
   },
-  createBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    paddingHorizontal: 18,
-    paddingVertical: 11,
-    borderRadius: 12,
-  },
-  createBtnText: {
-    color: '#FFFFFF',
-    fontWeight: '700' as const,
-    fontSize: 14,
-  },
-  listContent: {
-    paddingHorizontal: 20,
-    paddingTop: 6,
-    paddingBottom: 40,
-    gap: 14,
+  createBtn: { flexDirection: 'row', alignItems: 'center', gap: 5, paddingHorizontal: 16, paddingVertical: 9, borderRadius: 999 },
+  createBtnText: { color: '#FFFFFF', fontWeight: '600' as const, fontSize: 15, letterSpacing: -0.2 },
+  listContent: { paddingHorizontal: 20, paddingTop: 6, paddingBottom: 40, gap: 12,
   },
   manufacturerCard: {
-    borderRadius: 18,
+    borderRadius: 20,
     padding: 18,
     minHeight: 124,
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'flex-start',
     gap: 14,
-    borderWidth: 1,
-    shadowOffset: { width: 0, height: 6 },
+    borderWidth: 0,
+    shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 1,
-    shadowRadius: 14,
-    elevation: 4,
+    shadowRadius: 16,
+    elevation: 2,
   },
   cardLeft: {
     flexDirection: 'row',
@@ -428,21 +408,14 @@ const styles = StyleSheet.create({
     gap: 14,
     flex: 1,
   },
-  iconCircle: {
-    width: 42,
-    height: 42,
-    borderRadius: 13,
+  iconCircle: { width: 40, height: 40, borderRadius: 999,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  mfName: {
-    fontSize: 16,
-    fontWeight: '700' as const,
-    letterSpacing: -0.2,
+  mfName: { fontSize: 17, fontWeight: '600' as const, letterSpacing: -0.3,
   },
-  mfCode: {
-    fontSize: 12,
-    fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace',
+  mfCode: { fontSize: 13,
+    fontVariant: ['tabular-nums'],
     marginTop: 2,
   },
   yearBadges: {
@@ -451,22 +424,16 @@ const styles = StyleSheet.create({
     gap: 5,
     marginTop: 8,
   },
-  yearBadge: {
-    paddingHorizontal: 9,
-    paddingVertical: 3,
-    borderRadius: 7,
-    borderWidth: 1,
+  yearBadge: { paddingHorizontal: 9, paddingVertical: 2, borderRadius: 999, borderWidth: 0,
   },
-  yearBadgeText: {
-    fontSize: 11,
+  yearBadgeText: { fontSize: 12,
     fontWeight: '600' as const,
   },
   noYears: {
     fontSize: 12,
     fontStyle: 'italic' as const,
   },
-  orderCountText: {
-    fontSize: 12,
+  orderCountText: { fontSize: 13,
     marginTop: 6,
   },
   cardActions: {
@@ -514,14 +481,14 @@ const styles = StyleSheet.create({
     padding: 24,
   },
   modalContent: {
-    borderRadius: 24,
+    borderRadius: 22,
     padding: 24,
     width: '100%' as any,
     maxWidth: 440,
   },
   modalTitle: {
     fontSize: 21,
-    fontWeight: '800' as const,
+    fontWeight: '700' as const,
     marginBottom: 4,
     letterSpacing: -0.3,
   },
@@ -546,6 +513,7 @@ const styles = StyleSheet.create({
   modalInput: {
     borderWidth: 1,
     borderRadius: 12,
+    ...webInputReset,
     paddingHorizontal: 16,
     paddingVertical: 13,
     fontSize: 15,
@@ -556,12 +524,12 @@ const styles = StyleSheet.create({
     gap: 12,
     marginTop: 26,
     paddingTop: 18,
-    borderTopWidth: 1,
+    borderTopWidth: StyleSheet.hairlineWidth,
   },
   modalCancelBtn: {
     paddingHorizontal: 22,
     paddingVertical: 12,
-    borderRadius: 12,
+    borderRadius: 999,
     borderWidth: 1,
   },
   modalCancelText: {
@@ -571,7 +539,7 @@ const styles = StyleSheet.create({
   modalConfirmBtn: {
     paddingHorizontal: 22,
     paddingVertical: 12,
-    borderRadius: 12,
+    borderRadius: 999,
   },
   modalConfirmText: {
     fontSize: 14,
@@ -590,7 +558,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 18,
     paddingVertical: 13,
     borderRadius: 12,
-    borderWidth: 2,
+    borderWidth: 1.5,
     minWidth: 82,
     justifyContent: 'center',
   },

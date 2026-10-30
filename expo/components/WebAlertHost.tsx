@@ -101,23 +101,23 @@ export default function WebAlertHost() {
 }
 
 const styles = StyleSheet.create({
-  overlay: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 20 },
+  overlay: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 20, ...(Platform.OS === 'web' ? ({ backdropFilter: 'blur(6px)', WebkitBackdropFilter: 'blur(6px)' } as any) : {}) },
   card: {
     width: '100%',
     maxWidth: 420,
-    borderRadius: 18,
-    borderWidth: 1,
+    borderRadius: 22,
+    borderWidth: 0,
     padding: 22,
     shadowColor: '#000',
     shadowOpacity: 0.2,
     shadowRadius: 24,
     shadowOffset: { width: 0, height: 10 },
   },
-  title: { fontSize: 17, fontWeight: '700', marginBottom: 6 },
-  message: { fontSize: 14, lineHeight: 20, marginBottom: 4 },
+  title: { fontSize: 18, fontWeight: '600', marginBottom: 6, letterSpacing: -0.3 },
+  message: { fontSize: 15, lineHeight: 21, marginBottom: 4, letterSpacing: -0.15 },
   actions: { flexDirection: 'row', gap: 10, marginTop: 18 },
   actionsStacked: { flexDirection: 'column' },
-  button: { paddingVertical: 12, paddingHorizontal: 14, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
+  button: { paddingVertical: 12, paddingHorizontal: 14, borderRadius: 999, alignItems: 'center', justifyContent: 'center', ...(Platform.OS === 'web' ? ({ cursor: 'pointer' } as any) : {}) },
   buttonFlex: { flex: 1 },
-  buttonText: { fontSize: 15, fontWeight: '700' },
+  buttonText: { fontSize: 16, fontWeight: '600', letterSpacing: -0.2 },
 });

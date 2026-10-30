@@ -17,17 +17,18 @@ import { Stack } from 'expo-router';
 import { Eye, EyeOff, ArrowRight, Mail, Zap, Package, TrendingUp, Users, Fingerprint } from 'lucide-react-native';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/lib/supabase';
+import { webInputReset } from '@/constants/theme';
 import * as Haptics from 'expo-haptics';
 
-const ACCENT = '#FF4D2D';
-const ACCENT_DARK = '#E03A1E';
-const BG_DARK = '#0A0A0F';
-const BG_CARD = '#141419';
-const BG_INPUT = '#1C1C24';
-const BORDER_SUBTLE = '#2A2A35';
-const TEXT_DIM = '#6B6B7B';
-const TEXT_MUTED = '#9595A5';
-const GLOW_COLOR = 'rgba(255, 77, 45, 0.15)';
+const ACCENT = '#E5641C';
+const ACCENT_DARK = '#C2410C';
+const BG_DARK = '#000000';
+const BG_CARD = 'rgba(28, 28, 30, 0.72)';
+const BG_INPUT = 'rgba(118, 118, 128, 0.18)';
+const BORDER_SUBTLE = 'rgba(255, 255, 255, 0.10)';
+const TEXT_DIM = '#8D8D93';
+const TEXT_MUTED = '#A1A1A6';
+const GLOW_COLOR = 'rgba(229, 100, 28, 0.15)';
 
 export default function LoginScreen() {
   const { login, loginWithBiometric, requestPasswordReset, biometricEnabled, biometricAvailable, locked } = useAuth();
@@ -289,7 +290,7 @@ export default function LoginScreen() {
 
             <View style={styles.sidebarCards}>
               <View style={styles.statCard}>
-                <View style={[styles.statIcon, { backgroundColor: 'rgba(255,77,45,0.15)' }]}>
+                <View style={[styles.statIcon, { backgroundColor: 'rgba(229,100,28,0.15)' }]}>
                   <Package size={18} color={ACCENT} />
                 </View>
                 <View>
@@ -586,8 +587,8 @@ export default function LoginScreen() {
 const styles = StyleSheet.create({
   setupBanner: {
     borderWidth: 1,
-    borderColor: 'rgba(255, 77, 45, 0.45)',
-    backgroundColor: 'rgba(255, 77, 45, 0.08)',
+    borderColor: 'rgba(229, 100, 28, 0.45)',
+    backgroundColor: 'rgba(229, 100, 28, 0.08)',
     borderRadius: 12,
     padding: 14,
     marginBottom: 16,
@@ -665,7 +666,7 @@ const styles = StyleSheet.create({
   },
   sidebarBrandName: {
     fontSize: 22,
-    fontWeight: '800' as const,
+    fontWeight: '700' as const,
     color: '#fff',
     letterSpacing: -0.5,
   },
@@ -677,7 +678,7 @@ const styles = StyleSheet.create({
   },
   sidebarHeadline: {
     fontSize: 42,
-    fontWeight: '800' as const,
+    fontWeight: '700' as const,
     color: '#fff',
     lineHeight: 50,
     letterSpacing: -1.5,
@@ -773,7 +774,7 @@ const styles = StyleSheet.create({
     bottom: -8,
     borderRadius: 30,
     borderWidth: 1.5,
-    borderColor: 'rgba(255,77,45,0.2)',
+    borderColor: 'rgba(229,100,28,0.2)',
   },
   appName: {
     fontSize: 38,
@@ -796,13 +797,20 @@ const styles = StyleSheet.create({
     width: '100%' as any,
     borderWidth: 1,
     borderColor: BORDER_SUBTLE,
+    ...(Platform.OS === 'web'
+      ? ({
+          backdropFilter: 'saturate(160%) blur(24px)',
+          WebkitBackdropFilter: 'saturate(160%) blur(24px)',
+          boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.08), 0 24px 64px rgba(0,0,0,0.45)',
+        } as any)
+      : {}),
   },
   formHeader: {
     marginBottom: 24,
   },
   formTitle: {
     fontSize: 24,
-    fontWeight: '800' as const,
+    fontWeight: '700' as const,
     color: '#fff',
     letterSpacing: -0.5,
   },
@@ -815,9 +823,9 @@ const styles = StyleSheet.create({
     flexDirection: 'row' as const,
     alignItems: 'center' as const,
     gap: 10,
-    backgroundColor: 'rgba(255,77,45,0.08)',
+    backgroundColor: 'rgba(229,100,28,0.08)',
     borderWidth: 1,
-    borderColor: 'rgba(255,77,45,0.2)',
+    borderColor: 'rgba(229,100,28,0.2)',
     borderRadius: 12,
     padding: 14,
     marginBottom: 18,
@@ -839,21 +847,21 @@ const styles = StyleSheet.create({
     alignItems: 'center' as const,
     justifyContent: 'center' as const,
     gap: 12,
-    backgroundColor: 'rgba(255, 77, 45, 0.06)',
+    backgroundColor: 'rgba(229, 100, 28, 0.06)',
     borderRadius: 14,
     paddingVertical: 16,
     borderWidth: 1.5,
-    borderColor: 'rgba(255, 77, 45, 0.2)',
+    borderColor: 'rgba(229, 100, 28, 0.2)',
     marginBottom: 4,
   },
   biometricBtnPressed: {
-    backgroundColor: 'rgba(255, 77, 45, 0.12)',
+    backgroundColor: 'rgba(229, 100, 28, 0.12)',
   },
   biometricIconCircle: {
     width: 36,
     height: 36,
     borderRadius: 11,
-    backgroundColor: 'rgba(255, 77, 45, 0.1)',
+    backgroundColor: 'rgba(229, 100, 28, 0.1)',
     alignItems: 'center' as const,
     justifyContent: 'center' as const,
   },
@@ -926,13 +934,14 @@ const styles = StyleSheet.create({
   },
   inputWrapFocused: {
     borderColor: ACCENT,
-    backgroundColor: 'rgba(255,77,45,0.03)',
+    backgroundColor: 'rgba(229,100,28,0.03)',
   },
   input: {
     paddingHorizontal: 16,
     paddingVertical: 14,
     fontSize: 15,
     color: '#fff',
+    ...webInputReset,
   },
   inputWeb: {
     outlineStyle: 'none' as any,
@@ -947,6 +956,7 @@ const styles = StyleSheet.create({
     paddingVertical: 14,
     fontSize: 15,
     color: '#fff',
+    ...webInputReset,
   },
   eyeBtn: {
     paddingRight: 14,

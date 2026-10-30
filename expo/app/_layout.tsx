@@ -11,6 +11,8 @@ import ErrorBoundary from "@/components/ErrorBoundary";
 import LoginScreen from "@/app/login";
 import ResetPasswordScreen from "@/components/ResetPasswordScreen";
 import WebAlertHost from "@/components/WebAlertHost";
+import WebGlobalStyles from "@/components/WebGlobalStyles";
+import { headerOptions } from "@/constants/navigation";
 
 SplashScreen.preventAutoHideAsync();
 
@@ -51,18 +53,15 @@ function AuthGate() {
 }
 
 function RootLayoutNav() {
-  const { colors, isDark } = useTheme();
+  const { colors } = useTheme();
 
   return (
-    <Stack screenOptions={{ headerBackTitle: "Atrás" }}>
+    <Stack screenOptions={headerOptions(colors)}>
       <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
       <Stack.Screen
         name="order-detail"
         options={{
           title: "Detalle del Pedido",
-          headerStyle: { backgroundColor: isDark ? colors.surface : colors.primaryDark },
-          headerTintColor: '#FFFFFF',
-          headerTitleStyle: { fontWeight: '700' },
         }}
       />
       <Stack.Screen
@@ -70,9 +69,6 @@ function RootLayoutNav() {
         options={{
           presentation: 'modal',
           title: 'Nuevo Pedido',
-          headerStyle: { backgroundColor: isDark ? colors.surface : colors.primaryDark },
-          headerTintColor: '#FFFFFF',
-          headerTitleStyle: { fontWeight: '700' },
         }}
       />
       <Stack.Screen
@@ -112,6 +108,7 @@ export default function RootLayout() {
                   <AuthGate />
                 </ErrorBoundary>
                 <WebAlertHost />
+                <WebGlobalStyles />
               </DataProvider>
             </AuthProvider>
           </ThemeProvider>

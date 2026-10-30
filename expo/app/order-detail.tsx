@@ -1,5 +1,6 @@
 import React, { useMemo, useState, useCallback, useRef, useEffect } from 'react';
-import { NATIVE_DRIVER } from '@/constants/animation';
+import { NATIVE_DRIVER, enterAnimation } from '@/constants/animation';
+import { FONT_FAMILY, webInputReset } from '@/constants/theme';
 import {
   View,
   Text,
@@ -43,22 +44,16 @@ import { formatCurrency, formatDateLong } from '@/utils/calculations';
 import * as Haptics from 'expo-haptics';
 
 function AnimatedSection({ children, index }: { children: React.ReactNode; index: number }) {
-  const anim = useRef(new Animated.Value(0)).current;
-  const slideY = useRef(new Animated.Value(50)).current;
-  const scaleVal = useRef(new Animated.Value(0.9)).current;
+  const opacity = useRef(new Animated.Value(0)).current;
+  const translateY = useRef(new Animated.Value(12)).current;
 
   useEffect(() => {
-    const delay = Math.min(index * 120, 600);
-    Animated.parallel([
-      Animated.spring(anim, { toValue: 1, friction: 5, tension: 40, delay, useNativeDriver: NATIVE_DRIVER }),
-      Animated.spring(slideY, { toValue: 0, friction: 5, tension: 40, delay, useNativeDriver: NATIVE_DRIVER }),
-      Animated.spring(scaleVal, { toValue: 1, friction: 4, tension: 50, delay, useNativeDriver: NATIVE_DRIVER }),
-    ]).start();
+    enterAnimation(opacity, translateY, index).start();
   // eslint-disable-next-line react-hooks/exhaustive-deps -- los valores animados son refs estables
   }, [index]);
 
   return (
-    <Animated.View style={{ opacity: anim, transform: [{ translateY: slideY }, { scale: scaleVal }] }}>
+    <Animated.View style={{ opacity, transform: [{ translateY }] }}>
       {children}
     </Animated.View>
   );
@@ -68,7 +63,7 @@ export default function OrderDetailScreen() {
   const { orderId } = useLocalSearchParams<{ orderId: string }>();
   const router = useRouter();
   const { orders, deleteOrder, updateOrderField, duplicateOrder } = useData();
-  const { colors, isDark } = useTheme();
+  const { colors } = useTheme();
   const { width } = useWindowDimensions();
   const isDesktop = width >= 1024;
   const contentMaxWidth = isDesktop ? 880 : width;
@@ -204,14 +199,14 @@ export default function OrderDetailScreen() {
           title: order.reference_number,
           headerRight: () => (
             <View style={styles.headerActions}>
-              <Pressable onPress={handleDuplicate} style={({ pressed }) => [styles.headerBtn, { opacity: pressed ? 0.6 : 1 }]} hitSlop={8}>
-                <Copy size={20} color="#FFFFFF" />
+              <Pressable onPress={handleDuplicate} style={({ pressed }) => [styles.headerBtn, { opacity: pressed ? 0.6 : 1 }]} hitSlop={8} accessibilityRole="button" accessibilityLabel="Duplicar pedido">
+                <Copy size={20} color={colors.primary} />
               </Pressable>
-              <Pressable onPress={handleEdit} style={({ pressed }) => [styles.headerBtn, { opacity: pressed ? 0.6 : 1 }]} hitSlop={8}>
-                <Edit3 size={20} color="#FFFFFF" />
+              <Pressable onPress={handleEdit} style={({ pressed }) => [styles.headerBtn, { opacity: pressed ? 0.6 : 1 }]} hitSlop={8} accessibilityRole="button" accessibilityLabel="Editar pedido">
+                <Edit3 size={20} color={colors.primary} />
               </Pressable>
-              <Pressable onPress={handleDelete} style={({ pressed }) => [styles.headerBtn, { opacity: pressed ? 0.6 : 1 }]} hitSlop={8}>
-                <Trash2 size={20} color="#FFB4B4" />
+              <Pressable onPress={handleDelete} style={({ pressed }) => [styles.headerBtn, { opacity: pressed ? 0.6 : 1 }]} hitSlop={8} accessibilityRole="button" accessibilityLabel="Eliminar pedido">
+                <Trash2 size={20} color={colors.error} />
               </Pressable>
             </View>
           ),
@@ -273,7 +268,7 @@ export default function OrderDetailScreen() {
                     <Text style={[styles.heroCustomRefValue, { color: colors.text }]}>
                       {order.custom_reference || 'Sin referencia manual'}
                     </Text>
-                    <View style={[styles.editRefIconWrap, { backgroundColor: isDark ? 'rgba(52, 211, 153, 0.1)' : 'rgba(27, 107, 90, 0.08)' }]}>
+                    <View style={[styles.editRefIconWrap, { backgroundColor: colors.primarySoft }]}>
                       <Pencil size={12} color={colors.primary} />
                     </View>
                   </Pressable>
@@ -286,7 +281,7 @@ export default function OrderDetailScreen() {
         <AnimatedSection index={1}>
           <View style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.borderLight, shadowColor: colors.cardShadow }]}>
             <View style={styles.sectionTitle}>
-              <View style={[styles.sectionIconWrap, { backgroundColor: isDark ? 'rgba(52, 211, 153, 0.1)' : 'rgba(27, 107, 90, 0.07)' }]}>
+              <View style={[styles.sectionIconWrap, { backgroundColor: colors.primarySoft }]}>
                 <Building2 size={16} color={colors.primary} />
               </View>
               <Text style={[styles.sectionTitleText, { color: colors.text }]}>Cliente</Text>
@@ -316,7 +311,7 @@ export default function OrderDetailScreen() {
               ) : null}
 
               <View style={[styles.customerFieldWithIcon, { borderBottomColor: colors.divider }]}>
-                <View style={[styles.fieldIconWrap, { backgroundColor: isDark ? 'rgba(52, 211, 153, 0.1)' : 'rgba(27, 107, 90, 0.07)' }]}>
+                <View style={[styles.fieldIconWrap, { backgroundColor: colors.primarySoft }]}>
                   <MapPin size={14} color={colors.primary} />
                 </View>
                 <View style={styles.fieldContent}>
@@ -332,7 +327,7 @@ export default function OrderDetailScreen() {
 
               <View style={[styles.contactRow, { borderBottomColor: colors.divider }]}>
                 <View style={styles.contactItem}>
-                  <View style={[styles.fieldIconWrapSmall, { backgroundColor: isDark ? 'rgba(52, 211, 153, 0.1)' : 'rgba(27, 107, 90, 0.07)' }]}>
+                  <View style={[styles.fieldIconWrapSmall, { backgroundColor: colors.primarySoft }]}>
                     <Phone size={12} color={colors.primary} />
                   </View>
                   <View style={styles.fieldContent}>
@@ -342,7 +337,7 @@ export default function OrderDetailScreen() {
                   </View>
                 </View>
                 <View style={styles.contactItem}>
-                  <View style={[styles.fieldIconWrapSmall, { backgroundColor: isDark ? 'rgba(52, 211, 153, 0.1)' : 'rgba(27, 107, 90, 0.07)' }]}>
+                  <View style={[styles.fieldIconWrapSmall, { backgroundColor: colors.primarySoft }]}>
                     <Mail size={12} color={colors.primary} />
                   </View>
                   <View style={styles.fieldContent}>
@@ -361,7 +356,7 @@ export default function OrderDetailScreen() {
         </AnimatedSection>
 
         <AnimatedSection index={2}>
-          <View style={[styles.totalsCard, { backgroundColor: isDark ? colors.surface : colors.primaryDark, borderWidth: isDark ? 1 : 0, borderColor: colors.border }]}>
+          <View style={[styles.totalsCard, { backgroundColor: colors.heroTile }]}>
             <View style={styles.totalsHeader}>
               <View style={styles.totalsIconWrap}>
                 <Euro size={16} color="#FFFFFF" />
@@ -402,7 +397,7 @@ export default function OrderDetailScreen() {
 
         {order.shipping_items && order.shipping_items.length > 0 && (
           <AnimatedSection index={3}>
-            <View style={[styles.card, { backgroundColor: isDark ? colors.surface : '#FFFDF7', borderColor: isDark ? colors.border : colors.warningBorder }]}>
+            <View style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.borderLight, shadowColor: colors.cardShadow }]}>
               <View style={styles.sectionTitle}>
                 <View style={[styles.sectionIconWrap, { backgroundColor: colors.warningBg }]}>
                   <Truck size={16} color={colors.warning} />
@@ -414,7 +409,7 @@ export default function OrderDetailScreen() {
               </View>
 
               {order.shipping_items.map((shipping, index) => (
-                <View key={index} style={[styles.productItem, { backgroundColor: isDark ? colors.surfaceAlt : '#FFFFFF', borderColor: isDark ? colors.border : colors.warningBorder }, index < order.shipping_items.length - 1 && { marginBottom: 12 }]}>
+                <View key={index} style={[styles.productItem, { backgroundColor: colors.surfaceAlt, borderColor: colors.borderLight }, index < order.shipping_items.length - 1 && { marginBottom: 12 }]}>
                   <View style={styles.productHeader}>
                     <View style={styles.productHeaderLeft}>
                       <View style={[styles.productIndexBadge, { backgroundColor: colors.warningBg }]}>
@@ -453,7 +448,7 @@ export default function OrderDetailScreen() {
         <AnimatedSection index={4}>
           <View style={styles.metaRow}>
             <View style={[styles.metaItem, { backgroundColor: colors.surface, borderColor: colors.borderLight }]}>
-              <View style={[styles.metaIconWrap, { backgroundColor: isDark ? 'rgba(52, 211, 153, 0.1)' : 'rgba(27, 107, 90, 0.07)' }]}>
+              <View style={[styles.metaIconWrap, { backgroundColor: colors.primarySoft }]}>
                 <Building2 size={14} color={colors.primary} />
               </View>
               <View style={styles.metaTextWrap}>
@@ -463,7 +458,7 @@ export default function OrderDetailScreen() {
               </View>
             </View>
             <View style={[styles.metaItem, { backgroundColor: colors.surface, borderColor: colors.borderLight }]}>
-              <View style={[styles.metaIconWrap, { backgroundColor: isDark ? 'rgba(52, 211, 153, 0.1)' : 'rgba(27, 107, 90, 0.07)' }]}>
+              <View style={[styles.metaIconWrap, { backgroundColor: colors.primarySoft }]}>
                 <Calendar size={14} color={colors.primary} />
               </View>
               <View style={styles.metaTextWrap}>
@@ -477,7 +472,7 @@ export default function OrderDetailScreen() {
         <AnimatedSection index={5}>
           <View style={styles.metaRow}>
             <View style={[styles.metaItem, { backgroundColor: colors.surface, borderColor: colors.borderLight }]}>
-              <View style={[styles.metaIconWrap, { backgroundColor: isDark ? 'rgba(52, 211, 153, 0.1)' : 'rgba(27, 107, 90, 0.07)' }]}>
+              <View style={[styles.metaIconWrap, { backgroundColor: colors.primarySoft }]}>
                 <Clock size={14} color={colors.textSecondary} />
               </View>
               <View style={styles.metaTextWrap}>
@@ -486,7 +481,7 @@ export default function OrderDetailScreen() {
               </View>
             </View>
             <View style={[styles.metaItem, { backgroundColor: colors.surface, borderColor: colors.borderLight }]}>
-              <View style={[styles.metaIconWrap, { backgroundColor: isDark ? 'rgba(52, 211, 153, 0.1)' : 'rgba(27, 107, 90, 0.07)' }]}>
+              <View style={[styles.metaIconWrap, { backgroundColor: colors.primarySoft }]}>
                 <Clock size={14} color={colors.textSecondary} />
               </View>
               <View style={styles.metaTextWrap}>
@@ -502,11 +497,11 @@ export default function OrderDetailScreen() {
             <View style={isDesktop ? styles.desktopMain : undefined}>
               <View style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.borderLight, shadowColor: colors.cardShadow }]}>
                 <View style={styles.sectionTitle}>
-                  <View style={[styles.sectionIconWrap, { backgroundColor: isDark ? 'rgba(52, 211, 153, 0.1)' : 'rgba(27, 107, 90, 0.07)' }]}>
+                  <View style={[styles.sectionIconWrap, { backgroundColor: colors.primarySoft }]}>
                     <Package size={16} color={colors.primary} />
                   </View>
                   <Text style={[styles.sectionTitleText, { color: colors.text }]}>Productos</Text>
-                  <View style={[styles.sectionBadge, { backgroundColor: isDark ? 'rgba(52, 211, 153, 0.1)' : 'rgba(27, 107, 90, 0.08)' }]}>
+                  <View style={[styles.sectionBadge, { backgroundColor: colors.primarySoft }]}>
                     <Text style={[styles.sectionBadgeText, { color: colors.primary }]}>{order.items.length}</Text>
                   </View>
                 </View>
@@ -519,7 +514,7 @@ export default function OrderDetailScreen() {
                       <View style={[styles.productItem, { backgroundColor: colors.surfaceAlt, borderColor: colors.borderLight }]}>
                         <View style={styles.productHeader}>
                           <View style={styles.productHeaderLeft}>
-                            <View style={[styles.productIndexBadge, { backgroundColor: isDark ? 'rgba(52, 211, 153, 0.1)' : 'rgba(27, 107, 90, 0.08)' }]}>
+                            <View style={[styles.productIndexBadge, { backgroundColor: colors.primarySoft }]}>
                               <Text style={[styles.productIndexText, { color: colors.primary }]}>{index + 1}</Text>
                             </View>
                             <View style={styles.productNameWrap}>
@@ -536,7 +531,7 @@ export default function OrderDetailScreen() {
                         <View style={styles.descriptionSection}>
                           <Pressable
                             onPress={() => toggleItemExpand(index)}
-                            style={({ pressed }) => [styles.descriptionToggle, { backgroundColor: isDark ? 'rgba(52, 211, 153, 0.04)' : 'rgba(27, 107, 90, 0.04)', borderColor: colors.borderLight, transform: [{ scale: pressed ? 0.97 : 1 }] }]}
+                            style={({ pressed }) => [styles.descriptionToggle, { backgroundColor: colors.fill, borderColor: colors.borderLight, transform: [{ scale: pressed ? 0.97 : 1 }] }]}
                             hitSlop={4}
                           >
                             <FileText size={13} color={colors.textSecondary} />
@@ -577,7 +572,7 @@ export default function OrderDetailScreen() {
                             <Text style={[styles.gridLabel, { color: colors.textTertiary }]}>IVA</Text>
                             <Text style={[styles.gridValue, { color: colors.text }]}>{item.vat_percentage}%</Text>
                           </View>
-                          <View style={[styles.productGridItem, { backgroundColor: isDark ? 'rgba(52, 211, 153, 0.04)' : 'rgba(27, 107, 90, 0.04)', borderRadius: 8 }]}>
+                          <View style={[styles.productGridItem, { backgroundColor: colors.fill, borderRadius: 8 }]}>
                             <Text style={[styles.gridLabel, { color: colors.textTertiary }]}>Beneficio línea</Text>
                             <Text style={[styles.gridValue, { color: item.beneficio_bruto >= 0 ? colors.success : colors.error }]}>
                               {formatCurrency(item.beneficio_bruto)}
@@ -596,7 +591,7 @@ export default function OrderDetailScreen() {
                 {(order.customer.oferta_proforma || order.customer.condiciones_entrega || order.customer.condiciones_pago || order.customer.numero_factura || order.customer.numero_recibo) && (
                   <View style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.borderLight, shadowColor: colors.cardShadow }]}>
                     <View style={styles.sectionTitle}>
-                      <View style={[styles.sectionIconWrap, { backgroundColor: isDark ? 'rgba(52, 211, 153, 0.1)' : 'rgba(27, 107, 90, 0.07)' }]}>
+                      <View style={[styles.sectionIconWrap, { backgroundColor: colors.primarySoft }]}>
                         <FileText size={16} color={colors.primary} />
                       </View>
                       <Text style={[styles.sectionTitleText, { color: colors.text }]}>Info. Adicional</Text>
@@ -646,7 +641,7 @@ export default function OrderDetailScreen() {
           <AnimatedSection index={7}>
             <View style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.borderLight, shadowColor: colors.cardShadow }]}>
               <View style={styles.sectionTitle}>
-                <View style={[styles.sectionIconWrap, { backgroundColor: isDark ? 'rgba(52, 211, 153, 0.1)' : 'rgba(27, 107, 90, 0.07)' }]}>
+                <View style={[styles.sectionIconWrap, { backgroundColor: colors.primarySoft }]}>
                   <FileText size={16} color={colors.primary} />
                 </View>
                 <Text style={[styles.sectionTitleText, { color: colors.text }]}>Info. Adicional</Text>
@@ -694,20 +689,16 @@ export default function OrderDetailScreen() {
 }
 
 function ProductItemAnimated({ children, index }: { children: React.ReactNode; index: number }) {
-  const anim = useRef(new Animated.Value(0)).current;
-  const slideX = useRef(new Animated.Value(30)).current;
+  const opacity = useRef(new Animated.Value(0)).current;
+  const translateY = useRef(new Animated.Value(8)).current;
 
   useEffect(() => {
-    const delay = Math.min(index * 80, 400);
-    Animated.parallel([
-      Animated.spring(anim, { toValue: 1, friction: 6, tension: 50, delay, useNativeDriver: NATIVE_DRIVER }),
-      Animated.spring(slideX, { toValue: 0, friction: 6, tension: 50, delay, useNativeDriver: NATIVE_DRIVER }),
-    ]).start();
+    enterAnimation(opacity, translateY, index).start();
   // eslint-disable-next-line react-hooks/exhaustive-deps -- los valores animados son refs estables
   }, [index]);
 
   return (
-    <Animated.View style={{ opacity: anim, transform: [{ translateX: slideX }] }}>
+    <Animated.View style={{ opacity, transform: [{ translateY }] }}>
       {children}
     </Animated.View>
   );
@@ -720,85 +711,85 @@ const styles = StyleSheet.create({
   headerActions: { flexDirection: 'row', gap: 16, alignItems: 'center' },
   headerBtn: { padding: 4 },
   scrollContent: { padding: 20, paddingBottom: 40, gap: 16 },
-  heroCard: { borderRadius: 20, padding: 20, borderWidth: 1, shadowOffset: { width: 0, height: 4 }, shadowOpacity: 1, shadowRadius: 12, elevation: 3 },
+  heroCard: { borderRadius: 20, padding: 20, borderWidth: 0, shadowOffset: { width: 0, height: 4 }, shadowOpacity: 1, shadowRadius: 16, elevation: 2 },
   heroTop: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' },
-  heroRefSection: { flex: 1 },
+  heroRefSection: { flex: 1, minWidth: 0, marginRight: 10 },
   heroRefLabelRow: { flexDirection: 'row', alignItems: 'center', gap: 4, marginBottom: 6 },
-  heroRefLabel: { fontSize: 10, fontWeight: '700' as const, letterSpacing: 1 },
-  heroRefNumber: { fontSize: 20, fontWeight: '800' as const, fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace', letterSpacing: -0.5 },
+  heroRefLabel: { fontSize: 12, fontWeight: '600' as const, letterSpacing: 0.3 },
+  heroRefNumber: { fontSize: 24, fontWeight: '700' as const, letterSpacing: -0.4, ...(FONT_FAMILY ? { fontFamily: FONT_FAMILY } : {}) },
   heroDivider: { height: 1, marginVertical: 16 },
   heroCustomRefSection: { flexDirection: 'row', alignItems: 'center' },
   heroCustomRefLeft: { flex: 1 },
   heroCustomRefLabelRow: { flexDirection: 'row', alignItems: 'center', gap: 4, marginBottom: 6 },
-  heroCustomRefLabel: { fontSize: 10, fontWeight: '700' as const, letterSpacing: 1, textTransform: 'uppercase' as const },
-  customRefTappable: { flexDirection: 'row', alignItems: 'center', gap: 10, borderRadius: 12, paddingHorizontal: 14, paddingVertical: 10, borderWidth: 1, borderStyle: 'dashed' },
+  heroCustomRefLabel: { fontSize: 12, fontWeight: '600' as const, letterSpacing: 0.3, textTransform: 'uppercase' as const },
+  customRefTappable: { flexDirection: 'row', alignItems: 'center', gap: 10, borderRadius: 12, paddingHorizontal: 14, paddingVertical: 11, borderWidth: 0 },
   heroCustomRefValue: { fontSize: 15, fontWeight: '600' as const, flex: 1 },
   editRefIconWrap: { width: 28, height: 28, borderRadius: 8, alignItems: 'center', justifyContent: 'center' },
   editRefRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  editRefInput: { flex: 1, borderWidth: 2, borderRadius: 12, paddingHorizontal: 14, paddingVertical: 10, fontSize: 15, fontWeight: '600' as const },
+  editRefInput: { flex: 1, borderWidth: 1.5, borderRadius: 12, paddingHorizontal: 14, paddingVertical: 10, fontSize: 16, fontWeight: '500' as const, ...webInputReset },
   editRefBtn: { width: 36, height: 36, borderRadius: 10, alignItems: 'center', justifyContent: 'center' },
   totalsCard: { borderRadius: 20, padding: 20, overflow: 'hidden' },
   totalsHeader: { flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 18 },
-  totalsIconWrap: { width: 32, height: 32, borderRadius: 10, backgroundColor: 'rgba(255,255,255,0.12)', alignItems: 'center', justifyContent: 'center' },
-  totalsHeaderText: { fontSize: 16, fontWeight: '700' as const, color: '#FFFFFF', letterSpacing: -0.2 },
+  totalsIconWrap: { width: 30, height: 30, borderRadius: 999, backgroundColor: 'rgba(255,255,255,0.12)', alignItems: 'center', justifyContent: 'center' },
+  totalsHeaderText: { fontSize: 15, fontWeight: '600' as const, color: 'rgba(245,245,247,0.8)', letterSpacing: -0.1 },
   totalsRow: { flexDirection: 'row', alignItems: 'center' },
   totalItem: { flex: 1, alignItems: 'center', paddingVertical: 4 },
-  totalItemLabel: { fontSize: 11, fontWeight: '600' as const, color: 'rgba(255,255,255,0.5)', letterSpacing: 0.3, marginBottom: 6 },
-  totalItemValue: { fontSize: 17, fontWeight: '800' as const, color: '#FFFFFF', letterSpacing: -0.3 },
-  totalItemSub: { fontSize: 9, color: 'rgba(255,255,255,0.35)', marginTop: 2, letterSpacing: 0.5, textTransform: 'uppercase' as const },
+  totalItemLabel: { fontSize: 12, fontWeight: '500' as const, color: 'rgba(245,245,247,0.6)', marginBottom: 4 },
+  totalItemValue: { fontSize: 17, fontWeight: '600' as const, color: '#F5F5F7', letterSpacing: -0.3, fontVariant: ['tabular-nums'] },
+  totalItemSub: { fontSize: 11, color: 'rgba(245,245,247,0.45)', marginTop: 2 },
   totalsDividerV: { width: 1, height: 40, backgroundColor: 'rgba(255,255,255,0.1)' },
-  grandTotalRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', backgroundColor: 'rgba(255,255,255,0.1)', borderRadius: 14, paddingHorizontal: 18, paddingVertical: 14, marginTop: 16 },
-  grandTotalLabel: { fontSize: 13, fontWeight: '700' as const, color: 'rgba(255,255,255,0.6)', letterSpacing: 1.5 },
-  grandTotalValue: { fontSize: 26, fontWeight: '800' as const, color: '#FFFFFF', letterSpacing: -0.5 },
+  grandTotalRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-end', borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: 'rgba(245,245,247,0.18)', paddingTop: 16, marginTop: 18 },
+  grandTotalLabel: { fontSize: 15, fontWeight: '500' as const, color: 'rgba(245,245,247,0.7)', marginBottom: 6 },
+  grandTotalValue: { fontSize: 40, fontWeight: '700' as const, color: '#F5F5F7', letterSpacing: -1.2, fontVariant: ['tabular-nums'] },
   metaRow: { flexDirection: 'row', gap: 12 },
-  metaItem: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: 10, borderRadius: 16, padding: 16, borderWidth: 1 },
+  metaItem: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: 10, borderRadius: 16, padding: 16, borderWidth: 0 },
   metaIconWrap: { width: 32, height: 32, borderRadius: 10, alignItems: 'center', justifyContent: 'center' },
   metaTextWrap: { flex: 1 },
-  metaLabel: { fontSize: 10, fontWeight: '600' as const, letterSpacing: 0.5, textTransform: 'uppercase' as const, marginBottom: 2 },
-  metaValue: { fontSize: 14, fontWeight: '700' as const },
+  metaLabel: { fontSize: 12, fontWeight: '500' as const, marginBottom: 2 },
+  metaValue: { fontSize: 15, fontWeight: '600' as const, letterSpacing: -0.2 },
   metaValueSmall: { fontSize: 12, fontWeight: '600' as const },
   metaCode: { fontSize: 10, fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace', marginTop: 1 },
   desktopRow: { flexDirection: 'row', gap: 14 },
   desktopMain: { flex: 3, gap: 14 },
   desktopSide: { flex: 2, gap: 14 },
-  card: { borderRadius: 20, padding: 20, borderWidth: 1, shadowOffset: { width: 0, height: 2 }, shadowOpacity: 1, shadowRadius: 8, elevation: 2 },
+  card: { borderRadius: 20, padding: 20, borderWidth: 0, shadowOffset: { width: 0, height: 4 }, shadowOpacity: 1, shadowRadius: 16, elevation: 2 },
   sectionTitle: { flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 16 },
-  sectionIconWrap: { width: 32, height: 32, borderRadius: 10, alignItems: 'center', justifyContent: 'center' },
-  sectionTitleText: { fontSize: 17, fontWeight: '700' as const, letterSpacing: -0.2, flex: 1 },
-  sectionBadge: { borderRadius: 8, paddingHorizontal: 8, paddingVertical: 3 },
+  sectionIconWrap: { width: 30, height: 30, borderRadius: 999, alignItems: 'center', justifyContent: 'center' },
+  sectionTitleText: { fontSize: 20, fontWeight: '700' as const, letterSpacing: -0.4, flex: 1 },
+  sectionBadge: { borderRadius: 999, paddingHorizontal: 9, paddingVertical: 2 },
   sectionBadgeText: { fontSize: 12, fontWeight: '700' as const },
-  productItem: { borderRadius: 16, padding: 16, borderWidth: 1, marginBottom: 12 },
+  productItem: { borderRadius: 14, padding: 16, borderWidth: 0, marginBottom: 12 },
   descriptionSection: { marginBottom: 12 },
-  descriptionToggle: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingVertical: 8, paddingHorizontal: 12, borderRadius: 10, borderWidth: 1 },
+  descriptionToggle: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingVertical: 8, paddingHorizontal: 12, borderRadius: 10, borderWidth: 0 },
   descriptionToggleText: { fontSize: 12, fontWeight: '600' as const, flex: 1 },
-  descriptionContent: { marginTop: 8, paddingHorizontal: 12, paddingVertical: 10, borderRadius: 10, borderWidth: 1 },
-  descriptionText: { fontSize: 13, lineHeight: 19 },
+  descriptionContent: { marginTop: 8, paddingHorizontal: 12, paddingVertical: 10, borderRadius: 10, borderWidth: 0 },
+  descriptionText: { fontSize: 14, lineHeight: 20 },
   productHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 },
   productHeaderLeft: { flexDirection: 'row', alignItems: 'center', gap: 10, flex: 1 },
   productIndexBadge: { width: 26, height: 26, borderRadius: 8, alignItems: 'center', justifyContent: 'center' },
   productIndexText: { fontSize: 11, fontWeight: '700' as const },
   productNameWrap: { flex: 1 },
-  productName: { fontSize: 14, fontWeight: '700' as const, letterSpacing: -0.2 },
-  productQty: { fontSize: 12, marginTop: 2 },
+  productName: { fontSize: 16, fontWeight: '600' as const, letterSpacing: -0.3 },
+  productQty: { fontSize: 13, marginTop: 2 },
   productPriceWrap: { alignItems: 'flex-end' as const, marginLeft: 10 },
-  productTotal: { fontSize: 16, fontWeight: '800' as const, letterSpacing: -0.3 },
-  productTotalLabel: { fontSize: 10, marginTop: 1 },
-  productGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 0, borderTopWidth: 1, paddingTop: 12 },
+  productTotal: { fontSize: 17, fontWeight: '700' as const, letterSpacing: -0.3, fontVariant: ['tabular-nums'] },
+  productTotalLabel: { fontSize: 11, marginTop: 1 },
+  productGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 0, borderTopWidth: StyleSheet.hairlineWidth, paddingTop: 12 },
   productGridItem: { width: '33.33%' as any, paddingVertical: 6, paddingHorizontal: 4 },
-  gridLabel: { fontSize: 10, letterSpacing: 0.3, marginBottom: 2 },
-  gridValue: { fontSize: 13, fontWeight: '700' as const },
-  label: { fontSize: 10, marginBottom: 3, textTransform: 'uppercase' as const, letterSpacing: 0.5, fontWeight: '600' as const },
+  gridLabel: { fontSize: 12, marginBottom: 2 },
+  gridValue: { fontSize: 15, fontWeight: '600' as const, fontVariant: ['tabular-nums'] },
+  label: { fontSize: 12, marginBottom: 3, fontWeight: '500' as const },
   customerInfo: { gap: 16 },
-  customerField: { paddingBottom: 12, borderBottomWidth: 1 },
-  customerFieldWithIcon: { flexDirection: 'row', gap: 12, paddingBottom: 12, borderBottomWidth: 1 },
-  fieldIconWrap: { width: 32, height: 32, borderRadius: 10, alignItems: 'center', justifyContent: 'center', marginTop: 2 },
+  customerField: { paddingBottom: 12, borderBottomWidth: StyleSheet.hairlineWidth },
+  customerFieldWithIcon: { flexDirection: 'row', gap: 12, paddingBottom: 12, borderBottomWidth: StyleSheet.hairlineWidth },
+  fieldIconWrap: { width: 30, height: 30, borderRadius: 999, alignItems: 'center', justifyContent: 'center', marginTop: 2 },
   fieldIconWrapSmall: { width: 26, height: 26, borderRadius: 8, alignItems: 'center', justifyContent: 'center', marginTop: 2 },
   fieldContent: { flex: 1 },
-  contactRow: { flexDirection: 'row', gap: 10, paddingBottom: 12, borderBottomWidth: 1 },
+  contactRow: { flexDirection: 'row', gap: 10, paddingBottom: 12, borderBottomWidth: StyleSheet.hairlineWidth },
   contactItem: { flex: 1, flexDirection: 'row', gap: 8 },
-  customerValue: { fontSize: 14, fontWeight: '600' as const },
-  customerSubvalue: { fontSize: 13, marginTop: 2 },
+  customerValue: { fontSize: 16, fontWeight: '500' as const, letterSpacing: -0.2 },
+  customerSubvalue: { fontSize: 14, marginTop: 2 },
   additionalGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 12, marginBottom: 12 },
   additionalItem: { minWidth: '45%' as any, flex: 1, borderRadius: 12, padding: 12 },
-  conditionBlock: { paddingTop: 12, borderTopWidth: 1, marginBottom: 8 },
+  conditionBlock: { paddingTop: 12, borderTopWidth: StyleSheet.hairlineWidth, marginBottom: 8 },
 });

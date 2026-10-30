@@ -25,6 +25,7 @@ import * as Haptics from 'expo-haptics';
 import * as DocumentPicker from 'expo-document-picker';
 import * as ImagePicker from 'expo-image-picker';
 import { supabase, describeError } from '@/lib/supabase';
+import { webInputReset } from '@/constants/theme';
 import { z } from 'zod';
 
 const STATUS_OPTIONS: { value: OrderStatus; label: string }[] = [
@@ -663,7 +664,7 @@ export default function OrderFormScreen() {
         options={{
           title: editingOrder ? 'Editar Pedido' : 'Nuevo Pedido',
           headerRight: () => (
-            <Pressable onPress={handleSubmit} disabled={saving} style={[styles.saveBtn, { backgroundColor: colors.accent, opacity: saving ? 0.6 : 1 }]} testID="header-save-btn">
+            <Pressable onPress={handleSubmit} disabled={saving} style={[styles.saveBtn, { backgroundColor: colors.primary, opacity: saving ? 0.6 : 1 }]} testID="header-save-btn">
               <Text style={styles.saveBtnText}>Guardar</Text>
             </Pressable>
           ),
@@ -701,7 +702,7 @@ export default function OrderFormScreen() {
             </View>
           ) : (
             <Pressable
-              style={[styles.scanBtn, { backgroundColor: colors.surface, borderColor: colors.primaryLight }]}
+              style={[styles.scanBtn, { backgroundColor: colors.surface, borderColor: colors.borderLight }]}
               onPress={handleScanAction}
               testID="scan-document-btn"
             >
@@ -765,7 +766,7 @@ export default function OrderFormScreen() {
                     {manufacturers.map((m, i) => (
                       <Pressable
                         key={m.id}
-                        style={[styles.chip, { backgroundColor: colors.surfaceAlt, borderColor: colors.border }, selectedManufacturerIndex === i && { backgroundColor: colors.primary, borderColor: colors.primary }]}
+                        style={[styles.chip, { backgroundColor: colors.fill, borderColor: 'transparent' }, selectedManufacturerIndex === i && { backgroundColor: colors.primary, borderColor: colors.primary }]}
                         onPress={() => selectManufacturer(i)}
                       >
                         <Text style={[styles.chipText, { color: colors.text }, selectedManufacturerIndex === i && { color: '#FFFFFF' }]}>
@@ -799,7 +800,7 @@ export default function OrderFormScreen() {
                     {STATUS_OPTIONS.map((s, i) => (
                       <Pressable
                         key={s.value}
-                        style={[styles.chip, { backgroundColor: colors.surfaceAlt, borderColor: colors.border }, selectedStatusIndex === i && { backgroundColor: colors.primary, borderColor: colors.primary }]}
+                        style={[styles.chip, { backgroundColor: colors.fill, borderColor: 'transparent' }, selectedStatusIndex === i && { backgroundColor: colors.primary, borderColor: colors.primary }]}
                         onPress={() => selectStatus(i)}
                       >
                         <Text style={[styles.chipText, { color: colors.text }, selectedStatusIndex === i && { color: '#FFFFFF' }]}>
@@ -833,12 +834,12 @@ export default function OrderFormScreen() {
 
           <View style={[styles.section, { backgroundColor: colors.surface, borderColor: colors.borderLight, shadowColor: colors.cardShadow }]}>
             <View style={styles.sectionHeader}>
-              <View style={[styles.sectionIconBadge, { backgroundColor: isDark ? 'rgba(52, 211, 153, 0.1)' : 'rgba(27, 107, 90, 0.08)' }]}>
+              <View style={[styles.sectionIconBadge, { backgroundColor: colors.primarySoft }]}>
                 <Package size={16} color={colors.primary} />
               </View>
               <Text style={[styles.sectionTitle, { color: colors.text }]}>Productos</Text>
               <View style={{ flex: 1 }} />
-              <Pressable style={[styles.addBtn, { backgroundColor: isDark ? 'rgba(52, 211, 153, 0.06)' : 'rgba(27, 107, 90, 0.06)', borderColor: isDark ? 'rgba(52, 211, 153, 0.15)' : 'rgba(27, 107, 90, 0.15)' }]} onPress={addItem}>
+              <Pressable style={[styles.addBtn, { backgroundColor: colors.primarySoft, borderColor: 'transparent' }]} onPress={addItem}>
                 <Plus size={13} color={colors.primary} />
                 <Text style={[styles.addBtnText, { color: colors.primary }]}>Añadir</Text>
               </Pressable>
@@ -847,7 +848,7 @@ export default function OrderFormScreen() {
             {formData.items.map((item, index) => (
               <View key={index} style={[styles.itemCard, { backgroundColor: colors.background, borderColor: colors.border }]}>
                 <View style={styles.itemHeader}>
-                  <View style={[styles.itemBadge, { backgroundColor: isDark ? 'rgba(52, 211, 153, 0.08)' : 'rgba(27, 107, 90, 0.08)' }]}>
+                  <View style={[styles.itemBadge, { backgroundColor: colors.primarySoft }]}>
                     <Text style={[styles.itemBadgeText, { color: colors.primary }]}>#{index + 1}</Text>
                   </View>
                   {formData.items.length > 1 && (
@@ -888,7 +889,7 @@ export default function OrderFormScreen() {
               </View>
               <Text style={[styles.sectionTitle, { color: colors.text }]}>Gastos de Envío</Text>
               <View style={{ flex: 1 }} />
-              <Pressable style={[styles.addBtn, { backgroundColor: isDark ? 'rgba(52, 211, 153, 0.06)' : 'rgba(27, 107, 90, 0.06)', borderColor: isDark ? 'rgba(52, 211, 153, 0.15)' : 'rgba(27, 107, 90, 0.15)' }]} onPress={addShippingItem}>
+              <Pressable style={[styles.addBtn, { backgroundColor: colors.primarySoft, borderColor: 'transparent' }]} onPress={addShippingItem}>
                 <Plus size={13} color={colors.primary} />
                 <Text style={[styles.addBtnText, { color: colors.primary }]}>Añadir</Text>
               </Pressable>
@@ -899,7 +900,7 @@ export default function OrderFormScreen() {
             )}
 
             {formData.shipping_items.map((s, index) => (
-              <View key={index} style={[styles.itemCard, { backgroundColor: isDark ? colors.surfaceAlt : '#FFFDF7', borderColor: isDark ? colors.border : colors.warningBorder }]}>
+              <View key={index} style={[styles.itemCard, { backgroundColor: colors.surfaceAlt, borderColor: isDark ? colors.border : colors.warningBorder }]}>
                 <View style={styles.itemHeader}>
                   <View style={[styles.itemBadge, { backgroundColor: colors.warningBg }]}>
                     <Text style={[styles.itemBadgeText, { color: colors.warning }]}>#{index + 1}</Text>
@@ -939,7 +940,7 @@ export default function OrderFormScreen() {
             </View>
           </View>
 
-          <Pressable style={({ pressed }) => [styles.submitBtn, { backgroundColor: colors.accent, shadowColor: colors.accent, opacity: saving ? 0.6 : 1, transform: [{ scale: pressed ? 0.97 : 1 }] }]} onPress={handleSubmit} disabled={saving} testID="submit-order-btn">
+          <Pressable style={({ pressed }) => [styles.submitBtn, { backgroundColor: colors.primary, shadowColor: colors.primary, opacity: saving ? 0.6 : pressed ? 0.85 : 1 }]} onPress={handleSubmit} disabled={saving} testID="submit-order-btn">
             <Text style={styles.submitBtnText}>
               {saving ? 'Guardando…' : editingOrder ? 'Actualizar Pedido' : 'Crear Pedido'}
             </Text>
@@ -964,6 +965,7 @@ interface FormFieldProps {
 
 function FormField({ label, value, onChangeText, placeholder, keyboardType, multiline, testID, half, third }: FormFieldProps) {
   const { colors } = useTheme();
+  const [focused, setFocused] = useState(false);
   return (
     <View style={[
       formFieldStyles.container,
@@ -972,7 +974,9 @@ function FormField({ label, value, onChangeText, placeholder, keyboardType, mult
     ]}>
       <Text style={[formFieldStyles.label, { color: colors.textSecondary }]}>{label}</Text>
       <TextInput
-        style={[formFieldStyles.input, { backgroundColor: colors.background, borderColor: colors.border, color: colors.text }, multiline && formFieldStyles.multiline]}
+        style={[formFieldStyles.input, { backgroundColor: colors.fill, borderColor: focused ? colors.primary : 'transparent', color: colors.text }, multiline && formFieldStyles.multiline]}
+        onFocus={() => setFocused(true)}
+        onBlur={() => setFocused(false)}
         value={value}
         onChangeText={onChangeText}
         placeholder={placeholder || label}
@@ -1043,22 +1047,9 @@ const formFieldStyles = StyleSheet.create({
   thirdContainer: {
     flex: 1,
   },
-  label: {
-    fontSize: 11,
-    fontWeight: '600' as const,
-    color: StaticColors.textSecondary,
-    marginBottom: 5,
-    textTransform: 'uppercase' as const,
-    letterSpacing: 0.5,
+  label: { fontSize: 13, fontWeight: '500' as const, color: StaticColors.textSecondary, marginBottom: 6,
   },
-  input: {
-    backgroundColor: StaticColors.background,
-    borderWidth: 1,
-    borderColor: StaticColors.border,
-    borderRadius: 12,
-    paddingHorizontal: 14,
-    paddingVertical: 11,
-    fontSize: 14,
+  input: { backgroundColor: StaticColors.background, borderWidth: 1.5, borderColor: 'transparent', borderRadius: 10, paddingHorizontal: 12, paddingVertical: 10, fontSize: 16, letterSpacing: -0.2, ...webInputReset,
     color: StaticColors.text,
   },
   multiline: {
@@ -1076,12 +1067,9 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     paddingVertical: 8,
     backgroundColor: StaticColors.accent,
-    borderRadius: 10,
+    borderRadius: 999,
   },
-  saveBtnText: {
-    color: StaticColors.white,
-    fontWeight: '700' as const,
-    fontSize: 14,
+  saveBtnText: { color: StaticColors.white, fontWeight: '600' as const, fontSize: 15,
   },
   scrollContent: {
     padding: 20,
@@ -1101,15 +1089,12 @@ const styles = StyleSheet.create({
     borderRadius: 16,
     padding: 16,
     marginBottom: 16,
-    borderWidth: 1.5,
+    borderWidth: 0,
     borderColor: StaticColors.primaryLight,
-    borderStyle: 'dashed',
+    borderStyle: 'solid',
     gap: 14,
   },
-  scanBtnIconWrap: {
-    width: 42,
-    height: 42,
-    borderRadius: 12,
+  scanBtnIconWrap: { width: 40, height: 40, borderRadius: 999,
     backgroundColor: StaticColors.primary,
     alignItems: 'center',
     justifyContent: 'center',
@@ -1117,14 +1102,11 @@ const styles = StyleSheet.create({
   scanBtnTextWrap: {
     flex: 1,
   },
-  scanBtnTitle: {
-    fontSize: 15,
-    fontWeight: '700' as const,
+  scanBtnTitle: { fontSize: 16, fontWeight: '600' as const,
     color: StaticColors.text,
     marginBottom: 2,
   },
-  scanBtnSubtitle: {
-    fontSize: 12,
+  scanBtnSubtitle: { fontSize: 13,
     color: StaticColors.textSecondary,
   },
   extractingBanner: {
@@ -1139,10 +1121,7 @@ const styles = StyleSheet.create({
     gap: 12,
     marginBottom: 12,
   },
-  extractingIconWrap: {
-    width: 42,
-    height: 42,
-    borderRadius: 12,
+  extractingIconWrap: { width: 40, height: 40, borderRadius: 999,
     backgroundColor: 'rgba(255,255,255,0.12)',
     alignItems: 'center',
     justifyContent: 'center',
@@ -1182,12 +1161,12 @@ const styles = StyleSheet.create({
     borderRadius: 20,
     padding: 20,
     marginBottom: 18,
-    borderWidth: 1,
+    borderWidth: 0,
     borderColor: StaticColors.borderLight,
     shadowColor: StaticColors.cardShadow,
-    shadowOffset: { width: 0, height: 2 },
+    shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 1,
-    shadowRadius: 8,
+    shadowRadius: 16,
     elevation: 2,
   },
   sectionHeader: {
@@ -1196,39 +1175,23 @@ const styles = StyleSheet.create({
     gap: 10,
     marginBottom: 18,
   },
-  sectionNumberBadge: {
-    width: 28,
-    height: 28,
-    borderRadius: 9,
+  sectionNumberBadge: { width: 26, height: 26, borderRadius: 999,
     backgroundColor: StaticColors.primary,
     alignItems: 'center',
     justifyContent: 'center',
   },
   sectionNumberText: {
     fontSize: 13,
-    fontWeight: '800' as const,
+    fontWeight: '700' as const,
     color: StaticColors.white,
   },
-  sectionIconBadge: {
-    width: 28,
-    height: 28,
-    borderRadius: 9,
+  sectionIconBadge: { width: 26, height: 26, borderRadius: 999,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  sectionTitle: {
-    fontSize: 17,
-    fontWeight: '700' as const,
-    color: StaticColors.text,
-    letterSpacing: -0.2,
+  sectionTitle: { fontSize: 20, fontWeight: '700' as const, color: StaticColors.text, letterSpacing: -0.4,
   },
-  fieldLabel: {
-    fontSize: 11,
-    fontWeight: '600' as const,
-    color: StaticColors.textSecondary,
-    marginBottom: 8,
-    textTransform: 'uppercase' as const,
-    letterSpacing: 0.5,
+  fieldLabel: { fontSize: 13, fontWeight: '500' as const, color: StaticColors.textSecondary, marginBottom: 8,
   },
   chipScroll: {
     marginBottom: 14,
@@ -1243,15 +1206,14 @@ const styles = StyleSheet.create({
     paddingVertical: 9,
     borderRadius: 24,
     backgroundColor: StaticColors.surfaceAlt,
-    borderWidth: 1.5,
+    borderWidth: 0,
     borderColor: StaticColors.border,
   },
   chipSelected: {
     backgroundColor: StaticColors.primary,
     borderColor: StaticColors.primary,
   },
-  chipText: {
-    fontSize: 13,
+  chipText: { fontSize: 14,
     color: StaticColors.text,
     fontWeight: '600' as const,
   },
@@ -1268,13 +1230,9 @@ const styles = StyleSheet.create({
     gap: 5,
     paddingHorizontal: 14,
     paddingVertical: 7,
-    borderRadius: 10,
-    backgroundColor: 'rgba(27, 107, 90, 0.06)',
-    borderWidth: 1,
-    borderColor: 'rgba(27, 107, 90, 0.15)',
+    borderRadius: 999, backgroundColor: StaticColors.primarySoft, borderWidth: 0, borderColor: 'transparent',
   },
-  addBtnText: {
-    fontSize: 13,
+  addBtnText: { fontSize: 15,
     color: StaticColors.primary,
     fontWeight: '600' as const,
   },
@@ -1282,13 +1240,11 @@ const styles = StyleSheet.create({
     backgroundColor: StaticColors.background,
     borderRadius: 16,
     padding: 16,
-    borderWidth: 1,
+    borderWidth: 0,
     borderColor: StaticColors.border,
     marginBottom: 12,
   },
-  shippingItemCard: {
-    borderColor: StaticColors.warningBorder,
-    backgroundColor: '#FFFDF7',
+  shippingItemCard: { borderColor: 'transparent',
   },
   itemHeader: {
     flexDirection: 'row',
@@ -1296,20 +1252,17 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginBottom: 14,
   },
-  itemBadge: {
-    backgroundColor: 'rgba(27, 107, 90, 0.08)',
+  itemBadge: { backgroundColor: StaticColors.primarySoft,
     paddingHorizontal: 12,
     paddingVertical: 4,
-    borderRadius: 8,
+    borderRadius: 999,
   },
   itemBadgeText: {
     fontSize: 12,
     fontWeight: '700' as const,
     color: StaticColors.primary,
   },
-  deleteBtn: {
-    padding: 8,
-    borderRadius: 8,
+  deleteBtn: { padding: 8, borderRadius: 999,
     backgroundColor: StaticColors.errorBg,
   },
   calcRow: {
@@ -1318,7 +1271,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginTop: 4,
     paddingTop: 12,
-    borderTopWidth: 1,
+    borderTopWidth: StyleSheet.hairlineWidth,
     borderTopColor: StaticColors.divider,
   },
   calcText: {
@@ -1343,12 +1296,12 @@ const styles = StyleSheet.create({
     borderRadius: 20,
     padding: 20,
     marginBottom: 18,
-    borderWidth: 1,
+    borderWidth: 0,
     borderColor: StaticColors.borderLight,
     shadowColor: StaticColors.cardShadow,
-    shadowOffset: { width: 0, height: 2 },
+    shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 1,
-    shadowRadius: 8,
+    shadowRadius: 16,
     elevation: 2,
   },
   totalRow: {
@@ -1357,18 +1310,14 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingVertical: 8,
   },
-  totalsLabel: {
-    fontSize: 14,
+  totalsLabel: { fontSize: 15,
     color: StaticColors.textSecondary,
     fontWeight: '500' as const,
   },
-  totalsValue: {
-    fontSize: 15,
-    fontWeight: '600' as const,
+  totalsValue: { fontSize: 16, fontWeight: '500' as const, fontVariant: ['tabular-nums'],
     color: StaticColors.text,
   },
-  totalDivider: {
-    height: 1,
+  totalDivider: { height: StyleSheet.hairlineWidth,
     backgroundColor: StaticColors.border,
     marginVertical: 6,
   },
@@ -1377,28 +1326,17 @@ const styles = StyleSheet.create({
     fontWeight: '700' as const,
     color: StaticColors.text,
   },
-  grandTotalValue: {
-    fontSize: 22,
-    fontWeight: '800' as const,
-    color: StaticColors.primary,
-    letterSpacing: -0.5,
+  grandTotalValue: { fontSize: 28, fontWeight: '700' as const, color: StaticColors.primary, letterSpacing: -0.8, fontVariant: ['tabular-nums'],
   },
   submitBtn: {
     backgroundColor: StaticColors.accent,
-    borderRadius: 16,
-    paddingVertical: 17,
+    borderRadius: 14, paddingVertical: 16,
     alignItems: 'center',
     shadowColor: StaticColors.accent,
-    shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 0.25,
-    shadowRadius: 12,
+    shadowOffset: { width: 0, height: 6 }, shadowOpacity: 0.2, shadowRadius: 16,
     elevation: 6,
     marginBottom: 24,
   },
-  submitBtnText: {
-    color: StaticColors.white,
-    fontSize: 16,
-    fontWeight: '700' as const,
-    letterSpacing: 0.2,
+  submitBtnText: { color: StaticColors.white, fontSize: 17, fontWeight: '600' as const, letterSpacing: -0.2,
   },
 });

@@ -24,7 +24,7 @@ export default function ResetPasswordScreen() {
   return (
     <View style={styles.container}>
       <View style={styles.card}>
-        <View style={styles.iconWrap}><KeyRound size={22} color="#FF4D2D" /></View>
+        <View style={styles.iconWrap}><KeyRound size={22} color="#E5641C" /></View>
         <Text style={styles.title}>Crea tu nueva contraseña</Text>
         <Text style={styles.subtitle}>Mínimo 8 caracteres. La usarás para entrar en Flow.</Text>
         {error !== '' && <Text style={styles.error}>{error}</Text>}
@@ -65,16 +65,16 @@ export default function ResetPasswordScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#0A0A0F', alignItems: 'center', justifyContent: 'center', padding: 20 },
-  card: { width: '100%', maxWidth: 400, backgroundColor: '#131318', borderRadius: 18, borderWidth: 1, borderColor: '#2A2A35', padding: 24 },
-  iconWrap: { width: 44, height: 44, borderRadius: 12, backgroundColor: 'rgba(255,77,45,0.12)', alignItems: 'center', justifyContent: 'center', marginBottom: 14 },
+  container: { flex: 1, backgroundColor: '#000000', alignItems: 'center', justifyContent: 'center', padding: 20 },
+  card: { width: '100%', maxWidth: 400, backgroundColor: '#1C1C1E', borderRadius: 18, borderWidth: 1, borderColor: 'rgba(255,255,255,0.10)', padding: 24 },
+  iconWrap: { width: 44, height: 44, borderRadius: 12, backgroundColor: 'rgba(229,100,28,0.12)', alignItems: 'center', justifyContent: 'center', marginBottom: 14 },
   title: { color: '#FFFFFF', fontSize: 20, fontWeight: '700' },
   subtitle: { color: '#9595A5', fontSize: 13, marginTop: 6, marginBottom: 16 },
-  error: { color: '#FF8A75', backgroundColor: 'rgba(255,77,45,0.1)', borderRadius: 8, padding: 10, marginBottom: 12, fontSize: 13 },
+  error: { color: '#FF8A75', backgroundColor: 'rgba(229,100,28,0.1)', borderRadius: 8, padding: 10, marginBottom: 12, fontSize: 13 },
   label: { color: '#9595A5', fontSize: 12, fontWeight: '600', marginBottom: 6, marginTop: 6 },
-  input: { backgroundColor: '#0E0E13', borderWidth: 1, borderColor: '#2A2A35', borderRadius: 10, color: '#FFFFFF', paddingHorizontal: 14, paddingVertical: 12, fontSize: 15 },
+  input: { backgroundColor: 'rgba(118,118,128,0.18)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.10)', borderRadius: 10, color: '#FFFFFF', paddingHorizontal: 14, paddingVertical: 12, fontSize: 15 },
   inputWeb: { outlineStyle: 'none' } as any,
-  button: { backgroundColor: '#FF4D2D', borderRadius: 12, paddingVertical: 14, alignItems: 'center', marginTop: 18 },
+  button: { backgroundColor: '#E5641C', borderRadius: 12, paddingVertical: 14, alignItems: 'center', marginTop: 18 },
   buttonText: { color: '#FFFFFF', fontWeight: '700', fontSize: 15 },
   cancel: { alignItems: 'center', marginTop: 12 },
   cancelText: { color: '#6B6B7B', fontSize: 13 },
