@@ -23,10 +23,11 @@ import { OrderFormData, OrderFormItem, ShippingFormItem, OrderStatus, Customer }
 import { calculateItemTotals, calculateShippingTotals, formatCurrency } from '@/utils/calculations';
 import * as Haptics from 'expo-haptics';
 import * as DocumentPicker from 'expo-document-picker';
-import * as ImagePicker from 'expo-image-picker';
-import { supabase, describeError } from '@/lib/supabase';
 import { webInputReset } from '@/constants/theme';
-import { z } from 'zod';
+import DocumentReview from '@/components/DocumentReview';
+import { DOC_READ_SUPPORTED, DocReadError, readDocument, releaseReader, type ReadInput } from '@/utils/docread/read';
+import { applyReview, buildReview, type ReviewState } from '@/utils/docread/review';
+import type { ParsedDoc, ReadResult } from '@/utils/docread/types';
 
 const STATUS_OPTIONS: { value: OrderStatus; label: string }[] = [
   { value: 'pending', label: 'Pendiente' },
@@ -75,142 +76,6 @@ const emptyShipping: ShippingFormItem = {
   vat_percentage: 21,
 };
 
-const extractionSchema = z.object({
-  nombre_empresa: z.string().describe("Nombre de la empresa cliente").optional(),
-  contacto: z.string().describe("Nombre de la persona de contacto").optional(),
-  departamento: z.string().describe("Departamento del contacto").optional(),
-  numero_referencia_pedido: z.string().describe("Número de referencia del pedido del cliente").optional(),
-  direccion_1: z.string().describe("Dirección línea 1").optional(),
-  direccion_2: z.string().describe("Dirección línea 2").optional(),
-  codigo_postal: z.string().describe("Código postal").optional(),
-  provincia: z.string().describe("Provincia o comunidad autónoma").optional(),
-  pais: z.string().describe("País, por defecto España").optional(),
-  telefono_1: z.string().describe("Teléfono principal").optional(),
-  telefono_2: z.string().describe("Teléfono secundario").optional(),
-  email: z.string().describe("Dirección de email").optional(),
-  nif: z.string().describe("NIF o CIF de la empresa").optional(),
-  oferta_proforma: z.string().describe("Número de oferta o proforma").optional(),
-  condiciones_entrega: z.string().describe("Condiciones de entrega acordadas").optional(),
-  condiciones_pago: z.string().describe("Condiciones de pago acordadas").optional(),
-  numero_factura: z.string().describe("Número de factura si aparece").optional(),
-  numero_recibo: z.string().describe("Número de recibo o albarán si aparece").optional(),
-  custom_reference: z.string().describe("Referencia personalizada del pedido").optional(),
-  items: z.array(z.object({
-    product_name: z.string().describe("Nombre o descripción del producto/artículo"),
-    quantity: z.number().describe("Cantidad pedida").optional(),
-    costo_unitario: z.number().describe("Precio de coste unitario").optional(),
-    tpv_unitario: z.number().describe("Precio de venta unitario (PVP)").optional(),
-    total_sin_iva: z.number().describe("Total sin IVA de esta línea").optional(),
-    descuento_porcentaje: z.number().describe("Porcentaje de descuento aplicado").optional(),
-    vat_percentage: z.number().describe("Porcentaje de IVA, normalmente 21").optional(),
-  })).describe("Lista de productos/artículos encontrados en el documento").optional(),
-  shipping_items: z.array(z.object({
-    description: z.string().describe("Descripción del servicio de envío o transporte"),
-    quantity: z.number().describe("Cantidad").optional(),
-    costo_unitario: z.number().describe("Coste unitario del envío").optional(),
-    vat_percentage: z.number().describe("Porcentaje de IVA del envío").optional(),
-  })).describe("Gastos de envío o transporte si se encuentran").optional(),
-});
-
-type ExtractionResult = z.infer<typeof extractionSchema>;
-
-function blobToBase64(blob: Blob): Promise<string> {
-  return new Promise<string>((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onloadend = () => {
-      const result = reader.result as string;
-      const base64 = result.split(',')[1] || result;
-      resolve(base64);
-    };
-    reader.onerror = () => reject(new Error('FileReader falló'));
-    reader.readAsDataURL(blob);
-  });
-}
-
-async function readFileAsBase64(uri: string, _mimeType: string): Promise<string> {
-  console.log('[FileRead] Platform:', Platform.OS, 'URI:', uri.substring(0, 120));
-
-  try {
-    console.log('[FileRead] Trying fetch approach...');
-    const response = await fetch(uri);
-    if (!response.ok) {
-      throw new Error(`Fetch failed with status ${response.status}`);
-    }
-    const blob = await response.blob();
-    console.log('[FileRead] Blob size:', blob.size, 'type:', blob.type);
-    if (blob.size === 0) {
-      throw new Error('Blob vacío');
-    }
-    const base64 = await blobToBase64(blob);
-    console.log('[FileRead] fetch+blob base64 length:', base64.length);
-    return base64;
-  } catch (fetchErr: any) {
-    console.log('[FileRead] Fetch approach failed:', fetchErr?.message);
-  }
-
-  if (Platform.OS !== 'web') {
-    try {
-      console.log('[FileRead] Trying expo-file-system legacy...');
-      const LegacyFS = await import('expo-file-system/legacy');
-      const base64 = await LegacyFS.readAsStringAsync(uri, {
-        encoding: (LegacyFS as any).EncodingType?.Base64 ?? 'base64',
-      });
-      console.log('[FileRead] Legacy base64 length:', base64.length);
-      return base64;
-    } catch (legacyErr: any) {
-      console.log('[FileRead] Legacy failed:', legacyErr?.message);
-    }
-
-    try {
-      console.log('[FileRead] Trying expo-file-system File class...');
-      const FS = await import('expo-file-system');
-      const ExpoFile = (FS as any).File || (FS as any).default?.File;
-      if (ExpoFile) {
-        const file = new ExpoFile(uri);
-        const base64 = await file.base64();
-        console.log('[FileRead] File class base64 length:', base64.length);
-        return base64;
-      }
-      throw new Error('File class not found in expo-file-system');
-    } catch (fileErr: any) {
-      console.log('[FileRead] File class failed:', fileErr?.message);
-    }
-  }
-
-  throw new Error('No se pudo leer el archivo. Intenta con una imagen diferente.');
-}
-
-/**
- * Envía el documento a la función segura "extract-order" de Supabase, que usa IA para leerlo.
- * La clave de la IA vive en el servidor (nunca en la app).
- */
-async function extractDataFromDocument(
-  base64: string,
-  mimeType: string,
-): Promise<ExtractionResult> {
-  const effectiveMime = mimeType === 'application/pdf' ? 'application/pdf' : (mimeType || 'image/jpeg');
-  const { data, error } = await supabase.functions.invoke('extract-order', {
-    body: { base64, mimeType: effectiveMime },
-  });
-  if (error) {
-    let message = describeError(error);
-    try {
-      const ctx = (error as any).context;
-      if (ctx && typeof ctx.json === 'function') {
-        const body = await ctx.json();
-        if (body?.error) message = body.error;
-      }
-    } catch {
-      // mensaje genérico
-    }
-    throw new Error(message);
-  }
-  if (data?.error) throw new Error(data.error);
-  const parsed = extractionSchema.safeParse(data?.result ?? {});
-  if (!parsed.success) throw new Error('La IA devolvió datos con un formato inesperado. Inténtalo de nuevo.');
-  return parsed.data;
-}
-
 export default function OrderFormScreen() {
   const { colors, isDark } = useTheme();
   const { editOrderId, manufacturerId, year } = useLocalSearchParams<{
@@ -242,11 +107,22 @@ export default function OrderFormScreen() {
 
   const [selectedManufacturerIndex, setSelectedManufacturerIndex] = useState<number>(-1);
   const [selectedStatusIndex, setSelectedStatusIndex] = useState<number>(0);
-  const [isExtracting, setIsExtracting] = useState<boolean>(false);
+  const [scan, setScan] = useState<{ step: string; fraction?: number; fileName: string } | null>(null);
+  const isExtracting = !!scan;
+  const [scanError, setScanError] = useState<string | null>(null);
+  const [review, setReview] = useState<{ read: ReadResult; doc: ParsedDoc; state: ReviewState; fileName: string } | null>(null);
   const [saving, setSaving] = useState<boolean>(false);
-  const [extractionFileName, setExtractionFileName] = useState<string>('');
   const pulseAnim = useRef(new Animated.Value(0.4)).current;
-  const extractionAbortRef = useRef<boolean>(false);
+  const scanSignalRef = useRef<{ aborted: boolean }>({ aborted: false });
+  const lastFileRef = useRef<ReadInput | null>(null);
+  const formRef = useRef(formData);
+  formRef.current = formData;
+
+  // Liberar el lector (memoria del OCR) al salir del formulario
+  useEffect(() => () => {
+    scanSignalRef.current.aborted = true;
+    void releaseReader();
+  }, []);
 
   useEffect(() => {
     if (isExtracting) {
@@ -260,61 +136,6 @@ export default function OrderFormScreen() {
       return () => pulse.stop();
     }
   }, [isExtracting, pulseAnim]);
-
-  const applyExtractedData = useCallback((data: ExtractionResult) => {
-    console.log('[Apply] AI extracted data:', JSON.stringify(data, null, 2));
-
-    setFormData(prev => {
-      const updated = { ...prev };
-
-      const customerKeys: (keyof Customer)[] = [
-        'nombre_empresa', 'contacto', 'departamento', 'numero_referencia_pedido',
-        'direccion_1', 'direccion_2', 'codigo_postal', 'provincia', 'pais',
-        'telefono_1', 'telefono_2', 'email', 'nif', 'oferta_proforma',
-        'condiciones_entrega', 'condiciones_pago', 'numero_factura', 'numero_recibo',
-      ];
-
-      const newCustomer = { ...prev.customer };
-      for (const key of customerKeys) {
-        const val = (data as Record<string, unknown>)[key];
-        if (val && typeof val === 'string' && val.trim()) {
-          (newCustomer as Record<string, string>)[key] = val;
-        }
-      }
-      updated.customer = newCustomer;
-
-      if (data.custom_reference) {
-        updated.custom_reference = data.custom_reference;
-      }
-
-      if (data.items && data.items.length > 0) {
-        updated.items = data.items.map(item => ({
-          product_name: item.product_name || '',
-          quantity: item.quantity ?? 1,
-          costo_unitario: item.costo_unitario ?? 0,
-          tpv_unitario: item.tpv_unitario ?? 0,
-          total_sin_iva: item.total_sin_iva ?? 0,
-          descuento_porcentaje: item.descuento_porcentaje ?? 0,
-          vat_percentage: item.vat_percentage ?? 21,
-        }));
-      }
-
-      if (data.shipping_items && data.shipping_items.length > 0) {
-        updated.shipping_items = data.shipping_items.map(s => ({
-          description: s.description || '',
-          quantity: s.quantity ?? 1,
-          costo_unitario: s.costo_unitario ?? 0,
-          total_sin_iva: 0,
-          vat_percentage: s.vat_percentage ?? 21,
-        }));
-      }
-
-      return updated;
-    });
-
-    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-    Alert.alert('Datos extraídos', 'Se han rellenado los campos con la información del documento. Revisa y ajusta los datos antes de guardar.');
-  }, []);
 
   // Rellenar el formulario UNA sola vez (si llegan cambios en tiempo real no se pierde lo que estás escribiendo)
   const initializedRef = useRef<string | null>(null);
@@ -423,188 +244,74 @@ export default function OrderFormScreen() {
     setFormData(prev => ({ ...prev, status: STATUS_OPTIONS[index].value }));
   }, []);
 
-  const processFile = useCallback(async (uri: string, mimeType: string, fileName: string) => {
-    extractionAbortRef.current = false;
-    setIsExtracting(true);
-    setExtractionFileName(fileName);
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-
+  /** Lee el documento en el navegador y abre la pantalla de revisión (no toca el formulario). */
+  const startRead = useCallback(async (input: ReadInput) => {
+    const signal = { aborted: false };
+    scanSignalRef.current.aborted = true;
+    scanSignalRef.current = signal;
+    lastFileRef.current = input;
+    setScanError(null);
+    setScan({ step: 'Abriendo el archivo…', fileName: input.name || 'documento' });
+    void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     try {
-      console.log('[Process] Reading file:', fileName, 'mimeType:', mimeType);
-      const base64 = await readFileAsBase64(uri, mimeType);
-      console.log('[Process] File read OK, base64 length:', base64.length);
-
-      if (extractionAbortRef.current) {
-        console.log('[Process] Cancelled after file read');
-        return;
-      }
-
-      const extractedData = await extractDataFromDocument(base64, mimeType);
-      console.log('[Process] Extraction result:', JSON.stringify(extractedData, null, 2));
-
-      if (extractionAbortRef.current) {
-        console.log('[Process] Cancelled after AI response');
-        return;
-      }
-
-      applyExtractedData(extractedData);
-    } catch (extractErr: any) {
-      console.error('[Process] Extraction failed:', extractErr);
-      if (!extractionAbortRef.current) {
-        Alert.alert(
-          'Error de extracción',
-          `No se pudieron extraer los datos: ${extractErr?.message || 'Error desconocido'}. Intenta con una imagen o rellena manualmente.`
-        );
-      }
+      const seen = new Set<string>();
+      const knownCustomers = orders
+        .map(o => ({ name: o.customer?.nombre_empresa ?? '', nif: o.customer?.nif ?? '' }))
+        .filter(c => (c.name || c.nif) && !seen.has(c.name + c.nif) && seen.add(c.name + c.nif));
+      const { read, parsed } = await readDocument(
+        input,
+        { manufacturers: manufacturers.map(m => ({ id: m.id, name: m.name, code: m.code })), knownCustomers, ownNames: ['AO Gestiones'] },
+        prog => {
+          if (!signal.aborted) setScan(prev => (prev ? { ...prev, step: prog.step, fraction: prog.fraction } : prev));
+        },
+        signal,
+      );
+      if (signal.aborted) return;
+      setReview({ read, doc: parsed, fileName: input.name || 'documento', state: buildReview(parsed, formRef.current, formRef.current.manufacturer_id) });
+    } catch (e) {
+      if (signal.aborted) return;
+      const msg = (e as Error)?.message;
+      setScanError(e instanceof DocReadError ? msg : `No se pudo leer el documento${msg ? `: ${msg}` : ''}.`);
     } finally {
-      setIsExtracting(false);
-      setExtractionFileName('');
+      if (!signal.aborted) setScan(null);
     }
-  }, [applyExtractedData]);
+  }, [orders, manufacturers]);
 
-  const handlePickImage = useCallback(async () => {
-    try {
-      const result = await ImagePicker.launchImageLibraryAsync({
-        mediaTypes: ['images'],
-        quality: 0.9,
-        base64: true,
-      });
-
-      if (result.canceled || !result.assets?.length) return;
-
-      const asset = result.assets[0];
-      const mimeType = asset.mimeType || 'image/jpeg';
-      const fileName = asset.fileName || 'imagen_galeria';
-      console.log('[ImagePick] Image selected, mimeType:', mimeType, 'hasBase64:', !!asset.base64);
-
-      if (asset.base64) {
-        extractionAbortRef.current = false;
-        setIsExtracting(true);
-        setExtractionFileName(fileName);
-        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-
-        try {
-          const extractedData = await extractDataFromDocument(asset.base64, mimeType);
-          if (!extractionAbortRef.current) {
-            applyExtractedData(extractedData);
-          }
-        } catch (extractErr: any) {
-          console.error('[ImagePick] Extraction failed:', extractErr);
-          if (!extractionAbortRef.current) {
-            Alert.alert('Error de extracción', `No se pudieron extraer los datos: ${extractErr?.message || 'Error desconocido'}`);
-          }
-        } finally {
-          setIsExtracting(false);
-          setExtractionFileName('');
-        }
-      } else {
-        await processFile(asset.uri, mimeType, fileName);
-      }
-    } catch (err) {
-      console.error('[ImagePick] Error:', err);
-      setIsExtracting(false);
-      setExtractionFileName('');
-      Alert.alert('Error', 'No se pudo abrir la galería de imágenes');
+  const handleScanAction = useCallback(async () => {
+    if (!DOC_READ_SUPPORTED) {
+      Alert.alert('Disponible en la web', 'La lectura de documentos funciona en la versión web de la app (ao-gestiones-pedidos.vercel.app).');
+      return;
     }
-  }, [processFile, applyExtractedData]);
-
-  const handlePickDocument = useCallback(async () => {
     try {
       const result = await DocumentPicker.getDocumentAsync({
-        type: [
-          'image/jpeg',
-          'image/png',
-          'image/jpg',
-          'image/webp',
-          'application/pdf',
-        ],
+        type: ['application/pdf', 'image/*'],
         copyToCacheDirectory: true,
+        multiple: false,
       });
-
       if (result.canceled || !result.assets?.length) return;
-
       const asset = result.assets[0];
-      const mimeType = asset.mimeType || 'application/octet-stream';
-      console.log('[Pick] Document:', asset.name, mimeType, 'uri:', asset.uri?.substring(0, 100));
-
-      await processFile(asset.uri, mimeType, asset.name || 'documento');
-    } catch (err) {
-      console.error('[Pick] Document pick error:', err);
-      setIsExtracting(false);
-      setExtractionFileName('');
-      Alert.alert('Error', 'No se pudo abrir el selector de documentos');
+      await startRead({ uri: asset.uri, mimeType: asset.mimeType ?? undefined, name: asset.name });
+    } catch {
+      setScanError('No se pudo abrir el selector de archivos.');
     }
-  }, [processFile]);
-
-  const handleTakePhoto = useCallback(async () => {
-    try {
-      const permResult = await ImagePicker.requestCameraPermissionsAsync();
-      if (!permResult.granted) {
-        Alert.alert('Permiso necesario', 'Se necesita acceso a la cámara para tomar fotos de documentos.');
-        return;
-      }
-
-      const result = await ImagePicker.launchCameraAsync({
-        mediaTypes: ['images'],
-        quality: 0.9,
-        base64: true,
-      });
-
-      if (result.canceled || !result.assets?.length) return;
-
-      const asset = result.assets[0];
-      const mimeType = asset.mimeType || 'image/jpeg';
-      console.log('[Camera] Photo taken, mimeType:', mimeType);
-
-      if (asset.base64) {
-        extractionAbortRef.current = false;
-        setIsExtracting(true);
-        setExtractionFileName('foto_documento');
-        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-
-        try {
-          const extractedData = await extractDataFromDocument(asset.base64, mimeType);
-          if (!extractionAbortRef.current) {
-            applyExtractedData(extractedData);
-          }
-        } catch (extractErr: any) {
-          console.error('[Camera] Extraction failed:', extractErr);
-          if (!extractionAbortRef.current) {
-            Alert.alert('Error de extracción', `No se pudieron extraer los datos: ${extractErr?.message || 'Error desconocido'}`);
-          }
-        } finally {
-          setIsExtracting(false);
-          setExtractionFileName('');
-        }
-      } else {
-        await processFile(asset.uri, mimeType, 'foto_documento');
-      }
-    } catch (err) {
-      console.error('[Camera] Error:', err);
-      setIsExtracting(false);
-      setExtractionFileName('');
-      Alert.alert('Error', 'No se pudo acceder a la cámara');
-    }
-  }, [processFile, applyExtractedData]);
-
-  const handleScanAction = useCallback(() => {
-    Alert.alert(
-      'Escanear Documento',
-      'Elige cómo quieres importar el documento:',
-      [
-        { text: 'Imagen de Galería', onPress: handlePickImage },
-        { text: 'Archivo (PDF, Imagen)', onPress: handlePickDocument },
-        ...(Platform.OS !== 'web' ? [{ text: 'Tomar Foto', onPress: handleTakePhoto }] : []),
-        { text: 'Cancelar', style: 'cancel' as const },
-      ]
-    );
-  }, [handlePickImage, handlePickDocument, handleTakePhoto]);
+  }, [startRead]);
 
   const cancelExtraction = useCallback(() => {
-    extractionAbortRef.current = true;
-    setIsExtracting(false);
-    setExtractionFileName('');
+    scanSignalRef.current.aborted = true;
+    setScan(null);
   }, []);
+
+  const applyReviewToForm = useCallback(() => {
+    if (!review) return;
+    const { form, summary } = applyReview(formRef.current, review.state, review.doc.manufacturerMatch?.id);
+    setFormData(form);
+    if (form.manufacturer_id !== formRef.current.manufacturer_id) {
+      setSelectedManufacturerIndex(manufacturers.findIndex(m => m.id === form.manufacturer_id));
+    }
+    setReview(null);
+    void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    Alert.alert('Datos aplicados', `Se han aplicado ${summary}. Revisa el pedido y pulsa «Guardar» para guardarlo.`);
+  }, [review, manufacturers]);
 
   const totals = useMemo(() => {
     const itemTotals = formData.items.map(item => calculateItemTotals(item));
@@ -681,40 +388,65 @@ export default function OrderFormScreen() {
           showsVerticalScrollIndicator={false}
           keyboardShouldPersistTaps="handled"
         >
-          {isExtracting ? (
-            <View style={[styles.extractingBanner, { backgroundColor: isDark ? colors.surface : colors.primaryDark }]}>
+          {scan ? (
+            <View style={[styles.extractingBanner, { backgroundColor: isDark ? colors.surface : colors.primaryDark }]} accessibilityLiveRegion="polite">
               <View style={styles.extractingContent}>
                 <Animated.View style={[styles.extractingIconWrap, { opacity: pulseAnim }]}>
                   <ScanLine size={22} color="#FFFFFF" />
                 </Animated.View>
                 <View style={styles.extractingTextWrap}>
-                  <Text style={styles.extractingTitle}>Analizando documento...</Text>
-                  <Text style={styles.extractingSubtitle} numberOfLines={1}>{extractionFileName}</Text>
+                  <Text style={styles.extractingTitle}>Leyendo documento…</Text>
+                  <Text style={styles.extractingSubtitle} numberOfLines={1}>{scan.fileName}</Text>
                 </View>
-                <Pressable onPress={cancelExtraction} hitSlop={10} style={styles.extractingCancel}>
-                  <X size={18} color="rgba(255,255,255,0.7)" />
+                <Pressable onPress={cancelExtraction} hitSlop={10} style={styles.extractingCancel} accessibilityRole="button" accessibilityLabel="Cancelar lectura">
+                  <X size={18} color="rgba(255,255,255,0.8)" />
                 </Pressable>
               </View>
               <View style={styles.extractingProgress}>
                 <ActivityIndicator size="small" color="#FFFFFF" />
-                <Text style={styles.extractingProgressText}>Extrayendo datos con IA...</Text>
+                <Text style={styles.extractingProgressText} numberOfLines={2}>{scan.step}</Text>
               </View>
+              {typeof scan.fraction === 'number' && (
+                <View style={styles.progressTrack}>
+                  <View style={[styles.progressFill, { width: `${Math.round(Math.min(1, Math.max(0.03, scan.fraction)) * 100)}%` as any }]} />
+                </View>
+              )}
             </View>
           ) : (
             <Pressable
               style={[styles.scanBtn, { backgroundColor: colors.surface, borderColor: colors.borderLight }]}
               onPress={handleScanAction}
               testID="scan-document-btn"
+              accessibilityRole="button"
+              accessibilityLabel="Leer datos de un documento"
             >
               <View style={[styles.scanBtnIconWrap, { backgroundColor: colors.primary }]}>
                 <ScanLine size={18} color="#FFFFFF" />
               </View>
               <View style={styles.scanBtnTextWrap}>
-                <Text style={[styles.scanBtnTitle, { color: colors.text }]}>Escanear Documento</Text>
-                <Text style={[styles.scanBtnSubtitle, { color: colors.textSecondary }]}>PDF, JPG, PNG — Extracción con IA</Text>
+                <Text style={[styles.scanBtnTitle, { color: colors.text }]}>Leer datos de un documento</Text>
+                <Text style={[styles.scanBtnSubtitle, { color: colors.textSecondary }]}>PDF, JPG o PNG · se lee en tu dispositivo, sin enviarlo a ningún servicio</Text>
               </View>
               <FileText size={16} color={colors.primaryLight} />
             </Pressable>
+          )}
+          {scanError && !scan && (
+            <View style={[styles.scanErrorCard, { backgroundColor: colors.errorBg, borderColor: colors.errorBorder }]} accessibilityLiveRegion="assertive">
+              <Text style={[styles.scanErrorText, { color: colors.text }]}>{scanError}</Text>
+              <View style={styles.scanErrorActions}>
+                {lastFileRef.current && (
+                  <Pressable onPress={() => lastFileRef.current && startRead(lastFileRef.current)} style={[styles.scanErrorBtn, { backgroundColor: colors.surface }]} accessibilityRole="button">
+                    <Text style={[styles.scanErrorBtnText, { color: colors.primary }]}>Reintentar</Text>
+                  </Pressable>
+                )}
+                <Pressable onPress={handleScanAction} style={[styles.scanErrorBtn, { backgroundColor: colors.surface }]} accessibilityRole="button">
+                  <Text style={[styles.scanErrorBtnText, { color: colors.primary }]}>Elegir otro archivo</Text>
+                </Pressable>
+                <Pressable onPress={() => setScanError(null)} style={styles.scanErrorBtn} accessibilityRole="button" accessibilityLabel="Cerrar aviso">
+                  <Text style={[styles.scanErrorBtnText, { color: colors.textSecondary }]}>Cerrar</Text>
+                </Pressable>
+              </View>
+            </View>
           )}
 
           <View style={isDesktop ? styles.desktopFormRow : undefined}>
@@ -947,6 +679,22 @@ export default function OrderFormScreen() {
           </Pressable>
         </ScrollView>
       </KeyboardAvoidingView>
+      {review && (
+        <DocumentReview
+          visible
+          fileName={review.fileName}
+          read={review.read}
+          doc={review.doc}
+          form={formData}
+          state={review.state}
+          onChange={st => setReview(r => (r ? { ...r, state: st } : r))}
+          orders={orders}
+          editingOrderId={editingOrder?.id}
+          manufacturerName={manufacturers.find(m => m.id === formData.manufacturer_id)?.name}
+          onCancel={() => setReview(null)}
+          onApply={applyReviewToForm}
+        />
+      )}
     </View>
   );
 }
@@ -1139,9 +887,6 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: 'rgba(255,255,255,0.55)',
   },
-  extractingCancel: {
-    padding: 6,
-  },
   extractingProgress: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -1152,9 +897,55 @@ const styles = StyleSheet.create({
     paddingHorizontal: 14,
   },
   extractingProgressText: {
+    flex: 1,
     fontSize: 13,
-    color: 'rgba(255,255,255,0.8)',
+    color: 'rgba(255,255,255,0.85)',
     fontWeight: '500' as const,
+  },
+  extractingCancel: {
+    width: 44,
+    height: 44,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  progressTrack: {
+    height: 4,
+    borderRadius: 2,
+    backgroundColor: 'rgba(255,255,255,0.15)',
+    marginTop: 10,
+    overflow: 'hidden',
+  },
+  progressFill: {
+    height: 4,
+    borderRadius: 2,
+    backgroundColor: '#FFFFFF',
+  },
+  scanErrorCard: {
+    borderRadius: 16,
+    borderWidth: 1,
+    padding: 14,
+    marginBottom: 18,
+    gap: 10,
+  },
+  scanErrorText: {
+    fontSize: 14,
+    lineHeight: 20,
+  },
+  scanErrorActions: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+  },
+  scanErrorBtn: {
+    minHeight: 40,
+    paddingHorizontal: 14,
+    borderRadius: 999,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  scanErrorBtnText: {
+    fontSize: 14,
+    fontWeight: '600' as const,
   },
   section: {
     backgroundColor: StaticColors.surface,
