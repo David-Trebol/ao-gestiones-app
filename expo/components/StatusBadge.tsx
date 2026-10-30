@@ -11,7 +11,18 @@ interface StatusConfig {
   textKey: 'statusPendingText' | 'statusProcessingText' | 'statusShippedText' | 'statusDeliveredText' | 'statusCancelledText';
 }
 
-const statusConfig: Record<OrderStatus, StatusConfig> = {
+export const STATUS_ICONS = {
+  pending: Clock,
+  processing: Loader,
+  shipped: Truck,
+  delivered: CheckCircle,
+  cancelled: XCircle,
+} as const;
+
+/** Nombre completo de cada estado (nunca abreviado) */
+export const STATUS_ORDER: OrderStatus[] = ['pending', 'processing', 'shipped', 'delivered', 'cancelled'];
+
+export const statusConfig: Record<OrderStatus, StatusConfig> = {
   pending: {
     label: 'Pendiente',
     shortLabel: 'Pend.',
@@ -70,6 +81,7 @@ export default React.memo(function StatusBadge({ status, size = 'default' }: Pro
       style={[
         styles.badge,
         {
+          alignSelf: 'flex-start',
           backgroundColor: bg,
           borderColor: textColor,
           borderWidth: 0,
@@ -85,11 +97,11 @@ export default React.memo(function StatusBadge({ status, size = 'default' }: Pro
           styles.text,
           {
             color: textColor,
-            fontSize: isSmall ? 10 : 12,
+            fontSize: isSmall ? 11 : 12,
           },
         ]}
       >
-        {isSmall ? config.shortLabel : config.label}
+        {config.label}
       </Text>
     </View>
   );

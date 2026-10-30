@@ -1,795 +1,504 @@
-import React, { useMemo, useState, useCallback, useRef, useEffect } from 'react';
-import { NATIVE_DRIVER, enterAnimation } from '@/constants/animation';
-import { FONT_FAMILY, webInputReset } from '@/constants/theme';
-import {
-  View,
-  Text,
-  StyleSheet,
-  ScrollView,
-  Pressable,
-  Alert,
-  Platform,
-  useWindowDimensions,
-  TextInput,
-  Animated,
-  Easing,
-} from 'react-native';
-import { useLocalSearchParams, useRouter, Stack } from 'expo-router';
-import {
-  MapPin,
-  Phone,
-  Package,
-  Euro,
-  Building2,
-  Mail,
-  FileText,
-  Truck,
-  Edit3,
-  Trash2,
-  Check,
-  X,
-  Pencil,
-  Calendar,
-  Clock,
-  Hash,
-  Tag,
-  ChevronDown,
-  ChevronUp,
-  Copy,
-} from 'lucide-react-native';
+import React, { useCallback, useMemo, useState } from 'react';
+import { Alert, Pressable, ScrollView, StyleSheet, Text, TextInput, View, useWindowDimensions } from 'react-native';
+import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
+import { Check, ChevronDown, ChevronUp, Copy, MoreHorizontal, Pencil, X } from 'lucide-react-native';
+import * as Haptics from 'expo-haptics';
 import { useTheme } from '@/contexts/ThemeContext';
 import { useData } from '@/contexts/DataContext';
-import StatusBadge from '@/components/StatusBadge';
-import { formatCurrency, formatDateLong } from '@/utils/calculations';
-import * as Haptics from 'expo-haptics';
+import { ThemeColors } from '@/constants/colors';
+import { cardShadow, radius, webInputReset } from '@/constants/theme';
+import StatusBadge, { STATUS_ORDER, statusConfig } from '@/components/StatusBadge';
+import SelectSheet from '@/components/SelectSheet';
+import type { OrderStatus } from '@/types';
+import { formatCurrency, formatDate } from '@/utils/calculations';
 
-function AnimatedSection({ children, index }: { children: React.ReactNode; index: number }) {
-  const opacity = useRef(new Animated.Value(0)).current;
-  const translateY = useRef(new Animated.Value(12)).current;
-
-  useEffect(() => {
-    enterAnimation(opacity, translateY, index).start();
-  // eslint-disable-next-line react-hooks/exhaustive-deps -- los valores animados son refs estables
-  }, [index]);
-
-  return (
-    <Animated.View style={{ opacity, transform: [{ translateY }] }}>
-      {children}
-    </Animated.View>
-  );
-}
+type Sheet = 'more' | 'status' | null;
 
 export default function OrderDetailScreen() {
   const { orderId } = useLocalSearchParams<{ orderId: string }>();
   const router = useRouter();
   const { orders, deleteOrder, updateOrderField, duplicateOrder } = useData();
-  const { colors } = useTheme();
+  const { colors, isDark } = useTheme();
   const { width } = useWindowDimensions();
-  const isDesktop = width >= 1024;
-  const contentMaxWidth = isDesktop ? 880 : width;
-
+  const desktop = width >= 1024;
+  const s = useMemo(() => makeStyles(colors), [colors]);
   const order = useMemo(() => orders.find(o => o.id === orderId), [orders, orderId]);
-  const shippingGrandTotal = useMemo(() => {
-    if (!order) return 0;
-    const items = (order.shipping_items ?? []).reduce((sum, s) => sum + (s.valor_con_iva || 0), 0);
-    return Math.round((items + (order.shipping_cost || 0)) * 100) / 100;
-  }, [order]);
 
-  const [isEditingRef, setIsEditingRef] = useState<boolean>(false);
-  const [editRefValue, setEditRefValue] = useState<string>('');
-  const [expandedItems, setExpandedItems] = useState<Record<number, boolean>>({});
-  const editPulse = useRef(new Animated.Value(1)).current;
+  const [sheet, setSheet] = useState<Sheet>(null);
+  const [editingRef, setEditingRef] = useState(false);
+  const [refValue, setRefValue] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [openClient, setOpenClient] = useState(false);
+  const [openDocs, setOpenDocs] = useState(false);
 
-  const toggleItemExpand = useCallback((index: number) => {
-    setExpandedItems(prev => ({ ...prev, [index]: !prev[index] }));
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-  }, []);
-
-  const splitProductName = useCallback((fullName: string) => {
-    const dashIndex = fullName.indexOf(' - ');
-    if (dashIndex === -1) {
-      return { name: fullName, description: '' };
-    }
-    const firstPart = fullName.substring(0, dashIndex).trim();
-    const restPart = fullName.substring(dashIndex + 3).trim();
-    if (firstPart.length <= 40) {
-      return { name: firstPart, description: restPart };
-    }
-    return { name: fullName, description: '' };
-  }, []);
-
-  const handleStartEditRef = useCallback(() => {
-    if (!order) return;
-    setEditRefValue(order.custom_reference || '');
-    setIsEditingRef(true);
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    Animated.sequence([
-      Animated.timing(editPulse, { toValue: 1.04, duration: 150, easing: Easing.out(Easing.back(2)), useNativeDriver: NATIVE_DRIVER }),
-      Animated.spring(editPulse, { toValue: 1, friction: 4, tension: 80, useNativeDriver: NATIVE_DRIVER }),
-    ]).start();
-  }, [order, editPulse]);
-
-  const handleSaveRef = useCallback(async () => {
-    if (!order) return;
-    try {
-      await updateOrderField(order.id, 'custom_reference', editRefValue.trim());
-      setIsEditingRef(false);
-      void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-    } catch (e) {
-      Alert.alert('No se pudo guardar', (e as Error).message);
-    }
-  }, [order, editRefValue, updateOrderField]);
-
-  const handleCancelEditRef = useCallback(() => {
-    setIsEditingRef(false);
-    setEditRefValue('');
-  }, []);
-
-  const handleDelete = useCallback(() => {
-    if (!order) return;
-    Alert.alert(
-      '¿Estás seguro?',
-      `Se eliminará permanentemente el pedido ${order.reference_number}.`,
-      [
-        { text: 'Cancelar', style: 'cancel' },
-        {
-          text: 'Eliminar',
-          style: 'destructive',
-          onPress: async () => {
-            try {
-              await deleteOrder(order.id);
-              void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
-              if (router.canGoBack()) router.back();
-              else router.replace('/');
-            } catch (e) {
-              Alert.alert('No se pudo eliminar', (e as Error).message);
-            }
-          },
-        },
-      ]
-    );
-  }, [order, deleteOrder, router]);
+  const goBack = useCallback(() => (router.canGoBack() ? router.back() : router.replace('/')), [router]);
 
   const handleEdit = useCallback(() => {
-    if (!order) return;
-    router.push(`/order-form?editOrderId=${order.id}` as any);
+    if (order) router.push(`/order-form?editOrderId=${order.id}` as never);
   }, [order, router]);
 
   const handleDuplicate = useCallback(() => {
     if (!order) return;
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-    Alert.alert(
-      'Duplicar pedido',
-      `¿Duplicar "${order.reference_number}"?`,
-      [
-        { text: 'Cancelar', style: 'cancel' },
-        {
-          text: 'Duplicar',
-          onPress: async () => {
-            try {
-              const newOrder = await duplicateOrder(order.id);
-              void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-              Alert.alert('Pedido duplicado', `Se creó "${newOrder.reference_number}" como pedido pendiente.`, [
-                { text: 'Seguir aquí', style: 'cancel' },
-                { text: 'Abrir copia', onPress: () => router.replace(`/order-detail?orderId=${newOrder.id}` as any) },
-              ]);
-            } catch (e) {
-              Alert.alert('No se pudo duplicar', (e as Error).message);
-            }
-          },
+    Alert.alert('Duplicar pedido', `Se creará una copia de ${order.reference_number} como pedido pendiente, sin nº de factura ni de recibo.`, [
+      { text: 'Cancelar', style: 'cancel' },
+      {
+        text: 'Duplicar',
+        onPress: async () => {
+          try {
+            const copy = await duplicateOrder(order.id);
+            void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+            Alert.alert('Pedido duplicado', `Se ha creado ${copy.reference_number}.`, [
+              { text: 'Seguir aquí', style: 'cancel' },
+              { text: 'Abrir la copia', onPress: () => router.replace(`/order-detail?orderId=${copy.id}` as never) },
+            ]);
+          } catch (e) {
+            Alert.alert('No se pudo duplicar', (e as Error).message);
+          }
         },
-      ]
-    );
+      },
+    ]);
   }, [order, duplicateOrder, router]);
+
+  const handleDelete = useCallback(() => {
+    if (!order) return;
+    Alert.alert('Eliminar pedido', `Se eliminará ${order.reference_number} de forma permanente. Esta acción no se puede deshacer.`, [
+      { text: 'Cancelar', style: 'cancel' },
+      {
+        text: 'Eliminar',
+        style: 'destructive',
+        onPress: async () => {
+          try {
+            await deleteOrder(order.id);
+            void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
+            goBack();
+          } catch (e) {
+            Alert.alert('No se pudo eliminar', (e as Error).message);
+          }
+        },
+      },
+    ]);
+  }, [order, deleteOrder, goBack]);
+
+  const changeStatus = useCallback(
+    async (st: OrderStatus) => {
+      if (!order || st === order.status) return;
+      setBusy(true);
+      try {
+        await updateOrderField(order.id, 'status', st);
+        void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      } catch (e) {
+        Alert.alert('No se pudo cambiar el estado', (e as Error).message);
+      } finally {
+        setBusy(false);
+      }
+    },
+    [order, updateOrderField],
+  );
+
+  const saveRef = useCallback(async () => {
+    if (!order) return;
+    setBusy(true);
+    try {
+      await updateOrderField(order.id, 'custom_reference', refValue.trim());
+      setEditingRef(false);
+    } catch (e) {
+      Alert.alert('No se pudo guardar', (e as Error).message);
+    } finally {
+      setBusy(false);
+    }
+  }, [order, refValue, updateOrderField]);
 
   if (!order) {
     return (
-      <View style={[styles.container, { backgroundColor: colors.background }]}>
-        <View style={styles.notFoundWrap}>
-          <Text style={[styles.notFound, { color: colors.textSecondary }]}>Pedido no encontrado</Text>
-        </View>
+      <View style={[s.root, s.center]}>
+        <Stack.Screen options={{ title: 'Pedido' }} />
+        <Text style={s.h2}>Pedido no encontrado</Text>
+        <Text style={s.muted}>Puede que se haya eliminado.</Text>
+        <Pressable onPress={goBack} style={[s.btn, s.btnSecondary, { marginTop: 16 }]} accessibilityRole="button">
+          <Text style={[s.btnText, { color: colors.text }]}>Volver</Text>
+        </Pressable>
       </View>
     );
   }
 
-  return (
-    <View style={[styles.container, { backgroundColor: colors.background }]}>
-      <Stack.Screen
-        options={{
-          title: order.reference_number,
-          headerRight: () => (
-            <View style={styles.headerActions}>
-              <Pressable onPress={handleDuplicate} style={({ pressed }) => [styles.headerBtn, { opacity: pressed ? 0.6 : 1 }]} hitSlop={8} accessibilityRole="button" accessibilityLabel="Duplicar pedido">
-                <Copy size={20} color={colors.primary} />
+  const shipLines = order.shipping_items ?? [];
+  const shipTotal = shipLines.reduce((a, x) => a + (x.valor_con_iva || 0), 0);
+  const profit = order.items.reduce((a, i) => a + (i.beneficio_bruto || 0), 0);
+  const hasCost = order.items.some(i => i.costo_unitario > 0);
+  const c = order.customer;
+  const docs: [string, string][] = (
+    [
+      ['Nº pedido del cliente', c.numero_referencia_pedido],
+      ['Oferta / proforma', c.oferta_proforma],
+      ['Nº factura', c.numero_factura],
+      ['Nº recibo / albarán', c.numero_recibo],
+      ['Condiciones de entrega', c.condiciones_entrega],
+      ['Condiciones de pago', c.condiciones_pago],
+    ] as [string, string][]
+  ).filter(([, v]) => !!v?.trim());
+
+  // ---------------------------------------------------------------- bloques
+  const summary = (
+    <View style={[s.card, s.summary, cardShadow(isDark)]}>
+      <View style={s.summaryTop}>
+        <View style={{ flexGrow: 1, flexBasis: 240, minWidth: 0 }}>
+          <Text style={s.caption}>Referencia</Text>
+          <Text style={s.ref} selectable>
+            {order.reference_number}
+          </Text>
+          {editingRef ? (
+            <View style={s.refEditRow}>
+              <TextInput
+                value={refValue}
+                onChangeText={setRefValue}
+                placeholder="Referencia manual"
+                placeholderTextColor={colors.textTertiary}
+                style={s.refInput}
+                autoFocus
+                onSubmitEditing={saveRef}
+                returnKeyType="done"
+                accessibilityLabel="Referencia manual"
+              />
+              <Pressable onPress={saveRef} disabled={busy} style={[s.iconBtn, { backgroundColor: colors.primary }]} accessibilityLabel="Guardar referencia manual">
+                <Check size={18} color="#fff" />
               </Pressable>
-              <Pressable onPress={handleEdit} style={({ pressed }) => [styles.headerBtn, { opacity: pressed ? 0.6 : 1 }]} hitSlop={8} accessibilityRole="button" accessibilityLabel="Editar pedido">
-                <Edit3 size={20} color={colors.primary} />
-              </Pressable>
-              <Pressable onPress={handleDelete} style={({ pressed }) => [styles.headerBtn, { opacity: pressed ? 0.6 : 1 }]} hitSlop={8} accessibilityRole="button" accessibilityLabel="Eliminar pedido">
-                <Trash2 size={20} color={colors.error} />
+              <Pressable onPress={() => setEditingRef(false)} style={[s.iconBtn, { backgroundColor: colors.fill }]} accessibilityLabel="Cancelar">
+                <X size={18} color={colors.text} />
               </Pressable>
             </View>
-          ),
-        }}
-      />
+          ) : (
+            <Pressable
+              onPress={() => {
+                setRefValue(order.custom_reference || '');
+                setEditingRef(true);
+              }}
+              style={({ hovered }: { pressed: boolean; hovered?: boolean }) => [s.refManual, hovered && { backgroundColor: colors.fill }]}
+              accessibilityRole="button"
+              accessibilityLabel="Editar referencia manual"
+            >
+              <Text style={s.muted}>
+                Ref. manual: <Text style={{ color: colors.text }}>{order.custom_reference || '—'}</Text>
+              </Text>
+              <Pencil size={13} color={colors.textSecondary} />
+            </Pressable>
+          )}
+        </View>
+        <View style={s.totalBox}>
+          <Text style={s.caption}>Total con IVA</Text>
+          <Text style={s.total} accessibilityLabel={`Total ${formatCurrency(order.total_with_vat)}`}>
+            {formatCurrency(order.total_with_vat)}
+          </Text>
+        </View>
+      </View>
 
-      <ScrollView
-        contentContainerStyle={[
-          styles.scrollContent,
-          { maxWidth: contentMaxWidth, alignSelf: 'center' as const, width: '100%' as any },
-        ]}
-        showsVerticalScrollIndicator={false}
-      >
-        <AnimatedSection index={0}>
-          <Animated.View style={[styles.heroCard, { backgroundColor: colors.surface, borderColor: colors.borderLight, shadowColor: colors.cardShadow, transform: [{ scale: editPulse }] }]}>
-            <View style={styles.heroTop}>
-              <View style={styles.heroRefSection}>
-                <View style={styles.heroRefLabelRow}>
-                  <Hash size={12} color={colors.primaryLight} />
-                  <Text style={[styles.heroRefLabel, { color: colors.primaryLight }]}>REFERENCIA</Text>
-                </View>
-                <Text style={[styles.heroRefNumber, { color: colors.text }]} numberOfLines={1} adjustsFontSizeToFit>{order.reference_number}</Text>
-              </View>
-              <StatusBadge status={order.status} />
-            </View>
+      <View style={s.statusRow}>
+        <StatusBadge status={order.status} />
+        <Pressable onPress={() => setSheet('status')} disabled={busy} style={({ hovered }: { pressed: boolean; hovered?: boolean }) => [s.linkBtn, hovered && { backgroundColor: colors.fill }]} accessibilityRole="button" accessibilityLabel="Cambiar estado" testID="change-status">
+          <Text style={s.link}>Cambiar estado</Text>
+          <ChevronDown size={14} color={colors.primary} />
+        </Pressable>
+      </View>
 
-            <View style={[styles.heroDivider, { backgroundColor: colors.divider }]} />
+      <View style={s.metaGrid}>
+        <Meta s={s} label="Fabricante" value={`${order.manufacturer_name} (${order.manufacturer_code})`} />
+        <Meta s={s} label="Año" value={String(order.year)} />
+        <Meta s={s} label="Creado" value={formatDate(order.created_at)} />
+        <Meta s={s} label="Última actualización" value={formatDate(order.updated_at)} />
+      </View>
 
-            <View style={styles.heroCustomRefSection}>
-              <View style={styles.heroCustomRefLeft}>
-                <View style={styles.heroCustomRefLabelRow}>
-                  <Tag size={12} color={isEditingRef ? colors.accent : colors.textSecondary} />
-                  <Text style={[styles.heroCustomRefLabel, { color: isEditingRef ? colors.accent : colors.textSecondary }]}>
-                    REF. MANUAL
-                  </Text>
-                </View>
+      <View style={s.actions}>
+        <Pressable onPress={handleEdit} style={({ pressed, hovered }: { pressed: boolean; hovered?: boolean }) => [s.btn, { backgroundColor: hovered ? colors.primaryDark : colors.primary, opacity: pressed ? 0.85 : 1 }]} accessibilityRole="button" testID="edit-order-btn">
+          <Pencil size={16} color="#fff" />
+          <Text style={[s.btnText, { color: '#fff' }]}>Editar pedido</Text>
+        </Pressable>
+        <Pressable onPress={handleDuplicate} style={({ pressed }) => [s.btn, s.btnSecondary, width < 480 && s.btnIcon, { opacity: pressed ? 0.7 : 1 }]} accessibilityRole="button" accessibilityLabel="Duplicar pedido" testID="duplicate-order-btn">
+          <Copy size={16} color={colors.text} />
+          {width >= 480 && <Text style={[s.btnText, { color: colors.text }]}>Duplicar</Text>}
+        </Pressable>
+        <Pressable onPress={() => setSheet('more')} style={({ pressed }) => [s.btn, s.btnSecondary, s.btnIcon, { opacity: pressed ? 0.7 : 1 }]} accessibilityRole="button" accessibilityLabel="Más acciones" testID="more-actions-btn">
+          <MoreHorizontal size={18} color={colors.text} />
+        </Pressable>
+      </View>
+    </View>
+  );
 
-                {isEditingRef ? (
-                  <View style={styles.editRefRow}>
-                    <TextInput
-                      style={[styles.editRefInput, { backgroundColor: colors.background, borderColor: colors.accent, color: colors.text }]}
-                      value={editRefValue}
-                      onChangeText={setEditRefValue}
-                      placeholder="Escribe la referencia..."
-                      placeholderTextColor={colors.textTertiary}
-                      autoFocus
-                      onSubmitEditing={handleSaveRef}
-                      returnKeyType="done"
-                    />
-                    <Pressable onPress={handleSaveRef} style={({ pressed }) => [styles.editRefBtn, { backgroundColor: colors.surfaceAlt, transform: [{ scale: pressed ? 0.85 : 1 }] }]} hitSlop={6}>
-                      <Check size={16} color={colors.success} />
-                    </Pressable>
-                    <Pressable onPress={handleCancelEditRef} style={({ pressed }) => [styles.editRefBtn, { backgroundColor: colors.surfaceAlt, transform: [{ scale: pressed ? 0.85 : 1 }] }]} hitSlop={6}>
-                      <X size={16} color={colors.error} />
-                    </Pressable>
-                  </View>
-                ) : (
-                  <Pressable onPress={handleStartEditRef} style={({ pressed }) => [styles.customRefTappable, { backgroundColor: colors.surfaceAlt, borderColor: colors.borderLight, transform: [{ scale: pressed ? 0.97 : 1 }] }]}>
-                    <Text style={[styles.heroCustomRefValue, { color: colors.text }]}>
-                      {order.custom_reference || 'Sin referencia manual'}
-                    </Text>
-                    <View style={[styles.editRefIconWrap, { backgroundColor: colors.primarySoft }]}>
-                      <Pencil size={12} color={colors.primary} />
-                    </View>
-                  </Pressable>
-                )}
-              </View>
-            </View>
-          </Animated.View>
-        </AnimatedSection>
+  const finance = (
+    <View style={[s.card, s.finance, { backgroundColor: colors.heroTile }]}>
+      <Text style={[s.sectionTitleDark]}>Resumen económico</Text>
+      <FinRow s={s} label="Productos (sin IVA)" value={order.total_ex_vat} />
+      <FinRow s={s} label="IVA de los productos" value={order.total_vat} />
+      {shipTotal > 0 && <FinRow s={s} label="Gastos de envío (con IVA)" value={shipTotal} />}
+      {order.shipping_cost > 0 && <FinRow s={s} label="Envío extra (importe fijo)" value={order.shipping_cost} />}
+      <View style={s.finTotalRow}>
+        <Text style={s.finTotalLabel}>Total</Text>
+        <Text style={s.finTotal}>{formatCurrency(order.total_with_vat)}</Text>
+      </View>
+      {hasCost && (
+        <Text style={s.finNote}>
+          Beneficio bruto de los productos: <Text style={{ color: profit >= 0 ? '#7EE2A0' : '#FF8A80', fontWeight: '600' }}>{formatCurrency(profit)}</Text> (venta sin IVA − coste)
+        </Text>
+      )}
+    </View>
+  );
 
-        <AnimatedSection index={1}>
-          <View style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.borderLight, shadowColor: colors.cardShadow }]}>
-            <View style={styles.sectionTitle}>
-              <View style={[styles.sectionIconWrap, { backgroundColor: colors.primarySoft }]}>
-                <Building2 size={16} color={colors.primary} />
-              </View>
-              <Text style={[styles.sectionTitleText, { color: colors.text }]}>Cliente</Text>
-            </View>
-
-            <View style={styles.customerInfo}>
-              <View style={[styles.customerField, { borderBottomColor: colors.divider }]}>
-                <Text style={[styles.label, { color: colors.textSecondary }]}>Empresa</Text>
-                <Text style={[styles.customerValue, { color: colors.text }]}>{order.customer.nombre_empresa}</Text>
-              </View>
-
-              {order.customer.contacto ? (
-                <View style={[styles.customerField, { borderBottomColor: colors.divider }]}>
-                  <Text style={[styles.label, { color: colors.textSecondary }]}>Contacto</Text>
-                  <Text style={[styles.customerValue, { color: colors.text }]}>{order.customer.contacto}</Text>
-                  {order.customer.departamento ? (
-                    <Text style={[styles.customerSubvalue, { color: colors.textSecondary }]}>{order.customer.departamento}</Text>
-                  ) : null}
-                </View>
-              ) : null}
-
-              {order.customer.numero_referencia_pedido ? (
-                <View style={[styles.customerField, { borderBottomColor: colors.divider }]}>
-                  <Text style={[styles.label, { color: colors.textSecondary }]}>Ref. Pedido Cliente</Text>
-                  <Text style={[styles.customerValue, { color: colors.text }]}>{order.customer.numero_referencia_pedido}</Text>
-                </View>
-              ) : null}
-
-              <View style={[styles.customerFieldWithIcon, { borderBottomColor: colors.divider }]}>
-                <View style={[styles.fieldIconWrap, { backgroundColor: colors.primarySoft }]}>
-                  <MapPin size={14} color={colors.primary} />
-                </View>
-                <View style={styles.fieldContent}>
-                  <Text style={[styles.label, { color: colors.textSecondary }]}>Dirección</Text>
-                  <Text style={[styles.customerValue, { color: colors.text }]}>{order.customer.direccion_1}</Text>
-                  {order.customer.direccion_2 ? <Text style={[styles.customerSubvalue, { color: colors.textSecondary }]}>{order.customer.direccion_2}</Text> : null}
-                  <Text style={[styles.customerSubvalue, { color: colors.textSecondary }]}>
-                    {order.customer.codigo_postal} {order.customer.provincia}
-                  </Text>
-                  <Text style={[styles.customerSubvalue, { color: colors.textSecondary }]}>{order.customer.pais}</Text>
-                </View>
-              </View>
-
-              <View style={[styles.contactRow, { borderBottomColor: colors.divider }]}>
-                <View style={styles.contactItem}>
-                  <View style={[styles.fieldIconWrapSmall, { backgroundColor: colors.primarySoft }]}>
-                    <Phone size={12} color={colors.primary} />
-                  </View>
-                  <View style={styles.fieldContent}>
-                    <Text style={[styles.label, { color: colors.textSecondary }]}>Teléfonos</Text>
-                    <Text style={[styles.customerValue, { color: colors.text }]}>{order.customer.telefono_1}</Text>
-                    {order.customer.telefono_2 ? <Text style={[styles.customerSubvalue, { color: colors.textSecondary }]}>{order.customer.telefono_2}</Text> : null}
-                  </View>
-                </View>
-                <View style={styles.contactItem}>
-                  <View style={[styles.fieldIconWrapSmall, { backgroundColor: colors.primarySoft }]}>
-                    <Mail size={12} color={colors.primary} />
-                  </View>
-                  <View style={styles.fieldContent}>
-                    <Text style={[styles.label, { color: colors.textSecondary }]}>Email</Text>
-                    <Text style={[styles.customerValue, { color: colors.text }]} numberOfLines={1}>{order.customer.email}</Text>
-                  </View>
-                </View>
-              </View>
-
-              <View style={[styles.customerField, { borderBottomWidth: 0 }]}>
-                <Text style={[styles.label, { color: colors.textSecondary }]}>NIF</Text>
-                <Text style={[styles.customerValue, { color: colors.text }]}>{order.customer.nif}</Text>
-              </View>
-            </View>
+  const products = (
+    <View style={[s.card, cardShadow(isDark)]}>
+      <View style={s.cardHead}>
+        <Text style={s.sectionTitle}>Productos · {order.items.length}</Text>
+      </View>
+      {order.items.map((it, i) => (
+        <View key={i} style={[s.item, i > 0 && s.rowBorder]}>
+          <View style={s.itemTop}>
+            <Text style={s.itemName} selectable>
+              {it.product_name || 'Sin nombre'}
+            </Text>
+            <Text style={s.itemTotal}>{formatCurrency(it.valor_sin_iva)}</Text>
           </View>
-        </AnimatedSection>
-
-        <AnimatedSection index={2}>
-          <View style={[styles.totalsCard, { backgroundColor: colors.heroTile }]}>
-            <View style={styles.totalsHeader}>
-              <View style={styles.totalsIconWrap}>
-                <Euro size={16} color="#FFFFFF" />
-              </View>
-              <Text style={styles.totalsHeaderText}>Resumen Financiero</Text>
-            </View>
-
-            <View style={styles.totalsRow}>
-              <View style={styles.totalItem}>
-                <Text style={styles.totalItemLabel}>Subtotal</Text>
-                <Text style={styles.totalItemValue}>{formatCurrency(order.total_ex_vat)}</Text>
-                <Text style={styles.totalItemSub}>sin IVA</Text>
-              </View>
-              <View style={styles.totalsDividerV} />
-              <View style={styles.totalItem}>
-                <Text style={styles.totalItemLabel}>IVA</Text>
-                <Text style={styles.totalItemValue}>{formatCurrency(order.total_vat)}</Text>
-                <Text style={styles.totalItemSub}>impuestos</Text>
-              </View>
-              {shippingGrandTotal > 0 && (
-                <>
-                  <View style={styles.totalsDividerV} />
-                  <View style={styles.totalItem}>
-                    <Text style={styles.totalItemLabel}>Envío</Text>
-                    <Text style={styles.totalItemValue}>{formatCurrency(shippingGrandTotal)}</Text>
-                    <Text style={styles.totalItemSub}>con IVA</Text>
-                  </View>
-                </>
-              )}
-            </View>
-
-            <View style={styles.grandTotalRow}>
-              <Text style={styles.grandTotalLabel}>TOTAL</Text>
-              <Text style={styles.grandTotalValue}>{formatCurrency(order.total_with_vat)}</Text>
-            </View>
+          <Text style={s.muted}>
+            {it.quantity} × {formatCurrency(it.pvp_neto_sin_iva)} neto{it.descuento_porcentaje ? ` (dto. ${it.descuento_porcentaje} %)` : ''} · IVA {it.vat_percentage} % · sin IVA
+          </Text>
+          <View style={s.itemGrid}>
+            {it.tpv_unitario > 0 && <Mini s={s} label="Precio venta unit." value={formatCurrency(it.tpv_unitario)} />}
+            {it.total_sin_iva > 0 && <Mini s={s} label="Importe antes de dto." value={formatCurrency(it.total_sin_iva)} />}
+            {it.costo_unitario > 0 && <Mini s={s} label="Coste unitario" value={formatCurrency(it.costo_unitario)} />}
+            <Mini s={s} label="Con IVA" value={formatCurrency(it.valor_con_iva)} />
+            {it.costo_unitario > 0 && <Mini s={s} label="Beneficio de la línea" value={formatCurrency(it.beneficio_bruto)} tone={it.beneficio_bruto >= 0 ? colors.success : colors.error} />}
           </View>
-        </AnimatedSection>
+        </View>
+      ))}
+    </View>
+  );
 
-        {order.shipping_items && order.shipping_items.length > 0 && (
-          <AnimatedSection index={3}>
-            <View style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.borderLight, shadowColor: colors.cardShadow }]}>
-              <View style={styles.sectionTitle}>
-                <View style={[styles.sectionIconWrap, { backgroundColor: colors.warningBg }]}>
-                  <Truck size={16} color={colors.warning} />
-                </View>
-                <Text style={[styles.sectionTitleText, { color: colors.text }]}>Gastos de Envío</Text>
-                <View style={[styles.sectionBadge, { backgroundColor: colors.warningBg }]}>
-                  <Text style={[styles.sectionBadgeText, { color: colors.warning }]}>{order.shipping_items.length}</Text>
-                </View>
-              </View>
-
-              {order.shipping_items.map((shipping, index) => (
-                <View key={index} style={[styles.productItem, { backgroundColor: colors.surfaceAlt, borderColor: colors.borderLight }, index < order.shipping_items.length - 1 && { marginBottom: 12 }]}>
-                  <View style={styles.productHeader}>
-                    <View style={styles.productHeaderLeft}>
-                      <View style={[styles.productIndexBadge, { backgroundColor: colors.warningBg }]}>
-                        <Text style={[styles.productIndexText, { color: colors.warning }]}>{index + 1}</Text>
-                      </View>
-                      <View style={styles.productNameWrap}>
-                        <Text style={[styles.productName, { color: colors.text }]}>{shipping.description || 'Envío'}</Text>
-                        <Text style={[styles.productQty, { color: colors.textSecondary }]}>× {shipping.quantity} uds.</Text>
-                      </View>
-                    </View>
-                    <View style={styles.productPriceWrap}>
-                      <Text style={[styles.productTotal, { color: colors.text }]}>{formatCurrency(shipping.valor_con_iva)}</Text>
-                      <Text style={[styles.productTotalLabel, { color: colors.textTertiary }]}>con IVA</Text>
-                    </View>
-                  </View>
-                  <View style={[styles.productGrid, { borderTopColor: colors.borderLight }]}>
-                    <View style={styles.productGridItem}>
-                      <Text style={[styles.gridLabel, { color: colors.textTertiary }]}>Costo</Text>
-                      <Text style={[styles.gridValue, { color: colors.text }]}>{formatCurrency(shipping.costo_unitario)}</Text>
-                    </View>
-                    <View style={styles.productGridItem}>
-                      <Text style={[styles.gridLabel, { color: colors.warning }]}>Total s/IVA</Text>
-                      <Text style={[styles.gridValue, { color: colors.warning }]}>{formatCurrency(shipping.valor_sin_iva)}</Text>
-                    </View>
-                    <View style={styles.productGridItem}>
-                      <Text style={[styles.gridLabel, { color: colors.textTertiary }]}>IVA</Text>
-                      <Text style={[styles.gridValue, { color: colors.text }]}>{shipping.vat_percentage}%</Text>
-                    </View>
-                  </View>
-                </View>
-              ))}
-            </View>
-          </AnimatedSection>
-        )}
-
-        <AnimatedSection index={4}>
-          <View style={styles.metaRow}>
-            <View style={[styles.metaItem, { backgroundColor: colors.surface, borderColor: colors.borderLight }]}>
-              <View style={[styles.metaIconWrap, { backgroundColor: colors.primarySoft }]}>
-                <Building2 size={14} color={colors.primary} />
-              </View>
-              <View style={styles.metaTextWrap}>
-                <Text style={[styles.metaLabel, { color: colors.textSecondary }]}>Fabricante</Text>
-                <Text style={[styles.metaValue, { color: colors.text }]}>{order.manufacturer_name}</Text>
-                <Text style={[styles.metaCode, { color: colors.textTertiary }]}>{order.manufacturer_code}</Text>
-              </View>
-            </View>
-            <View style={[styles.metaItem, { backgroundColor: colors.surface, borderColor: colors.borderLight }]}>
-              <View style={[styles.metaIconWrap, { backgroundColor: colors.primarySoft }]}>
-                <Calendar size={14} color={colors.primary} />
-              </View>
-              <View style={styles.metaTextWrap}>
-                <Text style={[styles.metaLabel, { color: colors.textSecondary }]}>Año</Text>
-                <Text style={[styles.metaValue, { color: colors.text }]}>{order.year}</Text>
-              </View>
-            </View>
+  const shipping = shipLines.length > 0 && (
+    <View style={[s.card, cardShadow(isDark)]}>
+      <View style={s.cardHead}>
+        <Text style={s.sectionTitle}>Gastos de envío · {shipLines.length}</Text>
+      </View>
+      {shipLines.map((x, i) => (
+        <View key={i} style={[s.item, i > 0 && s.rowBorder]}>
+          <View style={s.itemTop}>
+            <Text style={s.itemName}>{x.description || 'Envío'}</Text>
+            <Text style={s.itemTotal}>{formatCurrency(x.valor_con_iva)}</Text>
           </View>
-        </AnimatedSection>
+          <Text style={s.muted}>
+            {x.quantity} × {formatCurrency(x.costo_unitario)} · {formatCurrency(x.valor_sin_iva)} sin IVA · IVA {x.vat_percentage} % · total con IVA
+          </Text>
+        </View>
+      ))}
+    </View>
+  );
 
-        <AnimatedSection index={5}>
-          <View style={styles.metaRow}>
-            <View style={[styles.metaItem, { backgroundColor: colors.surface, borderColor: colors.borderLight }]}>
-              <View style={[styles.metaIconWrap, { backgroundColor: colors.primarySoft }]}>
-                <Clock size={14} color={colors.textSecondary} />
-              </View>
-              <View style={styles.metaTextWrap}>
-                <Text style={[styles.metaLabel, { color: colors.textSecondary }]}>Creado</Text>
-                <Text style={[styles.metaValueSmall, { color: colors.text }]}>{formatDateLong(order.created_at)}</Text>
-              </View>
-            </View>
-            <View style={[styles.metaItem, { backgroundColor: colors.surface, borderColor: colors.borderLight }]}>
-              <View style={[styles.metaIconWrap, { backgroundColor: colors.primarySoft }]}>
-                <Clock size={14} color={colors.textSecondary} />
-              </View>
-              <View style={styles.metaTextWrap}>
-                <Text style={[styles.metaLabel, { color: colors.textSecondary }]}>Actualizado</Text>
-                <Text style={[styles.metaValueSmall, { color: colors.text }]}>{formatDateLong(order.updated_at)}</Text>
-              </View>
-            </View>
-          </View>
-        </AnimatedSection>
-
-        <AnimatedSection index={6}>
-          <View style={isDesktop ? styles.desktopRow : undefined}>
-            <View style={isDesktop ? styles.desktopMain : undefined}>
-              <View style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.borderLight, shadowColor: colors.cardShadow }]}>
-                <View style={styles.sectionTitle}>
-                  <View style={[styles.sectionIconWrap, { backgroundColor: colors.primarySoft }]}>
-                    <Package size={16} color={colors.primary} />
-                  </View>
-                  <Text style={[styles.sectionTitleText, { color: colors.text }]}>Productos</Text>
-                  <View style={[styles.sectionBadge, { backgroundColor: colors.primarySoft }]}>
-                    <Text style={[styles.sectionBadgeText, { color: colors.primary }]}>{order.items.length}</Text>
-                  </View>
-                </View>
-
-                {order.items.map((item, index) => {
-                  const { name: productTitle, description: productDesc } = splitProductName(item.product_name);
-                  const isExpanded = expandedItems[index] ?? false;
-                  return (
-                    <ProductItemAnimated key={index} index={index}>
-                      <View style={[styles.productItem, { backgroundColor: colors.surfaceAlt, borderColor: colors.borderLight }]}>
-                        <View style={styles.productHeader}>
-                          <View style={styles.productHeaderLeft}>
-                            <View style={[styles.productIndexBadge, { backgroundColor: colors.primarySoft }]}>
-                              <Text style={[styles.productIndexText, { color: colors.primary }]}>{index + 1}</Text>
-                            </View>
-                            <View style={styles.productNameWrap}>
-                              <Text style={[styles.productName, { color: colors.text }]} numberOfLines={2}>{productTitle}</Text>
-                              <Text style={[styles.productQty, { color: colors.textSecondary }]}>× {item.quantity} uds.</Text>
-                            </View>
-                          </View>
-                          <View style={styles.productPriceWrap}>
-                            <Text style={[styles.productTotal, { color: colors.text }]}>{formatCurrency(item.valor_con_iva)}</Text>
-                            <Text style={[styles.productTotalLabel, { color: colors.textTertiary }]}>con IVA</Text>
-                          </View>
-                        </View>
-
-                        <View style={styles.descriptionSection}>
-                          <Pressable
-                            onPress={() => toggleItemExpand(index)}
-                            style={({ pressed }) => [styles.descriptionToggle, { backgroundColor: colors.fill, borderColor: colors.borderLight, transform: [{ scale: pressed ? 0.97 : 1 }] }]}
-                            hitSlop={4}
-                          >
-                            <FileText size={13} color={colors.textSecondary} />
-                            <Text style={[styles.descriptionToggleText, { color: colors.textSecondary }]}>
-                              {isExpanded ? 'Ocultar descripción' : 'Ver descripción'}
-                            </Text>
-                            {isExpanded ? (
-                              <ChevronUp size={14} color={colors.textSecondary} />
-                            ) : (
-                              <ChevronDown size={14} color={colors.textSecondary} />
-                            )}
-                          </Pressable>
-                          {isExpanded && (
-                            <View style={[styles.descriptionContent, { backgroundColor: colors.surface, borderColor: colors.borderLight }]}>
-                              <Text style={[styles.descriptionText, { color: colors.textSecondary }]}>
-                                {productDesc.length > 0 ? productDesc : item.product_name}
-                              </Text>
-                            </View>
-                          )}
-                        </View>
-
-                        <View style={[styles.productGrid, { borderTopColor: colors.borderLight }]}>
-                          <View style={styles.productGridItem}>
-                            <Text style={[styles.gridLabel, { color: colors.textTertiary }]}>Costo Unit.</Text>
-                            <Text style={[styles.gridValue, { color: colors.text }]}>{formatCurrency(item.costo_unitario)}</Text>
-                          </View>
-                          <View style={styles.productGridItem}>
-                            <Text style={[styles.gridLabel, { color: colors.textTertiary }]}>Descuento</Text>
-                            <Text style={[styles.gridValue, { color: colors.text }]}>{item.descuento_porcentaje}%</Text>
-                          </View>
-                          {item.total_sin_iva > 0 && (
-                            <View style={styles.productGridItem}>
-                              <Text style={[styles.gridLabel, { color: colors.primary }]}>Total s/IVA</Text>
-                              <Text style={[styles.gridValue, { color: colors.primary }]}>{formatCurrency(item.total_sin_iva)}</Text>
-                            </View>
-                          )}
-                          <View style={styles.productGridItem}>
-                            <Text style={[styles.gridLabel, { color: colors.textTertiary }]}>IVA</Text>
-                            <Text style={[styles.gridValue, { color: colors.text }]}>{item.vat_percentage}%</Text>
-                          </View>
-                          <View style={[styles.productGridItem, { backgroundColor: colors.fill, borderRadius: 8 }]}>
-                            <Text style={[styles.gridLabel, { color: colors.textTertiary }]}>Beneficio línea</Text>
-                            <Text style={[styles.gridValue, { color: item.beneficio_bruto >= 0 ? colors.success : colors.error }]}>
-                              {formatCurrency(item.beneficio_bruto)}
-                            </Text>
-                          </View>
-                        </View>
-                      </View>
-                    </ProductItemAnimated>
-                  );
-                })}
-              </View>
-            </View>
-
-            {isDesktop && (
-              <View style={styles.desktopSide}>
-                {(order.customer.oferta_proforma || order.customer.condiciones_entrega || order.customer.condiciones_pago || order.customer.numero_factura || order.customer.numero_recibo) && (
-                  <View style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.borderLight, shadowColor: colors.cardShadow }]}>
-                    <View style={styles.sectionTitle}>
-                      <View style={[styles.sectionIconWrap, { backgroundColor: colors.primarySoft }]}>
-                        <FileText size={16} color={colors.primary} />
-                      </View>
-                      <Text style={[styles.sectionTitleText, { color: colors.text }]}>Info. Adicional</Text>
-                    </View>
-
-                    <View style={styles.additionalGrid}>
-                      {order.customer.oferta_proforma ? (
-                        <View style={[styles.additionalItem, { backgroundColor: colors.surfaceAlt }]}>
-                          <Text style={[styles.label, { color: colors.textSecondary }]}>Oferta/Proforma</Text>
-                          <Text style={[styles.customerValue, { color: colors.text }]}>{order.customer.oferta_proforma}</Text>
-                        </View>
-                      ) : null}
-                      {order.customer.numero_factura ? (
-                        <View style={[styles.additionalItem, { backgroundColor: colors.surfaceAlt }]}>
-                          <Text style={[styles.label, { color: colors.textSecondary }]}>Nº Factura</Text>
-                          <Text style={[styles.customerValue, { color: colors.text }]}>{order.customer.numero_factura}</Text>
-                        </View>
-                      ) : null}
-                      {order.customer.numero_recibo ? (
-                        <View style={[styles.additionalItem, { backgroundColor: colors.surfaceAlt }]}>
-                          <Text style={[styles.label, { color: colors.textSecondary }]}>Nº Recibo</Text>
-                          <Text style={[styles.customerValue, { color: colors.text }]}>{order.customer.numero_recibo}</Text>
-                        </View>
-                      ) : null}
-                    </View>
-
-                    {order.customer.condiciones_entrega ? (
-                      <View style={[styles.conditionBlock, { borderTopColor: colors.divider }]}>
-                        <Text style={[styles.label, { color: colors.textSecondary }]}>Condiciones de Entrega</Text>
-                        <Text style={[styles.customerSubvalue, { color: colors.textSecondary }]}>{order.customer.condiciones_entrega}</Text>
-                      </View>
-                    ) : null}
-                    {order.customer.condiciones_pago ? (
-                      <View style={[styles.conditionBlock, { borderTopColor: colors.divider }]}>
-                        <Text style={[styles.label, { color: colors.textSecondary }]}>Condiciones de Pago</Text>
-                        <Text style={[styles.customerSubvalue, { color: colors.textSecondary }]}>{order.customer.condiciones_pago}</Text>
-                      </View>
-                    ) : null}
-                  </View>
-                )}
-              </View>
+  const collapsible = (title: string, open: boolean, setOpen: (v: boolean) => void, preview: string, body: React.ReactNode) => {
+    const isOpen = desktop || open;
+    return (
+      <View style={[s.card, cardShadow(isDark)]}>
+        <Pressable
+          onPress={() => !desktop && setOpen(!open)}
+          disabled={desktop}
+          style={s.cardHeadPress}
+          accessibilityRole={desktop ? 'header' : 'button'}
+          accessibilityState={desktop ? undefined : { expanded: isOpen }}
+        >
+          <View style={{ flex: 1, minWidth: 0 }}>
+            <Text style={s.sectionTitle}>{title}</Text>
+            {!isOpen && !!preview && (
+              <Text style={s.preview} numberOfLines={1}>
+                {preview}
+              </Text>
             )}
           </View>
-        </AnimatedSection>
+          {!desktop && (isOpen ? <ChevronUp size={18} color={colors.textSecondary} /> : <ChevronDown size={18} color={colors.textSecondary} />)}
+        </Pressable>
+        {isOpen && body}
+      </View>
+    );
+  };
 
-        {!isDesktop && (order.customer.oferta_proforma || order.customer.condiciones_entrega || order.customer.condiciones_pago || order.customer.numero_factura || order.customer.numero_recibo) && (
-          <AnimatedSection index={7}>
-            <View style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.borderLight, shadowColor: colors.cardShadow }]}>
-              <View style={styles.sectionTitle}>
-                <View style={[styles.sectionIconWrap, { backgroundColor: colors.primarySoft }]}>
-                  <FileText size={16} color={colors.primary} />
-                </View>
-                <Text style={[styles.sectionTitleText, { color: colors.text }]}>Info. Adicional</Text>
-              </View>
+  const client = collapsible(
+    'Cliente',
+    openClient,
+    setOpenClient,
+    [c.nombre_empresa, c.contacto].filter(Boolean).join(' · ') || 'Sin datos',
+    <View style={s.fields}>
+      <Field s={s} label="Empresa" value={c.nombre_empresa} />
+      <Field s={s} label="NIF" value={c.nif} />
+      <Field s={s} label="Contacto" value={[c.contacto, c.departamento].filter(Boolean).join(' · ')} />
+      <Field s={s} label="Dirección" value={[c.direccion_1, c.direccion_2, [c.codigo_postal, c.provincia].filter(Boolean).join(' '), c.pais].filter(Boolean).join('\n')} />
+      <Field s={s} label="Teléfono" value={[c.telefono_1, c.telefono_2].filter(Boolean).join(' · ')} />
+      <Field s={s} label="Email" value={c.email} />
+    </View>,
+  );
 
-              <View style={styles.additionalGrid}>
-                {order.customer.oferta_proforma ? (
-                  <View style={[styles.additionalItem, { backgroundColor: colors.surfaceAlt }]}>
-                    <Text style={[styles.label, { color: colors.textSecondary }]}>Oferta/Proforma</Text>
-                    <Text style={[styles.customerValue, { color: colors.text }]}>{order.customer.oferta_proforma}</Text>
-                  </View>
-                ) : null}
-                {order.customer.numero_factura ? (
-                  <View style={[styles.additionalItem, { backgroundColor: colors.surfaceAlt }]}>
-                    <Text style={[styles.label, { color: colors.textSecondary }]}>Nº Factura</Text>
-                    <Text style={[styles.customerValue, { color: colors.text }]}>{order.customer.numero_factura}</Text>
-                  </View>
-                ) : null}
-                {order.customer.numero_recibo ? (
-                  <View style={[styles.additionalItem, { backgroundColor: colors.surfaceAlt }]}>
-                    <Text style={[styles.label, { color: colors.textSecondary }]}>Nº Recibo</Text>
-                    <Text style={[styles.customerValue, { color: colors.text }]}>{order.customer.numero_recibo}</Text>
-                  </View>
-                ) : null}
-              </View>
+  const documents = collapsible(
+    'Documentos y condiciones',
+    openDocs,
+    setOpenDocs,
+    docs.length ? docs.map(([k, v]) => `${k}: ${v}`).join(' · ') : 'Sin datos',
+    docs.length ? (
+      <View style={s.fields}>
+        {docs.map(([k, v]) => (
+          <Field key={k} s={s} label={k} value={v} />
+        ))}
+      </View>
+    ) : (
+      <Text style={[s.muted, { paddingHorizontal: 16, paddingBottom: 16 }]}>No hay documentos ni condiciones en este pedido.</Text>
+    ),
+  );
 
-              {order.customer.condiciones_entrega ? (
-                <View style={[styles.conditionBlock, { borderTopColor: colors.divider }]}>
-                  <Text style={[styles.label, { color: colors.textSecondary }]}>Condiciones de Entrega</Text>
-                  <Text style={[styles.customerSubvalue, { color: colors.textSecondary }]}>{order.customer.condiciones_entrega}</Text>
-                </View>
-              ) : null}
-              {order.customer.condiciones_pago ? (
-                <View style={[styles.conditionBlock, { borderTopColor: colors.divider }]}>
-                  <Text style={[styles.label, { color: colors.textSecondary }]}>Condiciones de Pago</Text>
-                  <Text style={[styles.customerSubvalue, { color: colors.textSecondary }]}>{order.customer.condiciones_pago}</Text>
-                </View>
-              ) : null}
+  return (
+    <View style={s.root}>
+      <Stack.Screen options={{ title: order.reference_number }} />
+      <ScrollView contentContainerStyle={[s.content, { maxWidth: desktop ? 1200 : 760 }]}>
+        {summary}
+        {desktop ? (
+          <View style={s.cols}>
+            <View style={s.colMain}>
+              {products}
+              {shipping}
             </View>
-          </AnimatedSection>
+            <View style={s.colSide}>
+              {finance}
+              {client}
+              {documents}
+            </View>
+          </View>
+        ) : (
+          <>
+            {finance}
+            {products}
+            {shipping}
+            {client}
+            {documents}
+          </>
         )}
       </ScrollView>
+
+      <SelectSheet
+        visible={sheet === 'status'}
+        title="Cambiar estado"
+        options={STATUS_ORDER.map(st => ({ value: st, label: statusConfig[st].label }))}
+        selected={order.status}
+        onSelect={v => void changeStatus(v as OrderStatus)}
+        onClose={() => setSheet(null)}
+      />
+      <SelectSheet
+        visible={sheet === 'more'}
+        title={order.reference_number}
+        options={[
+          { value: 'status', label: 'Cambiar estado…' },
+          { value: 'ref', label: 'Editar referencia manual' },
+          { value: 'delete', label: 'Eliminar pedido', destructive: true },
+        ]}
+        onSelect={v => {
+          if (v === 'status') setTimeout(() => setSheet('status'), 50);
+          else if (v === 'ref') {
+            setRefValue(order.custom_reference || '');
+            setEditingRef(true);
+          } else if (v === 'delete') handleDelete();
+        }}
+        onClose={() => setSheet(prev => (prev === 'more' ? null : prev))}
+      />
     </View>
   );
 }
 
-function ProductItemAnimated({ children, index }: { children: React.ReactNode; index: number }) {
-  const opacity = useRef(new Animated.Value(0)).current;
-  const translateY = useRef(new Animated.Value(8)).current;
-
-  useEffect(() => {
-    enterAnimation(opacity, translateY, index).start();
-  // eslint-disable-next-line react-hooks/exhaustive-deps -- los valores animados son refs estables
-  }, [index]);
-
+function Meta({ s, label, value }: { s: Styles; label: string; value: string }) {
   return (
-    <Animated.View style={{ opacity, transform: [{ translateY }] }}>
-      {children}
-    </Animated.View>
+    <View style={s.meta}>
+      <Text style={s.caption}>{label}</Text>
+      <Text style={s.metaValue}>{value}</Text>
+    </View>
   );
 }
 
-const styles = StyleSheet.create({
-  container: { flex: 1 },
-  notFoundWrap: { flex: 1, justifyContent: 'center', alignItems: 'center' },
-  notFound: { fontSize: 16, textAlign: 'center' as const },
-  headerActions: { flexDirection: 'row', gap: 16, alignItems: 'center' },
-  headerBtn: { padding: 4 },
-  scrollContent: { padding: 20, paddingBottom: 40, gap: 16 },
-  heroCard: { borderRadius: 20, padding: 20, borderWidth: 0, shadowOffset: { width: 0, height: 4 }, shadowOpacity: 1, shadowRadius: 16, elevation: 2 },
-  heroTop: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' },
-  heroRefSection: { flex: 1, minWidth: 0, marginRight: 10 },
-  heroRefLabelRow: { flexDirection: 'row', alignItems: 'center', gap: 4, marginBottom: 6 },
-  heroRefLabel: { fontSize: 12, fontWeight: '600' as const, letterSpacing: 0.3 },
-  heroRefNumber: { fontSize: 24, fontWeight: '700' as const, letterSpacing: -0.4, ...(FONT_FAMILY ? { fontFamily: FONT_FAMILY } : {}) },
-  heroDivider: { height: 1, marginVertical: 16 },
-  heroCustomRefSection: { flexDirection: 'row', alignItems: 'center' },
-  heroCustomRefLeft: { flex: 1 },
-  heroCustomRefLabelRow: { flexDirection: 'row', alignItems: 'center', gap: 4, marginBottom: 6 },
-  heroCustomRefLabel: { fontSize: 12, fontWeight: '600' as const, letterSpacing: 0.3, textTransform: 'uppercase' as const },
-  customRefTappable: { flexDirection: 'row', alignItems: 'center', gap: 10, borderRadius: 12, paddingHorizontal: 14, paddingVertical: 11, borderWidth: 0 },
-  heroCustomRefValue: { fontSize: 15, fontWeight: '600' as const, flex: 1 },
-  editRefIconWrap: { width: 28, height: 28, borderRadius: 8, alignItems: 'center', justifyContent: 'center' },
-  editRefRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  editRefInput: { flex: 1, borderWidth: 1.5, borderRadius: 12, paddingHorizontal: 14, paddingVertical: 10, fontSize: 16, fontWeight: '500' as const, ...webInputReset },
-  editRefBtn: { width: 36, height: 36, borderRadius: 10, alignItems: 'center', justifyContent: 'center' },
-  totalsCard: { borderRadius: 20, padding: 20, overflow: 'hidden' },
-  totalsHeader: { flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 18 },
-  totalsIconWrap: { width: 30, height: 30, borderRadius: 999, backgroundColor: 'rgba(255,255,255,0.12)', alignItems: 'center', justifyContent: 'center' },
-  totalsHeaderText: { fontSize: 15, fontWeight: '600' as const, color: 'rgba(245,245,247,0.8)', letterSpacing: -0.1 },
-  totalsRow: { flexDirection: 'row', alignItems: 'center' },
-  totalItem: { flex: 1, alignItems: 'center', paddingVertical: 4 },
-  totalItemLabel: { fontSize: 12, fontWeight: '500' as const, color: 'rgba(245,245,247,0.6)', marginBottom: 4 },
-  totalItemValue: { fontSize: 17, fontWeight: '600' as const, color: '#F5F5F7', letterSpacing: -0.3, fontVariant: ['tabular-nums'] },
-  totalItemSub: { fontSize: 11, color: 'rgba(245,245,247,0.45)', marginTop: 2 },
-  totalsDividerV: { width: 1, height: 40, backgroundColor: 'rgba(255,255,255,0.1)' },
-  grandTotalRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-end', borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: 'rgba(245,245,247,0.18)', paddingTop: 16, marginTop: 18 },
-  grandTotalLabel: { fontSize: 15, fontWeight: '500' as const, color: 'rgba(245,245,247,0.7)', marginBottom: 6 },
-  grandTotalValue: { fontSize: 40, fontWeight: '700' as const, color: '#F5F5F7', letterSpacing: -1.2, fontVariant: ['tabular-nums'] },
-  metaRow: { flexDirection: 'row', gap: 12 },
-  metaItem: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: 10, borderRadius: 16, padding: 16, borderWidth: 0 },
-  metaIconWrap: { width: 32, height: 32, borderRadius: 10, alignItems: 'center', justifyContent: 'center' },
-  metaTextWrap: { flex: 1 },
-  metaLabel: { fontSize: 12, fontWeight: '500' as const, marginBottom: 2 },
-  metaValue: { fontSize: 15, fontWeight: '600' as const, letterSpacing: -0.2 },
-  metaValueSmall: { fontSize: 12, fontWeight: '600' as const },
-  metaCode: { fontSize: 10, fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace', marginTop: 1 },
-  desktopRow: { flexDirection: 'row', gap: 14 },
-  desktopMain: { flex: 3, gap: 14 },
-  desktopSide: { flex: 2, gap: 14 },
-  card: { borderRadius: 20, padding: 20, borderWidth: 0, shadowOffset: { width: 0, height: 4 }, shadowOpacity: 1, shadowRadius: 16, elevation: 2 },
-  sectionTitle: { flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 16 },
-  sectionIconWrap: { width: 30, height: 30, borderRadius: 999, alignItems: 'center', justifyContent: 'center' },
-  sectionTitleText: { fontSize: 20, fontWeight: '700' as const, letterSpacing: -0.4, flex: 1 },
-  sectionBadge: { borderRadius: 999, paddingHorizontal: 9, paddingVertical: 2 },
-  sectionBadgeText: { fontSize: 12, fontWeight: '700' as const },
-  productItem: { borderRadius: 14, padding: 16, borderWidth: 0, marginBottom: 12 },
-  descriptionSection: { marginBottom: 12 },
-  descriptionToggle: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingVertical: 8, paddingHorizontal: 12, borderRadius: 10, borderWidth: 0 },
-  descriptionToggleText: { fontSize: 12, fontWeight: '600' as const, flex: 1 },
-  descriptionContent: { marginTop: 8, paddingHorizontal: 12, paddingVertical: 10, borderRadius: 10, borderWidth: 0 },
-  descriptionText: { fontSize: 14, lineHeight: 20 },
-  productHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 },
-  productHeaderLeft: { flexDirection: 'row', alignItems: 'center', gap: 10, flex: 1 },
-  productIndexBadge: { width: 26, height: 26, borderRadius: 8, alignItems: 'center', justifyContent: 'center' },
-  productIndexText: { fontSize: 11, fontWeight: '700' as const },
-  productNameWrap: { flex: 1 },
-  productName: { fontSize: 16, fontWeight: '600' as const, letterSpacing: -0.3 },
-  productQty: { fontSize: 13, marginTop: 2 },
-  productPriceWrap: { alignItems: 'flex-end' as const, marginLeft: 10 },
-  productTotal: { fontSize: 17, fontWeight: '700' as const, letterSpacing: -0.3, fontVariant: ['tabular-nums'] },
-  productTotalLabel: { fontSize: 11, marginTop: 1 },
-  productGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 0, borderTopWidth: StyleSheet.hairlineWidth, paddingTop: 12 },
-  productGridItem: { width: '33.33%' as any, paddingVertical: 6, paddingHorizontal: 4 },
-  gridLabel: { fontSize: 12, marginBottom: 2 },
-  gridValue: { fontSize: 15, fontWeight: '600' as const, fontVariant: ['tabular-nums'] },
-  label: { fontSize: 12, marginBottom: 3, fontWeight: '500' as const },
-  customerInfo: { gap: 16 },
-  customerField: { paddingBottom: 12, borderBottomWidth: StyleSheet.hairlineWidth },
-  customerFieldWithIcon: { flexDirection: 'row', gap: 12, paddingBottom: 12, borderBottomWidth: StyleSheet.hairlineWidth },
-  fieldIconWrap: { width: 30, height: 30, borderRadius: 999, alignItems: 'center', justifyContent: 'center', marginTop: 2 },
-  fieldIconWrapSmall: { width: 26, height: 26, borderRadius: 8, alignItems: 'center', justifyContent: 'center', marginTop: 2 },
-  fieldContent: { flex: 1 },
-  contactRow: { flexDirection: 'row', gap: 10, paddingBottom: 12, borderBottomWidth: StyleSheet.hairlineWidth },
-  contactItem: { flex: 1, flexDirection: 'row', gap: 8 },
-  customerValue: { fontSize: 16, fontWeight: '500' as const, letterSpacing: -0.2 },
-  customerSubvalue: { fontSize: 14, marginTop: 2 },
-  additionalGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 12, marginBottom: 12 },
-  additionalItem: { minWidth: '45%' as any, flex: 1, borderRadius: 12, padding: 12 },
-  conditionBlock: { paddingTop: 12, borderTopWidth: StyleSheet.hairlineWidth, marginBottom: 8 },
-});
+function Mini({ s, label, value, tone }: { s: Styles; label: string; value: string; tone?: string }) {
+  return (
+    <View style={s.mini}>
+      <Text style={s.miniLabel}>{label}</Text>
+      <Text style={[s.miniValue, tone ? { color: tone } : null]}>{value}</Text>
+    </View>
+  );
+}
+
+function FinRow({ s, label, value }: { s: Styles; label: string; value: number }) {
+  return (
+    <View style={s.finRow}>
+      <Text style={s.finLabel}>{label}</Text>
+      <Text style={s.finValue}>{formatCurrency(value)}</Text>
+    </View>
+  );
+}
+
+function Field({ s, label, value }: { s: Styles; label: string; value?: string }) {
+  return (
+    <View style={s.field}>
+      <Text style={s.caption}>{label}</Text>
+      <Text style={[s.fieldValue, !value && { color: s.muted.color as string }]} selectable>
+        {value || '—'}
+      </Text>
+    </View>
+  );
+}
+
+type Styles = ReturnType<typeof makeStyles>;
+
+function makeStyles(c: ThemeColors) {
+  return StyleSheet.create({
+    root: { flex: 1, backgroundColor: c.background },
+    center: { alignItems: 'center', justifyContent: 'center', padding: 24 },
+    content: { padding: 16, gap: 16, width: '100%', alignSelf: 'center', paddingBottom: 48 },
+    cols: { flexDirection: 'row', gap: 16, alignItems: 'flex-start' },
+    colMain: { flex: 1.65, gap: 16, minWidth: 0 },
+    colSide: { flex: 1, gap: 16, minWidth: 0 },
+    card: { backgroundColor: c.surface, borderRadius: radius.lg, overflow: 'hidden' },
+    summary: { padding: 20, gap: 16 },
+    summaryTop: { flexDirection: 'row', flexWrap: 'wrap', gap: 16, alignItems: 'flex-start' },
+    caption: { fontSize: 12, fontWeight: '500', color: c.textSecondary, letterSpacing: 0.1 },
+    ref: { fontSize: 26, fontWeight: '700', color: c.text, letterSpacing: -0.5, marginTop: 2, fontVariant: ['tabular-nums'] },
+    refManual: { flexDirection: 'row', alignItems: 'center', gap: 6, alignSelf: 'flex-start', marginTop: 4, paddingVertical: 4, paddingHorizontal: 6, marginLeft: -6, borderRadius: 8, minHeight: 32 },
+    refEditRow: { flexDirection: 'row', gap: 8, alignItems: 'center', marginTop: 8 },
+    refInput: { flex: 1, minWidth: 0, height: 40, borderRadius: radius.sm, backgroundColor: c.fill, paddingHorizontal: 12, fontSize: 15, color: c.text, borderWidth: 1, borderColor: c.primary, ...webInputReset },
+    iconBtn: { width: 40, height: 40, borderRadius: radius.sm, alignItems: 'center', justifyContent: 'center' },
+    totalBox: { alignItems: 'flex-start' },
+    total: { fontSize: 28, fontWeight: '700', color: c.text, letterSpacing: -0.6, fontVariant: ['tabular-nums'], marginTop: 2 },
+    statusRow: { flexDirection: 'row', alignItems: 'center', gap: 8, flexWrap: 'wrap' },
+    linkBtn: { flexDirection: 'row', alignItems: 'center', gap: 4, minHeight: 36, paddingHorizontal: 8, borderRadius: 8 },
+    link: { fontSize: 14, color: c.primary, fontWeight: '600' },
+    metaGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 12, paddingTop: 12, borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: c.divider },
+    meta: { flexGrow: 1, flexBasis: 150, minWidth: 0 },
+    metaValue: { fontSize: 15, color: c.text, marginTop: 2 },
+    actions: { flexDirection: 'row', gap: 8, flexWrap: 'wrap' },
+    btn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, minHeight: 44, paddingHorizontal: 16, borderRadius: radius.pill },
+    btnSecondary: { backgroundColor: c.fill },
+    btnIcon: { width: 44, paddingHorizontal: 0 },
+    btnText: { fontSize: 15, fontWeight: '600' },
+    finance: { padding: 20, gap: 10 },
+    sectionTitleDark: { fontSize: 13, fontWeight: '600', color: c.heroTileTextSecondary, textTransform: 'uppercase', letterSpacing: 0.4, marginBottom: 4 },
+    finRow: { flexDirection: 'row', justifyContent: 'space-between', gap: 12 },
+    finLabel: { fontSize: 15, color: c.heroTileTextSecondary, flex: 1 },
+    finValue: { fontSize: 15, color: c.heroTileText, fontVariant: ['tabular-nums'] },
+    finTotalRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'baseline', marginTop: 6, paddingTop: 12, borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: 'rgba(255,255,255,0.18)' },
+    finTotalLabel: { fontSize: 17, fontWeight: '600', color: c.heroTileText },
+    finTotal: { fontSize: 26, fontWeight: '700', color: c.heroTileText, fontVariant: ['tabular-nums'], letterSpacing: -0.5 },
+    finNote: { fontSize: 13, color: c.heroTileTextSecondary, marginTop: 4, lineHeight: 18 },
+    cardHead: { paddingHorizontal: 16, paddingTop: 16, paddingBottom: 8 },
+    cardHeadPress: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 16, paddingVertical: 14, minHeight: 52 },
+    sectionTitle: { fontSize: 13, fontWeight: '600', color: c.textSecondary, textTransform: 'uppercase', letterSpacing: 0.4 },
+    preview: { fontSize: 15, color: c.text, marginTop: 4 },
+    item: { paddingHorizontal: 16, paddingVertical: 14, gap: 4 },
+    rowBorder: { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: c.divider },
+    itemTop: { flexDirection: 'row', gap: 12, alignItems: 'flex-start' },
+    itemName: { flex: 1, minWidth: 0, fontSize: 16, fontWeight: '500', color: c.text, lineHeight: 21 },
+    itemTotal: { fontSize: 16, fontWeight: '600', color: c.text, fontVariant: ['tabular-nums'] },
+    itemGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 8 },
+    mini: { backgroundColor: c.fill, borderRadius: 8, paddingHorizontal: 10, paddingVertical: 6, flexGrow: 1, flexBasis: 120 },
+    miniLabel: { fontSize: 11, color: c.textSecondary },
+    miniValue: { fontSize: 14, color: c.text, fontWeight: '500', fontVariant: ['tabular-nums'], marginTop: 1 },
+    fields: { paddingHorizontal: 16, paddingBottom: 8 },
+    field: { paddingVertical: 10, borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: c.divider },
+    fieldValue: { fontSize: 15, color: c.text, marginTop: 2, lineHeight: 21 },
+    muted: { fontSize: 13, color: c.textSecondary, lineHeight: 18 },
+    h2: { fontSize: 20, fontWeight: '600', color: c.text, marginBottom: 6 },
+  });
+}
+

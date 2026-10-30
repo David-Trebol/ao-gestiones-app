@@ -26,7 +26,7 @@ export default function ResetPasswordScreen() {
       <View style={styles.card}>
         <View style={styles.iconWrap}><KeyRound size={22} color="#E5641C" /></View>
         <Text style={styles.title}>Crea tu nueva contraseña</Text>
-        <Text style={styles.subtitle}>Mínimo 8 caracteres. La usarás para entrar en Flow.</Text>
+        <Text style={styles.subtitle}>Mínimo 8 caracteres. La usarás para entrar en AO Gestiones.</Text>
         {error !== '' && <Text style={styles.error}>{error}</Text>}
         <Text style={styles.label}>Nueva contraseña</Text>
         <TextInput

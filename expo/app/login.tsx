@@ -278,7 +278,7 @@ export default function LoginScreen() {
                 <Zap size={24} color="#fff" />
               </View>
               <View>
-                <Text style={styles.sidebarBrandName}>Flow</Text>
+                <Text style={styles.sidebarBrandName}>AO Gestiones</Text>
                 <Text style={styles.sidebarBrandTag}>Pedidos en movimiento</Text>
               </View>
             </View>
@@ -318,7 +318,7 @@ export default function LoginScreen() {
               </View>
             </View>
 
-            <Text style={styles.sidebarVersion}>Flow v1.0 · Multiplataforma</Text>
+            <Text style={styles.sidebarVersion}>AO Gestiones · Libro de pedidos</Text>
           </View>
         </View>
       )}
@@ -360,7 +360,7 @@ export default function LoginScreen() {
                   </View>
                   <View style={styles.logoGlowRing} />
                 </View>
-                <Text style={styles.appName}>Flow</Text>
+                <Text style={styles.appName}>AO Gestiones</Text>
                 <Animated.View style={{ opacity: taglineAnim }}>
                   <Text style={styles.appTagline}>Pedidos en movimiento</Text>
                 </Animated.View>
@@ -576,7 +576,7 @@ export default function LoginScreen() {
               )}
             </Animated.View>
 
-            <Text style={styles.versionText}>Flow v1.0</Text>
+            <Text style={styles.versionText}>AO Gestiones</Text>
           </Animated.View>
         </ScrollView>
       </KeyboardAvoidingView>

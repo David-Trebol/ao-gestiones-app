@@ -28,6 +28,10 @@ import StatusBadge from '@/components/StatusBadge';
 import { NavigationView, Manufacturer, Order } from '@/types';
 import { formatCurrency, formatDate } from '@/utils/calculations';
 import * as Haptics from 'expo-haptics';
+import OrdersDashboard from '@/components/home/OrdersDashboard';
+
+// Vista elegida (se conserva al volver de un pedido)
+let savedMode: 'lista' | 'carpetas' = 'lista';
 
 export default function HomeScreen() {
   const router = useRouter();
@@ -52,6 +56,11 @@ export default function HomeScreen() {
     duplicateOrders,
   } = useData();
 
+  const [mode, setModeState] = useState<'lista' | 'carpetas'>(savedMode);
+  const setMode = (m: 'lista' | 'carpetas') => {
+    savedMode = m;
+    setModeState(m);
+  };
   const [currentView, setCurrentView] = useState<NavigationView>('years');
   const [selectedYear, setSelectedYear] = useState<number | null>(null);
   const [selectedManufacturer, setSelectedManufacturer] = useState<Manufacturer | null>(null);
@@ -305,9 +314,9 @@ export default function HomeScreen() {
       <>
         <Animated.View style={{ transform: [{ scale: titleScale }] }}>
           <SectionHeader
-            title="Pedidos"
+            title="Años"
             subtitle="Elige un año para ver sus fabricantes y pedidos"
-            actionLabel="Añadir"
+            actionLabel="Añadir año"
             onAction={handleAddYear}
           />
         </Animated.View>
@@ -447,14 +456,34 @@ export default function HomeScreen() {
           <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.primary} />
         }
       >
+        {currentView === 'years' && (
+          <View style={styles.homeHeader}>
+            <Text style={[styles.homeTitle, { color: colors.text }]} accessibilityRole="header">Pedidos</Text>
+            <View style={[styles.segment, { backgroundColor: colors.fill }]} accessibilityRole="tablist">
+              {(['lista', 'carpetas'] as const).map(m => (
+                <Pressable
+                  key={m}
+                  onPress={() => setMode(m)}
+                  style={[styles.segBtn, mode === m && [styles.segOn, { backgroundColor: colors.surface }]]}
+                  accessibilityRole="tab"
+                  accessibilityState={{ selected: mode === m }}
+                  testID={`home-mode-${m}`}
+                >
+                  <Text style={[styles.segText, { color: mode === m ? colors.text : colors.textSecondary }]}>{m === 'lista' ? 'Resumen y lista' : 'Por año y fabricante'}</Text>
+                </Pressable>
+              ))}
+            </View>
+          </View>
+        )}
         <Animated.View style={{ opacity: fadeAnim, transform: [{ translateY: slideAnim }] }}>
-          {currentView === 'years' && renderYearsView()}
+          {currentView === 'years' && mode === 'lista' && <OrdersDashboard />}
+          {currentView === 'years' && mode === 'carpetas' && renderYearsView()}
           {currentView === 'manufacturers' && renderManufacturersView()}
           {currentView === 'orders' && renderOrdersView()}
         </Animated.View>
       </ScrollView>
 
-      {currentView === 'years' && (
+      {currentView === 'years' && mode === 'carpetas' && (
         <Animated.View style={{ transform: [{ scale: fabScale }, { rotate: fabSpin }] }}>
           <Pressable
             style={({ pressed }) => [styles.fab, { backgroundColor: colors.primary, opacity: pressed ? 0.85 : 1 }, isDesktop && styles.fabDesktop]}
@@ -624,6 +653,37 @@ const styles = StyleSheet.create({
   },
   scrollView: {
     flex: 1,
+  },
+  homeHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    flexWrap: 'wrap',
+    gap: 12,
+    marginBottom: 16,
+  },
+  homeTitle: {
+    ...type.largeTitle,
+  },
+  segment: {
+    flexDirection: 'row',
+    borderRadius: 10,
+    padding: 2,
+    gap: 2,
+  },
+  segBtn: {
+    minHeight: 36,
+    paddingHorizontal: 14,
+    borderRadius: 8,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  segOn: {
+    ...(Platform.OS === 'web' ? ({ boxShadow: '0 1px 3px rgba(0,0,0,0.12)' } as any) : { elevation: 1 }),
+  },
+  segText: {
+    fontSize: 14,
+    fontWeight: '600' as const,
   },
   scrollContent: {
     paddingHorizontal: 20,

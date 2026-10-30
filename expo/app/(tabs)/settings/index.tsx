@@ -37,10 +37,12 @@ import { useAuth, AppUser } from '@/contexts/AuthContext';
 import { formatCurrency } from '@/utils/calculations';
 import { webInputReset } from '@/constants/theme';
 import * as Haptics from 'expo-haptics';
+import { useRouter } from 'expo-router';
 
 export default function SettingsScreen() {
   const { orders, manufacturers, years, deleteAllData } = useData();
   const { currentUser, users, isAdmin, logout, addUser, updateUser, deleteUser, biometricEnabled, biometricAvailable, toggleBiometric, requestPasswordReset } = useAuth();
+  const router = useRouter();
   const { colors, isDark, themeMode, setTheme } = useTheme();
   const [deleting, setDeleting] = useState(false);
   const [savingUser, setSavingUser] = useState(false);
@@ -62,10 +64,6 @@ export default function SettingsScreen() {
   const totalYears = years.length;
   const totalAmount = orders.reduce((sum, o) => sum + o.total_with_vat, 0);
 
-  const statusCounts = orders.reduce((acc, o) => {
-    acc[o.status] = (acc[o.status] || 0) + 1;
-    return acc;
-  }, {} as Record<string, number>);
 
   const handleClearAll = useCallback(() => {
     Alert.alert(
@@ -228,13 +226,6 @@ export default function SettingsScreen() {
     void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
   }, [setTheme]);
 
-  const statusLabels: Record<string, string> = {
-    pending: 'Pendientes',
-    processing: 'Procesando',
-    shipped: 'Enviados',
-    delivered: 'Entregados',
-    cancelled: 'Cancelados',
-  };
 
   return (
     <View style={[styles.outerContainer, { backgroundColor: colors.background }]}>
@@ -360,19 +351,12 @@ export default function SettingsScreen() {
           <View style={isDesktop ? styles.desktopHalf : undefined}>
             <View style={[styles.section, { backgroundColor: colors.surface, borderColor: colors.borderLight, shadowColor: colors.cardShadow }]}>
               <Text style={[styles.sectionTitle, { color: colors.text }]}>Estado de Pedidos</Text>
-              <View style={styles.statusList}>
-                {Object.entries(statusLabels).map(([key, label]) => (
-                  <View key={key} style={styles.statusRow}>
-                    <View style={[styles.statusIndicator, { backgroundColor: colors[`status${key.charAt(0).toUpperCase() + key.slice(1)}Bg` as keyof typeof colors] as string }]}>
-                      <View style={[styles.statusDot, { backgroundColor: colors[`status${key.charAt(0).toUpperCase() + key.slice(1)}Text` as keyof typeof colors] as string }]} />
-                    </View>
-                    <Text style={[styles.statusLabel, { color: colors.text }]}>{label}</Text>
-                    <View style={[styles.statusCountWrap, { backgroundColor: colors.surfaceAlt }]}>
-                      <Text style={[styles.statusCount, { color: colors.text }]}>{statusCounts[key] || 0}</Text>
-                    </View>
-                  </View>
-                ))}
-              </View>
+              <Text style={[styles.statusLabel, { color: colors.textSecondary, fontSize: 15, lineHeight: 21 }]}>
+                El resumen por estados está ahora en la pantalla principal (Pedidos), donde cada contador abre la lista filtrada.
+              </Text>
+              <Pressable onPress={() => router.push('/' as never)} style={({ pressed }) => [styles.statusMoved, { backgroundColor: colors.fill, opacity: pressed ? 0.7 : 1 }]} accessibilityRole="link">
+                <Text style={{ color: colors.primary, fontSize: 15, fontWeight: '600' }}>Ir a Pedidos</Text>
+              </Pressable>
             </View>
           </View>
         </View>
@@ -483,7 +467,7 @@ export default function SettingsScreen() {
         <View style={styles.footer}>
           <View style={styles.footerBadge}>
             <Info size={14} color={colors.textTertiary} />
-            <Text style={[styles.footerText, { color: colors.textSecondary }]}>Flow v1.0</Text>
+            <Text style={[styles.footerText, { color: colors.textSecondary }]}>AO Gestiones</Text>
           </View>
           <Text style={[styles.footerSubtext, { color: colors.textTertiary }]}>Pedidos en movimiento · Multiplataforma</Text>
         </View>
@@ -779,6 +763,7 @@ const styles = StyleSheet.create({
   totalAmountCard: { borderRadius: 20, paddingVertical: 24, paddingHorizontal: 20, alignItems: 'center', },
   totalAmountLabel: { fontSize: 15, color: 'rgba(245,245,247,0.65)', marginBottom: 4, fontWeight: '500' as const, },
   totalAmountValue: { fontSize: 40, fontWeight: '700' as const, color: '#F5F5F7', letterSpacing: -1.2, fontVariant: ['tabular-nums'], },
+  statusMoved: { marginTop: 12, minHeight: 44, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
   statusList: {
     gap: 10,
     marginTop: 16,

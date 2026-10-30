@@ -210,15 +210,26 @@ export default function ManufacturersScreen() {
               <Text style={[styles.mfName, { color: colors.text }]}>{item.name}</Text>
               <Text style={[styles.mfCode, { color: colors.textSecondary }]}>{item.code}</Text>
               <View style={styles.yearBadges}>
-                {item.active_years && item.active_years.length > 0 ? (
-                  [...item.active_years].sort((a, b) => b - a).map(year => (
-                    <View key={year} style={[styles.yearBadge, { backgroundColor: colors.primarySoft, borderColor: colors.primarySoftAlt }]}>
-                      <Text style={[styles.yearBadgeText, { color: colors.primary }]}>{year}</Text>
-                    </View>
-                  ))
-                ) : (
-                  <Text style={[styles.noYears, { color: colors.textTertiary }]}>Sin años asignados</Text>
-                )}
+                {(() => {
+                  // Años asignados a mano + años en los que ya tiene pedidos (antes estos no se mostraban
+                  // y un fabricante con pedidos de 2026 aparecía como "Sin años asignados")
+                  const assigned = new Set(item.active_years ?? []);
+                  const withOrders = new Set(orders.filter(o => o.manufacturer_id === item.id).map(o => o.year));
+                  const all = Array.from(new Set([...assigned, ...withOrders])).sort((a, b) => b - a);
+                  if (!all.length) return <Text style={[styles.noYears, { color: colors.textTertiary }]}>Sin años ni pedidos</Text>;
+                  return all.map(year => {
+                    const onlyOrders = !assigned.has(year);
+                    return (
+                      <View
+                        key={year}
+                        style={[styles.yearBadge, onlyOrders ? { backgroundColor: 'transparent', borderColor: colors.border, borderStyle: 'dashed' } : { backgroundColor: colors.primarySoft, borderColor: colors.primarySoftAlt }]}
+                        accessibilityLabel={onlyOrders ? `${year}: tiene pedidos, sin asignar` : `${year}: asignado`}
+                      >
+                        <Text style={[styles.yearBadgeText, { color: onlyOrders ? colors.textSecondary : colors.primary }]}>{year}</Text>
+                      </View>
+                    );
+                  });
+                })()}
               </View>
               <Text style={[styles.orderCountText, { color: colors.textSecondary }]}>{orderCount} pedido{orderCount !== 1 ? 's' : ''}</Text>
             </View>
@@ -240,15 +251,15 @@ export default function ManufacturersScreen() {
         </Pressable>
       </AnimatedManufacturerCard>
     );
-  }, [getOrderCount, openYears, openEdit, handleDelete, handleDuplicate, colors]);
+  }, [getOrderCount, openYears, openEdit, handleDelete, handleDuplicate, colors, orders]);
 
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
       <View style={[styles.innerContainer, { maxWidth: contentMaxWidth }]}>
         <Animated.View style={[styles.headerBar, { opacity: headerFade, transform: [{ translateY: headerSlide }, { scale: headerScale }] }]}>
-          <View>
+          <View style={{ flex: 1, minWidth: 0, paddingRight: 12 }}>
             <Text style={[styles.headerTitle, { color: colors.text }]}>Fabricantes</Text>
-            <Text style={[styles.headerSubtitle, { color: colors.textSecondary }]}>{manufacturers.length} fabricante{manufacturers.length !== 1 ? 's' : ''}</Text>
+            <Text style={[styles.headerSubtitle, { color: colors.textSecondary }]}>{manufacturers.length} fabricante{manufacturers.length !== 1 ? 's' : ''} · años en naranja: asignados; con borde discontinuo: tienen pedidos pero no están asignados</Text>
           </View>
           <Pressable
             style={({ pressed }) => [styles.createBtn, { backgroundColor: colors.primary, opacity: pressed ? 0.8 : 1 }]}
