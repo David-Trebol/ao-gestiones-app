@@ -12,7 +12,7 @@ Diagnóstico: la app funciona y los datos son correctos, pero su estructura era 
 ## Fase 0 · Que no se caiga ni se pierda nada
 
 - [x] RPC `public.keepalive()` creada en Supabase (no lee ni escribe datos).
-- [ ] **Algo que la llame cada 3 días** para que el plan gratis no pause la base de datos. Propuesta preparada: workflow de GitHub Actions (`POST /rest/v1/rpc/keepalive` con la clave publicable). **Necesita la aprobación del propietario**; alternativa: plan Pro de Supabase (~25 $/mes).
+- [x] Llamada cada 3 días (aprobada por el propietario el 16/11/2026): workflow `.github/workflows/keepalive-supabase.yml` (06:17 UTC, también a mano desde Actions). Primera ejecución correcta el 16/11/2026 (HTTP 200), aunque GitHub tardó ~1 h en arrancarla.
 - [x] Exportar a Excel: `expo/utils/exportExcel.ts` (hojas Pedidos, Líneas, Envíos, Fabricantes; importes con formato €). Botón «Excel» en la lista de Pedidos (exporta lo filtrado). *En la rama.*
 - [x] Ajustes → «Descargar copia completa» (Excel con pedidos, líneas, envíos y fabricantes).
 - [x] «Eliminar todos los datos»: ventana propia que ofrece descargar la copia antes y solo se activa al escribir `ELIMINAR`.
