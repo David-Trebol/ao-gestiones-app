@@ -22,8 +22,11 @@ export default function WebGlobalStyles() {
     }
     el.textContent = `
       :root { color-scheme: ${isDark ? 'dark' : 'light'}; }
-      html, body { background-color: ${colors.background}; }
-      body { background-image: ${colors.ambient}; background-attachment: fixed; background-repeat: no-repeat; min-height: 100vh; }
+      html { background-color: ${colors.background}; }
+      body { background-color: transparent; }
+      /* Brillo de color en una capa fija propia: «background-attachment: fixed» hace que Safari de iOS repinte sin parar */
+      body { min-height: 100vh; }
+      body::before { content: ''; position: fixed; inset: 0; z-index: -1; pointer-events: none; background-image: ${colors.ambient}; background-repeat: no-repeat; }
       body, input, textarea, button, [dir] { font-family: ${FONT_FAMILY}; }
       body { -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale; text-rendering: optimizeLegibility; }
       ::selection { background: ${colors.primarySoftAlt}; }

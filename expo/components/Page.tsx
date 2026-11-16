@@ -84,7 +84,8 @@ export function CompactTitleBar({ title, shown, actions }: { title: string; show
       style={[
         compact.bar,
         { paddingTop: insets.top, borderBottomColor: colors.divider, opacity: shown ? 1 : 0 },
-        glass(colors.headerBackground, 24),
+        // El desenfoque solo mientras se ve (oculto seguía costando en cada fotograma del desplazamiento)
+        shown ? glass(colors.headerBackground, 24) : { backgroundColor: 'transparent' },
         Platform.OS === 'web' && ({ transitionProperty: 'opacity', transitionDuration: '180ms' } as ViewStyle),
       ]}
       aria-hidden={!shown}
