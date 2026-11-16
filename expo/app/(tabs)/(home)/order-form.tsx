@@ -92,6 +92,8 @@ export default function OrderFormScreen() {
   const router = useRouter();
   const { orders, manufacturers, addOrder, updateOrder } = useData();
   const { width, height, pad } = usePageLayout();
+  // Móvil en horizontal: una sola barra arriba (Cancelar · título y total · Guardar) para dejar sitio al formulario
+  const compact = height < 500;
   const isDesktop = width >= 1024;
   // Mismo ancho máximo que el resto de pantallas
   const insets = useSafeAreaInsets();
@@ -481,13 +483,27 @@ export default function OrderFormScreen() {
     </FormSection>
   );
 
+  const submitButton = (
+    <Pressable
+      style={({ pressed, hovered }: { pressed: boolean; hovered?: boolean }) => [styles.submitBtn, compact && styles.submitBtnCompact, { backgroundColor: hovered ? colors.primaryDark : colors.primaryFill, opacity: saving ? 0.6 : pressed ? 0.85 : 1 }]}
+      onPress={handleSubmit}
+      disabled={saving}
+      testID="submit-order-btn"
+      accessibilityRole="button"
+      accessibilityState={{ disabled: saving, busy: saving }}
+    >
+      {saving && <ActivityIndicator size="small" color="#fff" />}
+      <Text style={[styles.submitBtnText, compact && { fontSize: 15 }]}>{saving ? 'Guardando…' : compact ? (editingOrder ? 'Guardar' : 'Crear') : editingOrder ? 'Guardar cambios' : 'Crear pedido'}</Text>
+    </Pressable>
+  );
+
   return (
     <View style={[styles.container, { backgroundColor: canvas(colors) }]}>
       <Stack.Screen options={{ title: editingOrder ? 'Editar pedido' : 'Nuevo pedido', headerShown: false }} />
 
       {/* Barra superior como la de una hoja de iOS: Cancelar · título · Leer documento. Guardar va abajo, con el total. */}
       <View style={[styles.topBar, { paddingTop: insets.top, borderBottomColor: colors.divider }, glass(colors.headerBackground, 24)]}>
-        <View style={[styles.topBarInner, { maxWidth: PAGE_MAX, paddingHorizontal: pad - 8 }]}>
+        <View style={[styles.topBarInner, compact && { height: 48 }, { maxWidth: PAGE_MAX, paddingHorizontal: pad - 8 }]}>
           <Pressable
             onPress={() => (router.canGoBack() ? router.back() : router.replace('/'))}
             style={({ hovered }: { pressed: boolean; hovered?: boolean }) => [styles.topBtn, hovered && { backgroundColor: colors.fill }]}
@@ -496,9 +512,17 @@ export default function OrderFormScreen() {
           >
             <Text style={[styles.topBtnText, { color: colors.primary }]}>Cancelar</Text>
           </Pressable>
-          <Text style={[styles.topTitle, { color: colors.text }]} numberOfLines={1} accessibilityRole="header">
-            {editingOrder ? editingOrder.reference_number : 'Nuevo pedido'}
-          </Text>
+          <View style={[styles.topTitleWrap, compact && { left: 120, right: 230 }]} pointerEvents="none">
+            <Text style={[styles.topTitleText, { color: colors.text }]} numberOfLines={1} accessibilityRole="header">
+              {editingOrder ? editingOrder.reference_number : 'Nuevo pedido'}
+            </Text>
+            {compact && (
+              <Text style={[styles.topTotal, { color: showErrors && errorCount > 0 ? colors.error : colors.textSecondary }]} numberOfLines={1}>
+                {showErrors && errorCount > 0 ? (errorCount === 1 ? 'Falta 1 dato obligatorio' : `Faltan ${errorCount} datos obligatorios`) : `Total ${formatCurrency(totals.grandTotal)}`}
+              </Text>
+            )}
+          </View>
+          <View style={styles.topRight}>
           <Pressable
             onPress={handleScanAction}
             disabled={!!scan}
@@ -508,8 +532,10 @@ export default function OrderFormScreen() {
             accessibilityLabel="Leer datos de un documento (PDF o foto)"
           >
             <ScanLine size={17} color={colors.primary} />
-            {width >= 420 && <Text style={[styles.scanPillText, { color: colors.primary }]}>Leer documento</Text>}
+            {width >= 420 && !compact && <Text style={[styles.scanPillText, { color: colors.primary }]}>Leer documento</Text>}
           </Pressable>
+          {compact && submitButton}
+          </View>
         </View>
       </View>
 
@@ -843,6 +869,7 @@ export default function OrderFormScreen() {
             </View>
           </View>
         </ScrollView>
+        {!compact && (
         <View style={[styles.saveBar, { borderTopColor: colors.divider, paddingBottom: 10 + insets.bottom, paddingHorizontal: pad }, glass(colors.headerBackground, 24)]}>
           <View style={[styles.saveBarInner, { maxWidth: PAGE_MAX - pad * 2 }]}>
             <View style={{ flex: 1, minWidth: 0 }}>
@@ -857,19 +884,10 @@ export default function OrderFormScreen() {
                 </>
               )}
             </View>
-            <Pressable
-              style={({ pressed, hovered }: { pressed: boolean; hovered?: boolean }) => [styles.submitBtn, { backgroundColor: hovered ? colors.primaryDark : colors.primaryFill, opacity: saving ? 0.6 : pressed ? 0.85 : 1 }]}
-              onPress={handleSubmit}
-              disabled={saving}
-              testID="submit-order-btn"
-              accessibilityRole="button"
-              accessibilityState={{ disabled: saving, busy: saving }}
-            >
-              {saving && <ActivityIndicator size="small" color="#fff" />}
-              <Text style={styles.submitBtnText}>{saving ? 'Guardando…' : editingOrder ? 'Guardar cambios' : 'Crear pedido'}</Text>
-            </Pressable>
+            {submitButton}
           </View>
         </View>
+        )}
       </KeyboardAvoidingView>
       <SelectSheet
         visible={mfSheetOpen}
@@ -1440,7 +1458,11 @@ const styles = StyleSheet.create({
   topBarInner: { width: '100%', alignSelf: 'center', height: 52, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 8 },
   topBtn: { minHeight: 44, paddingHorizontal: 8, justifyContent: 'center', borderRadius: 10 },
   topBtnText: { fontSize: 17, letterSpacing: -0.3 },
-  topTitle: { position: 'absolute', left: 110, right: 110, textAlign: 'center', fontSize: 17, fontWeight: '600' as const, letterSpacing: -0.3 },
+  topTitleWrap: { position: 'absolute', left: 110, right: 110, alignItems: 'center' },
+  topTitleText: { fontSize: 17, fontWeight: '600' as const, letterSpacing: -0.3, textAlign: 'center' },
+  topTotal: { fontSize: 12.5, fontVariant: ['tabular-nums'], marginTop: -1 },
+  topRight: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  submitBtnCompact: { minHeight: 36, paddingHorizontal: 16 },
   scanPill: { flexDirection: 'row', alignItems: 'center', gap: 6, minHeight: 36, minWidth: 44, justifyContent: 'center', paddingHorizontal: 12, borderRadius: 999 },
   scanPillText: { fontSize: 15, fontWeight: '600' as const, letterSpacing: -0.2 },
   submitBtn: {
