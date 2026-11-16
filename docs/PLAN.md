@@ -57,7 +57,8 @@ Pedido del propietario el 16/11/2026: estética de Apple (tipografía, colores, 
 - [x] Pedidos: contadores compactos que filtran, aviso de atención en una línea que filtra la lista (con «Ver retrasados»), la lista visible desde la primera pantalla, tabla desde 1.100 px y tarjetas en 1 o 2 columnas.
 - [ ] Ficha: cabecera compacta (referencia, estado, total y acciones en dos líneas); en móvil los productos deben verse en la primera pantalla.
 - [x] Formulario: fabricante en un selector con buscador (`SelectSheet searchable`, sin acentos); «Leer documento» en la barra superior; un solo botón de guardar.
-- [ ] Formulario: secciones plegables en móvil; versión compacta en horizontal (844×390).
+- [x] Formulario: en móvil, «Seguimiento» y «Documentos y condiciones» se pliegan en una línea si están vacías (se abren solas si tienen datos).
+- [ ] Formulario: versión compacta en horizontal (844×390).
 - [x] Fabricantes: tabla en ordenador, lista agrupada en móvil; tocar la fila edita; acciones con nombre en el menú «…».
 - [x] Ajustes como Ajustes de iOS: perfil → apariencia → resumen → usuarios → cuenta → datos → cerrar sesión. Fuera «Estado de pedidos» y «Plataforma».
 - [x] «Facturación total» ya no suma los pedidos cancelados (aprobado por el propietario el 16/11/2026); la nota de debajo dice cuántos no cuenta.
