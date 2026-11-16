@@ -34,7 +34,7 @@ Terminado el 16/11/2026:
 - [x] Vista «Por año y fabricante»: sin «Atrás» (migas de pan «Años › año › fabricante»), pedidos con `OrderTable` (≥ 1.100 px) u `OrderCardItem` (1 o 2 columnas). Duplicar un pedido sigue disponible desde su ficha. Sigue pendiente de decisión si pasa a ser «agrupar por» dentro de la lista.
 - [x] Pruebas ajustadas: t2 usa `header-new-order`; t4 busca con `home-search` (ya no existe la pestaña Buscar); `ControlOrMeta+a` para que funcionen también en Mac. Nueva `tools/e2e/shots-carpetas.js` (capturas de la vista por año en 3 tamaños).
 
-## Sistema de diseño (rama `diseno-apple`, en revisión)
+## Sistema de diseño estilo Apple (publicado el 16/11/2026)
 
 Pedido del propietario el 16/11/2026: estética de Apple (tipografía, colores, translucidez) que funcione en web y como app de móvil.
 - [x] Tokens nuevos en `constants/colors.ts`: azul del sistema como único color de acción, estados con colores de sistema, `SystemTint` para iconos de colores, vidrio (`glass*`) y brillo de fondo (`ambient`). Contrastes ≥ 4,5:1 comprobados.
@@ -43,7 +43,8 @@ Pedido del propietario el 16/11/2026: estética de Apple (tipografía, colores, 
 - [x] Barra de título de vidrio que aparece al desplazarse (`useCollapsingTitle` + `CompactTitleBar`) en Pedidos y Ajustes.
 - [x] Pedidos: contadores como las listas de Recordatorios (en móvil, desplazables en horizontal), buscador de iOS, lista agrupada en móvil, títulos sin mayúsculas.
 - [x] Ajustes: iconos en cuadrados de color. Entrada rehecha con el estilo de la app (se quita «Análisis · Métricas en vivo», que no existía).
-- [ ] Pendiente de visto bueno del propietario antes de fusionar con `main`.
+- [x] Aprobado por el propietario y fusionado con `main`.
+- [ ] Siguiente: adaptar ficha del pedido y formulario; revisar modo oscuro y un iPhone real.
 
 ## Fase 2 · Pantalla por pantalla
 
