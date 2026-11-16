@@ -1,0 +1,3 @@
+# Lectura de documentos (utils/docread)
+
+`read.web.ts` abre el archivo en el navegador: PDF con texto → PDF.js; imágenes y PDF escaneados → Tesseract con corrección de inclinación (`layout.deskew`) y prueba de giros 90/180/270. `parse.ts` reconoce con reglas emisor/cliente, NIF/CIF/NIE con letra de control, CP→provincia, referencias, líneas (cantidad × precio − dto = importe; separa números que el OCR junta solo si cuadran), totales e IVA. `review.ts` + `components/DocumentReview.tsx` = pantalla de revisión: nada se aplica al formulario sin marcarlo y nunca se sobrescribe un dato existente por defecto. En nativo (`read.ts`) solo informa de que está disponible en la web.

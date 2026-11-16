@@ -4,9 +4,9 @@ import { useRouter } from 'expo-router';
 import { AlertTriangle, ChevronDown, Download, Search, SlidersHorizontal, X } from 'lucide-react-native';
 import { useTheme } from '@/contexts/ThemeContext';
 import { useData } from '@/contexts/DataContext';
-import { ThemeColors } from '@/constants/colors';
+import { ThemeColors , SystemTint } from '@/constants/colors';
 import { cardShadow, radius, webInputReset } from '@/constants/theme';
-import StatusBadge, { STATUS_ORDER, statusConfig } from '@/components/StatusBadge';
+import StatusBadge, { STATUS_ICONS, STATUS_ORDER, statusConfig } from '@/components/StatusBadge';
 import SelectSheet, { SheetOption } from '@/components/SelectSheet';
 import { usePageLayout } from '@/components/Page';
 import type { Order, OrderStatus } from '@/types';
@@ -30,6 +30,15 @@ import {
 // Se conservan al volver de un pedido o al cambiar de vista
 let savedFilters: OrderFilters = { ...DEFAULT_FILTERS };
 let savedVisible = 50;
+
+/** Color de sistema de cada estado (círculos de los contadores, como las listas de Recordatorios) */
+export const STATUS_TINT: Record<OrderStatus, string> = {
+  pending: SystemTint.orange,
+  processing: SystemTint.blue,
+  shipped: SystemTint.purple,
+  delivered: SystemTint.green,
+  cancelled: SystemTint.red,
+};
 
 type SheetKind = 'manufacturer' | 'owner' | 'year' | 'period' | 'sort' | null;
 
@@ -188,20 +197,23 @@ export default function OrdersDashboard() {
         )}
       </View>
 
-      {/* Contadores por estado: abren la lista filtrada */}
-      <View style={s.counters}>
-        {STATUS_ORDER.map(st => {
+      {/* Contadores por estado (como las listas de Recordatorios): abren la lista filtrada */}
+      {(() => {
+        const tiles = STATUS_ORDER.map(st => {
           const sel = filters.status === st;
           const cfg = statusConfig[st];
+          const tint = STATUS_TINT[st];
+          const Icon = STATUS_ICONS[st];
           return (
             <Pressable
               key={st}
               onPress={() => setFilters({ status: sel ? 'all' : st })}
               style={({ hovered, pressed }: { pressed: boolean; hovered?: boolean }) => [
                 s.counter,
-                { flexBasis: width >= 700 ? '18%' : '30%', borderColor: sel ? colors[cfg.textKey] : 'transparent' },
+                width < 700 ? s.counterScroll : s.counterGrid,
+                sel ? { backgroundColor: tint } : (hovered || pressed) ? { backgroundColor: colors.surfaceAlt } : null,
                 cardShadow(isDark),
-                (hovered || pressed) && !sel && { backgroundColor: colors.surfaceAlt },
+                Platform.OS === 'web' && ({ cursor: 'pointer', transitionProperty: 'background-color', transitionDuration: '160ms' } as object),
               ]}
               accessibilityRole="button"
               accessibilityState={{ selected: sel }}
@@ -209,21 +221,28 @@ export default function OrdersDashboard() {
               testID={`counter-${st}`}
             >
               <View style={s.counterTop}>
-                <View style={[s.dot, { backgroundColor: colors[cfg.textKey] }]} />
-                <Text style={s.counterLabel} numberOfLines={1}>
-                  {cfg.label}
-                </Text>
+                <View style={[s.counterIcon, { backgroundColor: sel ? '#FFFFFF' : tint }]}>
+                  <Icon size={17} color={sel ? tint : '#FFFFFF'} strokeWidth={2.4} />
+                </View>
+                <Text style={[s.counterValue, sel && { color: '#FFFFFF' }]}>{counts[st].n}</Text>
               </View>
-              <Text style={s.counterValue}>{counts[st].n}</Text>
-              {width >= 700 && (
-                <Text style={s.counterSub} numberOfLines={1}>
-                  {formatCurrency(counts[st].total)}
-                </Text>
-              )}
+              <Text style={[s.counterLabel, sel && { color: '#FFFFFF' }]} numberOfLines={1}>
+                {cfg.label}
+              </Text>
+              <Text style={[s.counterSub, sel && { color: 'rgba(255,255,255,0.85)' }]} numberOfLines={1}>
+                {formatCurrency(counts[st].total)}
+              </Text>
             </Pressable>
           );
-        })}
-      </View>
+        });
+        return width < 700 ? (
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={[s.countersScroll, { paddingHorizontal: pad }]} style={{ marginHorizontal: -pad }}>
+            {tiles}
+          </ScrollView>
+        ) : (
+          <View style={s.counters}>{tiles}</View>
+        );
+      })()}
 
       {/* Atención: una sola línea que filtra la lista */}
       {attentionCount > 0 && (
@@ -251,8 +270,8 @@ export default function OrdersDashboard() {
       {/* Lista */}
       <View>
         <View style={s.listHead}>
-          <Text style={s.sectionTitle}>
-            {listTitle} · {list.length}
+          <Text style={s.sectionTitle} accessibilityRole="header">
+            {listTitle} <Text style={s.sectionCount}>{list.length}</Text>
           </Text>
           <View style={s.listHeadActions}>
             {nActive > 0 && (
@@ -300,9 +319,9 @@ export default function OrdersDashboard() {
         ) : table ? (
           <OrderTable orders={shown} onOpen={open} showReasons={showReasons} showUpdated={wideTable} />
         ) : (
-          <View style={[s.cardsWrap, twoCols && s.cardsWrapTwo]}>
-            {shown.map(o => (
-              <OrderCardItem key={o.id} order={o} onOpen={open} twoCols={twoCols} showReasons={showReasons} />
+          <View style={twoCols ? [s.cardsWrap, s.cardsWrapTwo] : [s.card, s.grouped, cardShadow(isDark)]}>
+            {shown.map((o, i) => (
+              <OrderCardItem key={o.id} order={o} onOpen={open} twoCols={twoCols} grouped={!twoCols} first={i === 0} showReasons={showReasons} />
             ))}
           </View>
         )}
@@ -409,18 +428,28 @@ export function OrderTable({ orders, onOpen, showReasons, showUpdated }: { order
   );
 }
 
-export function OrderCardItem({ order: o, onOpen, twoCols, showReasons }: { order: Order; onOpen: (o: Order) => void; twoCols?: boolean; showReasons?: boolean }) {
+/**
+ * Pedido como tarjeta (2 columnas) o como fila de una lista agrupada de iOS (`grouped`: sin sombra,
+ * separadas por una línea fina que empieza en el margen del texto, como en Mail).
+ */
+export function OrderCardItem({ order: o, onOpen, twoCols, showReasons, grouped, first }: { order: Order; onOpen: (o: Order) => void; twoCols?: boolean; showReasons?: boolean; grouped?: boolean; first?: boolean }) {
   const { colors, isDark } = useTheme();
   const s = useMemo(() => makeStyles(colors), [colors]);
   const reasons = showReasons ? attentionReasons(o) : [];
   return (
     <Pressable
       onPress={() => onOpen(o)}
-      style={({ pressed, hovered }: { pressed: boolean; hovered?: boolean }) => [s.oCard, twoCols && s.oCardTwo, cardShadow(isDark), (pressed || hovered) && { backgroundColor: colors.surfaceAlt }]}
+      style={({ pressed, hovered }: { pressed: boolean; hovered?: boolean }) => [
+        s.oCard,
+        twoCols && s.oCardTwo,
+        grouped ? s.oRow : cardShadow(isDark),
+        (pressed || hovered) && { backgroundColor: grouped ? colors.fill : colors.surfaceAlt },
+      ]}
       accessibilityRole="link"
       accessibilityLabel={`Pedido ${o.reference_number}, ${o.customer?.nombre_empresa || 'sin cliente'}, ${statusConfig[o.status].label}, ${formatCurrency(o.total_with_vat)}`}
       testID={`order-card-${o.id}`}
     >
+      {grouped && !first && <View style={s.oSep} />}
       <View style={s.oTop}>
         <Text style={s.oRef}>{o.reference_number}</Text>
         <StatusBadge status={o.status} size="sm" />
@@ -451,23 +480,27 @@ export function OrderCardItem({ order: o, onOpen, twoCols, showReasons }: { orde
 
 function makeStyles(c: ThemeColors) {
   return StyleSheet.create({
-    searchBox: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 14, height: 48, borderRadius: radius.md, backgroundColor: c.surface },
-    searchInput: { flex: 1, minWidth: 0, fontSize: 16, color: c.text, height: 48, ...webInputReset },
+    searchBox: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 12, height: 44, borderRadius: 12, backgroundColor: c.fill },
+    searchInput: { flex: 1, minWidth: 0, fontSize: 17, color: c.text, height: 44, letterSpacing: -0.2, ...webInputReset },
     clearBtn: { width: 36, height: 36, alignItems: 'center', justifyContent: 'center' },
-    counters: { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
-    counter: { flexGrow: 1, borderRadius: radius.lg, paddingHorizontal: 14, paddingVertical: 12, borderWidth: 2, backgroundColor: c.surface, minHeight: 72 },
-    counterTop: { flexDirection: 'row', alignItems: 'center', gap: 6 },
-    dot: { width: 8, height: 8, borderRadius: 4 },
-    counterLabel: { fontSize: 13, color: c.textSecondary, fontWeight: '500', flexShrink: 1 },
-    counterValue: { fontSize: 24, fontWeight: '700', color: c.text, letterSpacing: -0.5, fontVariant: ['tabular-nums'], marginTop: 2 },
-    counterSub: { fontSize: 12, color: c.textSecondary, fontVariant: ['tabular-nums'] },
-    attention: { flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', gap: 10, paddingLeft: 14, paddingRight: 6, paddingVertical: 4, borderRadius: radius.lg, borderWidth: 1, minHeight: 52 },
+    counters: { flexDirection: 'row', flexWrap: 'wrap', gap: 12 },
+    countersScroll: { flexDirection: 'row', gap: 10, paddingVertical: 2 },
+    counter: { borderRadius: 14, padding: 12, backgroundColor: c.surface, gap: 6 },
+    counterGrid: { flexGrow: 1, flexBasis: '17%' as unknown as number },
+    counterScroll: { width: 148 },
+    counterTop: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+    counterIcon: { width: 32, height: 32, borderRadius: 16, alignItems: 'center', justifyContent: 'center' },
+    counterLabel: { fontSize: 15, color: c.textSecondary, fontWeight: '600', letterSpacing: -0.2, marginTop: 2 },
+    counterValue: { fontSize: 28, fontWeight: '700', color: c.text, letterSpacing: -0.6, fontVariant: ['tabular-nums'] },
+    counterSub: { fontSize: 12.5, color: c.textSecondary, fontVariant: ['tabular-nums'], marginTop: -4 },
+    attention: { flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', gap: 10, paddingLeft: 14, paddingRight: 6, paddingVertical: 4, borderRadius: 14, borderWidth: 0, minHeight: 52 },
     attentionText: { flex: 1, minWidth: 180, fontSize: 15 },
     attentionActions: { flexDirection: 'row', alignItems: 'center' },
     textBtn: { minHeight: 44, paddingHorizontal: 10, alignItems: 'center', justifyContent: 'center', borderRadius: radius.sm },
     listHead: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 8, flexWrap: 'wrap' },
     listHeadActions: { flexDirection: 'row', alignItems: 'center' },
-    sectionTitle: { fontSize: 13, fontWeight: '600', color: c.textSecondary, textTransform: 'uppercase', letterSpacing: 0.4, paddingHorizontal: 4 },
+    sectionTitle: { fontSize: 22, fontWeight: '700', color: c.text, letterSpacing: -0.4, paddingHorizontal: 2 },
+    sectionCount: { fontWeight: '400', color: c.textSecondary },
     link: { fontSize: 14, color: c.primary, fontWeight: '600' },
     ruleNote: { fontSize: 12.5, lineHeight: 17, color: c.textSecondary, paddingHorizontal: 4, marginBottom: 4 },
     chips: { flexDirection: 'row', gap: 8, paddingBottom: 12, paddingTop: 4, alignItems: 'center' },
@@ -480,9 +513,9 @@ function makeStyles(c: ThemeColors) {
     emptyText: { fontSize: 14, color: c.textSecondary, textAlign: 'center' },
     emptyBtn: { marginTop: 8, paddingHorizontal: 16, minHeight: 44, justifyContent: 'center', borderRadius: radius.pill },
     tr: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 16, paddingVertical: 12, minHeight: 56 },
-    th: { minHeight: 40, paddingVertical: 10, backgroundColor: c.surfaceAlt },
+    th: { minHeight: 40, paddingVertical: 10, backgroundColor: 'transparent', borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: c.divider },
     rowBorder: { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: c.divider },
-    thText: { fontSize: 12, fontWeight: '600', color: c.textSecondary, textTransform: 'uppercase', letterSpacing: 0.3 },
+    thText: { fontSize: 12.5, fontWeight: '600', color: c.textSecondary, letterSpacing: -0.05 },
     td: { fontSize: 14, color: c.text },
     tdStrong: { fontSize: 14, color: c.text, fontWeight: '600', fontVariant: ['tabular-nums'] },
     tdSub: { fontSize: 13, color: c.textSecondary, fontVariant: ['tabular-nums'] },
@@ -496,11 +529,14 @@ function makeStyles(c: ThemeColors) {
     cardsWrapTwo: { flexDirection: 'row', flexWrap: 'wrap', gap: 12 },
     oCard: { backgroundColor: c.surface, borderRadius: radius.lg, padding: 16, gap: 4 },
     oCardTwo: { width: '48.8%' as unknown as number },
+    grouped: { paddingVertical: 0 },
+    oRow: { borderRadius: 0, backgroundColor: 'transparent', paddingTop: 14, paddingBottom: 14 },
+    oSep: { position: 'absolute', top: 0, left: 16, right: 0, height: StyleSheet.hairlineWidth, backgroundColor: c.divider },
     oTop: { flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between', gap: 10 },
     oRef: { flex: 1, fontSize: 16, fontWeight: '600', color: c.text, fontVariant: ['tabular-nums'] },
     oClient: { fontSize: 15, color: c.text },
     follow: { flexDirection: 'row', flexWrap: 'wrap', columnGap: 12, rowGap: 2, marginTop: 4 },
-    oBottom: { flexDirection: 'row', alignItems: 'flex-end', justifyContent: 'space-between', gap: 12, marginTop: 8, paddingTop: 10, borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: c.divider },
+    oBottom: { flexDirection: 'row', alignItems: 'flex-end', justifyContent: 'space-between', gap: 12, marginTop: 6 },
     oMeta: { flex: 1, fontSize: 13, color: c.textSecondary },
     oTotal: { fontSize: 18, fontWeight: '700', color: c.text, fontVariant: ['tabular-nums'], letterSpacing: -0.3 },
     moreBtn: { alignSelf: 'center', marginTop: 12, minHeight: 44, paddingHorizontal: 18, justifyContent: 'center' },

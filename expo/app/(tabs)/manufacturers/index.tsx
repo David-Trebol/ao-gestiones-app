@@ -15,8 +15,8 @@ import {
 import { Building2, Plus, Edit3, Trash2, Calendar, Check, Copy } from 'lucide-react-native';
 import { PageHeader, usePageLayout } from '@/components/Page';
 import Button from '@/components/Button';
+import { canvas , webInputReset } from '@/constants/theme';
 import { useTheme } from '@/contexts/ThemeContext';
-import { webInputReset } from '@/constants/theme';
 import { useData } from '@/contexts/DataContext';
 import { Manufacturer } from '@/types';
 import * as Haptics from 'expo-haptics';
@@ -45,7 +45,7 @@ function AnimatedManufacturerCard({ index, children }: { index: number; children
 export default function ManufacturersScreen() {
   const { manufacturers, years, orders, addManufacturer, updateManufacturer, deleteManufacturer, duplicateManufacturer } = useData();
   const { colors } = useTheme();
-  const { width, content } = usePageLayout();
+  const { width, content, bottomSpace } = usePageLayout();
   // Dos columnas cuando hay sitio (en ordenador las tarjetas a todo el ancho quedaban estiradas)
   const columns = width >= 1024 ? 2 : 1;
 
@@ -255,7 +255,7 @@ export default function ManufacturersScreen() {
   }, [getOrderCount, openYears, openEdit, handleDelete, handleDuplicate, colors, orders]);
 
   return (
-    <View style={[styles.container, { backgroundColor: colors.background }]}>
+    <View style={[styles.container, { backgroundColor: canvas(colors) }]}>
       <View style={[styles.innerContainer, content]}>
         <Animated.View style={{ opacity: headerFade, transform: [{ translateY: headerSlide }, { scale: headerScale }] }}>
           <PageHeader
@@ -290,7 +290,7 @@ export default function ManufacturersScreen() {
             numColumns={columns}
             columnWrapperStyle={columns > 1 ? { gap: 12 } : undefined}
             keyExtractor={(item) => item.id}
-            contentContainerStyle={styles.listContent}
+            contentContainerStyle={[styles.listContent, { paddingBottom: bottomSpace }]}
             showsVerticalScrollIndicator={false}
           />
         )}

@@ -1,6 +1,6 @@
 import React, { useState, useCallback, useRef, useEffect } from 'react';
 import { NATIVE_DRIVER, enterAnimation } from '@/constants/animation';
-import { radius, type, webInputReset } from '@/constants/theme';
+import { radius, type, webInputReset , canvas } from '@/constants/theme';
 import {
   View,
   Text,
@@ -27,9 +27,9 @@ import { NavigationView, Manufacturer, Order } from '@/types';
 import { formatCurrency } from '@/utils/calculations';
 import * as Haptics from 'expo-haptics';
 import OrdersDashboard, { OrderCardItem, OrderTable } from '@/components/home/OrdersDashboard';
-import { PageHeader, PAGE_MAX, usePageLayout } from '@/components/Page';
+import { CompactTitleBar, PageHeader, PAGE_MAX, useCollapsingTitle, usePageLayout } from '@/components/Page';
 import Button from '@/components/Button';
-import { NAV_FULL_MIN, NAV_SIDE_MIN } from '@/components/AppNav';
+import { NAV_FULL_MIN, NAV_SIDE_MIN, NAV_WIDTH_COMPACT, NAV_WIDTH_FULL } from '@/components/AppNav';
 
 // Vista elegida (se conserva al volver de un pedido)
 let savedMode: 'lista' | 'carpetas' = 'lista';
@@ -37,9 +37,10 @@ let savedMode: 'lista' | 'carpetas' = 'lista';
 export default function HomeScreen() {
   const router = useRouter();
   const { colors } = useTheme();
-  const { width, pad, content, mobile } = usePageLayout();
+  const { width, pad, content, mobile, bottomSpace } = usePageLayout();
+  const { shown: compactShown, scrollProps } = useCollapsingTitle();
   // Ancho útil real: ventana menos la barra lateral, con el máximo común y sin márgenes
-  const navWidth = width >= NAV_FULL_MIN ? 232 : width >= NAV_SIDE_MIN ? 76 : 0;
+  const navWidth = width >= NAV_FULL_MIN ? NAV_WIDTH_FULL : width >= NAV_SIDE_MIN ? NAV_WIDTH_COMPACT : 0;
   const innerWidth = Math.min(width - navWidth, PAGE_MAX) - pad * 2;
   const gridColumns = innerWidth >= 1000 ? 4 : innerWidth >= 640 ? 3 : innerWidth >= 320 ? 2 : 1;
   const useTable = width >= 1100; // igual que la lista del inicio
@@ -391,10 +392,12 @@ export default function HomeScreen() {
   };
 
   return (
-    <View style={[styles.container, { backgroundColor: colors.background }]}>
+    <View style={[styles.container, { backgroundColor: canvas(colors) }]}>
+      <CompactTitleBar title="Pedidos" shown={compactShown} />
       <ScrollView
+        {...scrollProps}
         style={styles.scrollView}
-        contentContainerStyle={[content, styles.scrollContent]}
+        contentContainerStyle={[content, styles.scrollContent, { paddingBottom: bottomSpace }]}
         showsVerticalScrollIndicator={false}
         refreshControl={
           <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.primary} />

@@ -30,9 +30,9 @@ const mkOrder = (id, ref, m, year, extra = {}) => ({ id, reference_number: ref, 
   await p.getByTestId('home-mode-lista').click(); await wait(800);
   await p.getByTestId('home-search').fill('garcía'); await wait(1200);
   const st = await text();
-  check('búsqueda por contacto (6 pedidos)', /PEDIDOS · 6\b/i.test(st), (st.match(/PEDIDOS · \d+/i) || [''])[0]);
+  check('búsqueda por contacto (6 pedidos)', /PEDIDOS\W+6\b/i.test(st), (st.match(/PEDIDOS\W+\d+/i) || [''])[0]);
   await p.getByTestId('home-search').fill('F-o1'); await wait(1000);
-  check('búsqueda por nº factura (1 pedido)', /PEDIDOS · 1\b/i.test(await text()), ((await text()).match(/PEDIDOS · \d+/i) || [''])[0]);
+  check('búsqueda por nº factura (1 pedido)', /PEDIDOS\W+1\b/i.test(await text()), ((await text()).match(/PEDIDOS\W+\d+/i) || [''])[0]);
   await p.getByTestId('home-search').fill(''); await wait(600);
   // Fabricantes: editar nombre se propaga a pedidos
   await tab('Fabricantes');

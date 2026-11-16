@@ -23,7 +23,7 @@ export default function Button({ label, icon: Icon, onPress, variant = 'secondar
   const fg = variant === 'primary' ? '#FFFFFF' : variant === 'danger' ? colors.error : variant === 'ghost' ? colors.primary : colors.text;
   const bg = (hovered?: boolean) =>
     variant === 'primary'
-      ? hovered ? colors.primaryDark : colors.primary
+      ? hovered ? colors.primaryDark : colors.primaryFill
       : variant === 'danger'
         ? colors.errorBg
         : variant === 'ghost'

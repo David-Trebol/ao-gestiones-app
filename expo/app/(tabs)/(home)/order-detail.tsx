@@ -4,10 +4,10 @@ import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import { Check, ChevronDown, ChevronUp, Copy, MoreHorizontal, Pencil, X } from 'lucide-react-native';
 import * as Haptics from 'expo-haptics';
 import { usePageLayout } from '@/components/Page';
+import { canvas , cardShadow, radius, webInputReset } from '@/constants/theme';
 import { useTheme } from '@/contexts/ThemeContext';
 import { useData } from '@/contexts/DataContext';
 import { ThemeColors } from '@/constants/colors';
-import { cardShadow, radius, webInputReset } from '@/constants/theme';
 import StatusBadge, { STATUS_ORDER, statusConfig } from '@/components/StatusBadge';
 import SelectSheet from '@/components/SelectSheet';
 import type { OrderStatus } from '@/types';
@@ -21,7 +21,7 @@ export default function OrderDetailScreen() {
   const router = useRouter();
   const { orders, deleteOrder, updateOrderField, duplicateOrder } = useData();
   const { colors, isDark } = useTheme();
-  const { width, content } = usePageLayout();
+  const { width, content, bottomSpace } = usePageLayout();
   const desktop = width >= 1024;
   const s = useMemo(() => makeStyles(colors), [colors]);
   const order = useMemo(() => orders.find(o => o.id === orderId), [orders, orderId]);
@@ -367,7 +367,7 @@ export default function OrderDetailScreen() {
   return (
     <View style={s.root}>
       <Stack.Screen options={{ title: order.reference_number }} />
-      <ScrollView contentContainerStyle={[s.content, content]}>
+      <ScrollView contentContainerStyle={[s.content, content, { paddingBottom: bottomSpace }]}>
         {summary}
         {desktop ? (
           <View style={s.cols}>
@@ -463,7 +463,7 @@ type Styles = ReturnType<typeof makeStyles>;
 
 function makeStyles(c: ThemeColors) {
   return StyleSheet.create({
-    root: { flex: 1, backgroundColor: c.background },
+    root: { flex: 1, backgroundColor: canvas(c) },
     center: { alignItems: 'center', justifyContent: 'center', padding: 24 },
     content: { padding: 16, gap: 16, width: '100%', alignSelf: 'center', paddingBottom: 48 },
     cols: { flexDirection: 'row', gap: 16, alignItems: 'flex-start' },
