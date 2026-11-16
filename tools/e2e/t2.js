@@ -39,7 +39,7 @@ const check = (name, ok, extra = '') => { results.push((ok ? 'OK  ' : 'FAIL') + 
   check('no se guarda con errores', db().orders.length === 0);
   const f = (ph, v) => p.getByLabel(ph, { exact: true }).first().fill(v);
   await f('Empresa', 'Cliente Prueba SL'); await f('NIF / CIF', 'B12345678'); await f('Email', 'cliente@prueba.es');
-  await p.getByText('Acme Industries (ACM)').click();
+  await p.getByTestId('manufacturer-select').click(); await wait(500); await p.getByText('Acme Industries (ACM)').last().click(); await wait(400);
   const yr = p.getByLabel('Año', { exact: true }).first(); await yr.fill(''); await yr.pressSequentially('2026');
   await f('Producto', 'Motor 5HP');
   const typeNum = async (ph, v) => { const el = p.getByLabel(ph, { exact: true }).first(); await el.click(); await el.press('ControlOrMeta+a'); await el.press('Backspace'); await el.pressSequentially(v, { delay: 40 }); };
@@ -65,7 +65,7 @@ const check = (name, ok, extra = '') => { results.push((ok ? 'OK  ' : 'FAIL') + 
   check('detalle muestra total 326,70', /326,70\s?€/.test(dt));
   await p.getByTestId('edit-order-btn').click(); await wait(1800);
   await p.getByLabel('Empresa', { exact: true }).first().fill('Cliente Editado SL');
-  await p.getByText('TechParts Global (TPG)').click();
+  await p.getByTestId('manufacturer-select').click(); await wait(500); await p.getByText('TechParts Global (TPG)').last().click(); await wait(400);
   await p.getByTestId('submit-order-btn').click(); await wait(2500);
   o = db().orders[0];
   check('editar cliente', o.customer.nombre_empresa === 'Cliente Editado SL');

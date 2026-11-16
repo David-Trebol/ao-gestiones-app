@@ -16,22 +16,21 @@ import {
   Building2,
   FileText,
   Trash2,
-  Info,
   KeyRound,
-  LogOut,
-  Users,
   UserPlus,
-  Edit3,
   Shield,
   User,
   X,
-  Monitor,
   Moon,
   Sun,
   Fingerprint,
+  ChevronRight,
+  Download,
+  Euro,
 } from 'lucide-react-native';
 import { CompactTitleBar, PageHeader, useCollapsingTitle, usePageLayout } from '@/components/Page';
-import { canvas , webInputReset } from '@/constants/theme';
+import { canvas, cardShadow, webInputReset } from '@/constants/theme';
+import { exportOrdersToExcel } from '@/utils/exportExcel';
 import { TintChip } from '@/components/AppNav';
 import { SystemTint } from '@/constants/colors';
 import { useTheme } from '@/contexts/ThemeContext';
@@ -39,18 +38,15 @@ import { useData } from '@/contexts/DataContext';
 import { useAuth, AppUser } from '@/contexts/AuthContext';
 import { formatCurrency } from '@/utils/calculations';
 import * as Haptics from 'expo-haptics';
-import { useRouter } from 'expo-router';
 
 export default function SettingsScreen() {
   const { orders, manufacturers, years, deleteAllData } = useData();
   const { currentUser, users, isAdmin, logout, addUser, updateUser, deleteUser, biometricEnabled, biometricAvailable, toggleBiometric, requestPasswordReset } = useAuth();
-  const router = useRouter();
   const { colors, isDark, themeMode, setTheme } = useTheme();
   const [deleting, setDeleting] = useState(false);
   const [savingUser, setSavingUser] = useState(false);
-  const { width, content, desktop: isDesktop, bottomSpace } = usePageLayout();
+  const { content, bottomSpace } = usePageLayout();
   const { shown: compactShown, scrollProps } = useCollapsingTitle();
-  const isCompact = width < 480;
 
   const [userModalOpen, setUserModalOpen] = useState(false);
   const [editingUser, setEditingUser] = useState<AppUser | null>(null);
@@ -66,31 +62,43 @@ export default function SettingsScreen() {
   const totalAmount = orders.reduce((sum, o) => sum + o.total_with_vat, 0);
 
 
-  const handleClearAll = useCallback(() => {
-    Alert.alert(
-      '¿Eliminar TODOS los datos?',
-      `Se borrarán ${orders.length} pedidos, ${manufacturers.length} fabricantes y ${years.length} años de la base de datos, para todos los usuarios. Esta acción no se puede deshacer.`,
-      [
-        { text: 'Cancelar', style: 'cancel' },
-        {
-          text: 'Eliminar todo',
-          style: 'destructive',
-          onPress: async () => {
-            try {
-              setDeleting(true);
-              await deleteAllData();
-              void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
-              Alert.alert('Datos eliminados', 'La base de datos está vacía.');
-            } catch (e) {
-              Alert.alert('No se pudo eliminar', (e as Error).message);
-            } finally {
-              setDeleting(false);
-            }
-          },
-        },
-      ]
-    );
-  }, [deleteAllData, orders.length, manufacturers.length, years.length]);
+  const [deleteOpen, setDeleteOpen] = useState(false);
+  const [deleteConfirm, setDeleteConfirm] = useState('');
+  const [exporting, setExporting] = useState(false);
+
+  /** Copia completa en Excel (hojas Pedidos, Líneas, Envíos y Fabricantes) */
+  const handleExportAll = useCallback(async () => {
+    if (exporting) return;
+    setExporting(true);
+    try {
+      const name = await exportOrdersToExcel(orders, manufacturers, 'copia-completa');
+      Alert.alert('Copia descargada', `${name} · ${orders.length} pedido${orders.length === 1 ? '' : 's'}.`);
+    } catch (e) {
+      Alert.alert('No se pudo descargar la copia', (e as Error).message);
+    } finally {
+      setExporting(false);
+    }
+  }, [exporting, orders, manufacturers]);
+
+  const openDeleteAll = useCallback(() => {
+    setDeleteConfirm('');
+    setDeleteOpen(true);
+  }, []);
+
+  const confirmDeleteAll = useCallback(async () => {
+    if (deleteConfirm !== 'ELIMINAR') return;
+    try {
+      setDeleting(true);
+      await deleteAllData();
+      void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
+      setDeleteOpen(false);
+      Alert.alert('Datos eliminados', 'La base de datos está vacía.');
+    } catch (e) {
+      Alert.alert('No se pudo eliminar', (e as Error).message);
+    } finally {
+      setDeleting(false);
+    }
+  }, [deleteConfirm, deleteAllData]);
 
   const handleChangePassword = useCallback(() => {
     if (!currentUser?.email) return;
@@ -113,8 +121,8 @@ export default function SettingsScreen() {
 
   const handleLogout = useCallback(() => {
     Alert.alert(
-      'Cerrar Sesión',
-      '¿Estás seguro de que quieres salir?',
+      'Cerrar sesión',
+      '¿Quieres salir de AO Gestiones?',
       [
         { text: 'Cancelar', style: 'cancel' },
         {
@@ -228,256 +236,218 @@ export default function SettingsScreen() {
   }, [setTheme]);
 
 
+  const chevron = <ChevronRight size={18} color={colors.textTertiary} />;
+  const row = (opts: { icon: React.ComponentType<{ size?: number; color?: string; strokeWidth?: number }>; tint: string; title: string; detail?: string; value?: string; onPress?: () => void; destructive?: boolean; testID?: string; first?: boolean; disabled?: boolean; trailing?: React.ReactNode }) => {
+    const body = (
+      <>
+        <TintChip Icon={opts.icon} tint={opts.tint} size={30} />
+        <View style={styles.rowText}>
+          <Text style={[styles.rowTitle, { color: opts.destructive ? colors.error : colors.text }]}>{opts.title}</Text>
+          {!!opts.detail && <Text style={[styles.rowDetail, { color: colors.textSecondary }]}>{opts.detail}</Text>}
+        </View>
+        {!!opts.value && <Text style={[styles.rowValue, { color: colors.textSecondary }]}>{opts.value}</Text>}
+        {opts.trailing}
+        {opts.onPress && !opts.trailing && chevron}
+      </>
+    );
+    const style = [styles.row, !opts.first && { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.divider }];
+    return opts.onPress ? (
+      <Pressable
+        onPress={opts.onPress}
+        disabled={opts.disabled}
+        style={({ pressed, hovered }: { pressed: boolean; hovered?: boolean }) => [...style, (pressed || hovered) && { backgroundColor: colors.fill }, opts.disabled && { opacity: 0.5 }]}
+        accessibilityRole="button"
+        testID={opts.testID}
+      >
+        {body}
+      </Pressable>
+    ) : (
+      <View style={style} testID={opts.testID}>{body}</View>
+    );
+  };
+  const group = (title: string | null, children: React.ReactNode, footer?: string) => (
+    <View style={styles.group}>
+      {!!title && <Text style={[styles.groupTitle, { color: colors.text }]} accessibilityRole="header">{title}</Text>}
+      <View style={[styles.groupCard, { backgroundColor: colors.surface }, cardShadow(isDark)]}>{children}</View>
+      {!!footer && <Text style={[styles.groupFooter, { color: colors.textSecondary }]}>{footer}</Text>}
+    </View>
+  );
+
   return (
     <View style={[styles.outerContainer, { backgroundColor: canvas(colors) }]}>
       <CompactTitleBar title="Ajustes" shown={compactShown} />
       <ScrollView {...scrollProps} style={styles.container} contentContainerStyle={[content, styles.content, { paddingBottom: bottomSpace }]} showsVerticalScrollIndicator={false}>
         <PageHeader title="Ajustes" />
-        {/* Columna de lectura: mismo margen izquierdo que el resto de pantallas, sin estirarse a 1.280 px */}
+        {/* Columna de lectura (como Ajustes de iOS/macOS): mismo margen izquierdo que el resto de pantallas */}
         <View style={styles.column}>
-
-        <View style={[styles.userBanner, isCompact && styles.userBannerCompact, { backgroundColor: colors.surface, borderColor: colors.borderLight, shadowColor: colors.cardShadow }]}>
-          <View style={styles.userBannerLeft}>
-            <View style={[styles.userAvatar, { backgroundColor: isAdmin ? colors.primary : colors.textSecondary }]}>
-              {isAdmin ? <Shield size={20} color="#FFFFFF" /> : <User size={20} color="#FFFFFF" />}
+          {/* Perfil */}
+          <View style={[styles.groupCard, styles.profile, { backgroundColor: colors.surface }, cardShadow(isDark)]}>
+            <View style={[styles.profileAvatar, { backgroundColor: isDark ? '#3A3A3C' : '#D1D1D6' }]}>
+              <Text style={[styles.profileInitial, { color: colors.text }]}>{(currentUser?.displayName || currentUser?.email || '?').slice(0, 1).toUpperCase()}</Text>
             </View>
-            <View style={{ flex: 1 }}>
-              <Text style={[styles.userBannerName, { color: colors.text }]}>{currentUser?.displayName}</Text>
-              {currentUser?.email && (
-                <Text style={[styles.userEmail, { color: colors.textTertiary }]} numberOfLines={1}>{currentUser.email}</Text>
-              )}
-              <View style={styles.userRoleBadgeRow}>
-                <View style={styles.userRoleBadge}>
-                  <Text style={[styles.userRoleText, { color: colors.textSecondary }]}>{isAdmin ? 'Administrador' : 'Usuario'}</Text>
-                </View>
-              </View>
-            </View>
-          </View>
-          <Pressable
-            style={({ pressed }) => [styles.logoutBtn, isCompact && styles.logoutBtnCompact, { backgroundColor: colors.errorBg, borderColor: colors.errorBorder }, pressed && { opacity: 0.8 }]}
-            onPress={handleLogout}
-            testID="logout-btn"
-          >
-            <LogOut size={15} color={colors.error} />
-            <Text style={[styles.logoutBtnText, { color: colors.error }]}>Salir</Text>
-          </Pressable>
-        </View>
-
-        <View style={[styles.section, { backgroundColor: colors.surface, borderColor: colors.borderLight, shadowColor: colors.cardShadow }]}>
-          <View style={styles.sectionTitleRow}>
-            <TintChip Icon={isDark ? Moon : Sun} tint={SystemTint.blue} size={28} />
-            <Text style={[styles.sectionTitle, { color: colors.text }]}>Apariencia</Text>
-          </View>
-
-          <View style={styles.themeSelector}>
-            <Pressable
-              style={({ pressed }) => [
-                styles.themeOption,
-                { borderColor: themeMode === 'light' ? colors.primary : colors.border, backgroundColor: themeMode === 'light' ? colors.primarySoft : colors.surfaceAlt, transform: [{ scale: pressed ? 0.96 : 1 }] },
-              ]}
-              onPress={() => handleSetTheme('light')}
-            >
-              <View style={[styles.themeIconWrap, { backgroundColor: themeMode === 'light' ? colors.primary : colors.surfaceAlt }]}>
-                <Sun size={18} color={themeMode === 'light' ? '#FFFFFF' : colors.textTertiary} />
-              </View>
-              <Text style={[styles.themeOptionText, { color: themeMode === 'light' ? colors.primary : colors.textSecondary }]}>Claro</Text>
-            </Pressable>
-            <Pressable
-              style={({ pressed }) => [
-                styles.themeOption,
-                { borderColor: themeMode === 'dark' ? colors.primary : colors.border, backgroundColor: themeMode === 'dark' ? colors.primarySoft : colors.surfaceAlt, transform: [{ scale: pressed ? 0.96 : 1 }] },
-              ]}
-              onPress={() => handleSetTheme('dark')}
-            >
-              <View style={[styles.themeIconWrap, { backgroundColor: themeMode === 'dark' ? colors.primary : colors.surfaceAlt }]}>
-                <Moon size={18} color={themeMode === 'dark' ? '#FFFFFF' : colors.textTertiary} />
-              </View>
-              <Text style={[styles.themeOptionText, { color: themeMode === 'dark' ? colors.primary : colors.textSecondary }]}>Oscuro</Text>
-            </Pressable>
-          </View>
-
-          {(Platform.OS !== 'web' && biometricAvailable) && (
-            <View style={[styles.biometricRow, { borderTopColor: colors.divider }]}>
-              <View style={styles.biometricLeft}>
-                <View style={[styles.biometricIconWrap, { backgroundColor: colors.primarySoft }]}>
-                  <Fingerprint size={18} color={colors.primary} />
-                </View>
-                <View style={{ flex: 1 }}>
-                  <Text style={[styles.biometricTitle, { color: colors.text }]}>Acceso con huella</Text>
-                  <Text style={[styles.biometricSubtitle, { color: colors.textSecondary }]}>Desbloquea la app con tu huella digital</Text>
-                </View>
-              </View>
-              <Switch
-                value={biometricEnabled}
-                onValueChange={handleToggleBiometric}
-                trackColor={{ false: colors.border, true: colors.primaryLight }}
-                thumbColor={biometricEnabled ? colors.primary : colors.textTertiary}
-              />
-            </View>
-          )}
-        </View>
-
-        <View style={isDesktop ? styles.desktopRow : undefined}>
-          <View style={isDesktop ? styles.desktopHalf : undefined}>
-            <View style={[styles.section, { backgroundColor: colors.surface, borderColor: colors.borderLight, shadowColor: colors.cardShadow }]}>
-              <Text style={[styles.sectionTitle, { color: colors.text }]}>Resumen</Text>
-
-              <View style={[styles.statsGrid, isCompact && styles.statsGridCompact]}>
-                <View style={[styles.statCard, isCompact && styles.statCardCompact, { backgroundColor: colors.surfaceAlt }]}>
-                  <View style={[styles.statIconWrap, { backgroundColor: SystemTint.blue }]}>
-                    <FileText size={18} color="#FFFFFF" strokeWidth={2.2} />
-                  </View>
-                  <Text style={[styles.statValue, { color: colors.text }]}>{totalOrders}</Text>
-                  <Text style={[styles.statLabel, { color: colors.textSecondary }]}>Pedidos</Text>
-                </View>
-                <View style={[styles.statCard, isCompact && styles.statCardCompact, { backgroundColor: colors.surfaceAlt }]}>
-                  <View style={[styles.statIconWrap, { backgroundColor: SystemTint.orange }]}>
-                    <Building2 size={18} color="#FFFFFF" strokeWidth={2.2} />
-                  </View>
-                  <Text style={[styles.statValue, { color: colors.text }]}>{totalManufacturers}</Text>
-                  <Text style={[styles.statLabel, { color: colors.textSecondary }]}>Fabricantes</Text>
-                </View>
-                <View style={[styles.statCard, isCompact && styles.statCardCompact, { backgroundColor: colors.surfaceAlt }]}>
-                  <View style={[styles.statIconWrap, { backgroundColor: SystemTint.indigo }]}>
-                    <FolderOpen size={18} color="#FFFFFF" strokeWidth={2.2} />
-                  </View>
-                  <Text style={[styles.statValue, { color: colors.text }]}>{totalYears}</Text>
-                  <Text style={[styles.statLabel, { color: colors.textSecondary }]}>Años</Text>
-                </View>
-              </View>
-
-              <View style={[styles.totalAmountCard, { backgroundColor: colors.heroTile }]}>
-                <Text style={styles.totalAmountLabel}>Facturación Total</Text>
-                <Text style={styles.totalAmountValue}>{formatCurrency(totalAmount)}</Text>
-              </View>
+            <View style={{ flex: 1, minWidth: 0 }}>
+              <Text style={[styles.profileName, { color: colors.text }]} numberOfLines={1}>{currentUser?.displayName}</Text>
+              {!!currentUser?.email && <Text style={[styles.rowDetail, { color: colors.textSecondary }]} numberOfLines={1}>{currentUser.email}</Text>}
+              <Text style={[styles.rowDetail, { color: colors.textSecondary }]}>{isAdmin ? 'Administrador' : 'Usuario'}</Text>
             </View>
           </View>
 
-          <View style={isDesktop ? styles.desktopHalf : undefined}>
-            <View style={[styles.section, { backgroundColor: colors.surface, borderColor: colors.borderLight, shadowColor: colors.cardShadow }]}>
-              <Text style={[styles.sectionTitle, { color: colors.text }]}>Estado de Pedidos</Text>
-              <Text style={[styles.statusLabel, { color: colors.textSecondary, fontSize: 15, lineHeight: 21 }]}>
-                El resumen por estados está ahora en la pantalla principal (Pedidos), donde cada contador abre la lista filtrada.
-              </Text>
-              <Pressable onPress={() => router.push('/' as never)} style={({ pressed }) => [styles.statusMoved, { backgroundColor: colors.fill, opacity: pressed ? 0.7 : 1 }]} accessibilityRole="link">
-                <Text style={{ color: colors.primary, fontSize: 15, fontWeight: '600' }}>Ir a Pedidos</Text>
-              </Pressable>
-            </View>
-          </View>
-        </View>
-
-        {isAdmin && (
-          <View style={[styles.section, { backgroundColor: colors.surface, borderColor: colors.borderLight, shadowColor: colors.cardShadow }]}>
-            <View style={styles.sectionHeaderRow}>
-              <View style={styles.sectionTitleRow}>
-                <TintChip Icon={Users} tint={SystemTint.green} size={28} />
-                <Text style={[styles.sectionTitle, { color: colors.text }]}>Gestión de Usuarios</Text>
-              </View>
-              <Pressable style={[styles.addUserBtn, { backgroundColor: colors.primary }]} onPress={openCreateUser} testID="add-user-btn">
-                <UserPlus size={14} color="#FFFFFF" />
-                <Text style={styles.addUserBtnText}>Nuevo</Text>
-              </Pressable>
-            </View>
-
-            {users.map(user => (
-              <View key={user.id} style={[styles.userRow, { borderBottomColor: colors.divider }]}>
-                <View style={styles.userRowLeft}>
-                  <View style={[styles.userRowAvatar, { backgroundColor: user.role === 'admin' ? colors.primary : colors.textSecondary }]}>
-                    {user.role === 'admin' ? <Shield size={14} color="#FFFFFF" /> : <User size={14} color="#FFFFFF" />}
-                  </View>
-                  <View style={{ flex: 1 }}>
-                    <Text style={[styles.userRowName, { color: colors.text }]}>{user.displayName}</Text>
-                    <Text style={[styles.userRowUsername, { color: colors.textTertiary }]}>
-                      {user.email}
-                    </Text>
-                    <View style={styles.userRowMeta}>
-                      <View style={[styles.userRolePill, { backgroundColor: user.role === 'admin' ? colors.primarySoft : colors.fill }]}>
-                        <Text style={[styles.rolePillText, { color: user.role === 'admin' ? colors.primary : colors.textSecondary }]}>
-                          {user.role === 'admin' ? 'Admin' : 'Usuario'}
-                        </Text>
-                      </View>
-                      {!user.active && (
-                        <View style={[styles.inactivePill, { backgroundColor: colors.errorBg }]}>
-                          <Text style={[styles.inactivePillText, { color: colors.error }]}>Inactivo</Text>
-                        </View>
-                      )}
-                    </View>
-                  </View>
-                </View>
-                <View style={styles.userRowActions}>
-                  <Pressable onPress={() => openEditUser(user)} style={[styles.userActionBtn, { backgroundColor: colors.surfaceAlt }]} hitSlop={8}>
-                    <Edit3 size={14} color={colors.textSecondary} />
-                  </Pressable>
-                  {user.id !== currentUser?.id && (
-                    <Pressable onPress={() => handleDeleteUser(user)} style={[styles.userActionBtn, { backgroundColor: colors.errorBg }]} hitSlop={8}>
-                      <Trash2 size={14} color={colors.error} />
-                    </Pressable>
-                  )}
-                </View>
-              </View>
-            ))}
-          </View>
-        )}
-
-        <View style={[styles.section, { backgroundColor: colors.surface, borderColor: colors.borderLight, shadowColor: colors.cardShadow }]}>
-          <Text style={[styles.sectionTitle, { color: colors.text }]}>Cuenta y datos</Text>
-          <Pressable style={[styles.menuItem, { borderBottomColor: colors.divider }]} onPress={handleChangePassword} testID="change-password-btn">
-            <View style={[styles.menuIconWrap, { backgroundColor: SystemTint.gray }]}>
-              <KeyRound size={17} color="#FFFFFF" strokeWidth={2.2} />
-            </View>
-            <View style={{ flex: 1 }}>
-              <Text style={[styles.menuItemTitle, { color: colors.text }]}>Cambiar mi contraseña</Text>
-              <Text style={[styles.menuItemDescription, { color: colors.textSecondary }]}>Te enviamos un enlace seguro por email</Text>
-            </View>
-          </Pressable>
-
-          {isAdmin && (
+          {group(
+            'Apariencia',
             <>
-              <Pressable style={[styles.menuItem, { borderBottomColor: colors.divider }, deleting && { opacity: 0.5 }]} onPress={handleClearAll} disabled={deleting} testID="delete-all-btn">
-                <View style={[styles.menuIconWrap, { backgroundColor: SystemTint.red }]}>
-                  <Trash2 size={17} color="#FFFFFF" strokeWidth={2.2} />
+              <View style={styles.row}>
+                <TintChip Icon={isDark ? Moon : Sun} tint={SystemTint.blue} size={30} />
+                <Text style={[styles.rowTitle, styles.rowText, { color: colors.text }]}>Tema</Text>
+                <View style={[styles.segment, { backgroundColor: colors.fill }]} accessibilityRole="tablist">
+                  {(['light', 'dark'] as const).map(m => (
+                    <Pressable
+                      key={m}
+                      onPress={() => handleSetTheme(m)}
+                      style={[styles.segBtn, themeMode === m && [styles.segOn, { backgroundColor: isDark ? '#636366' : '#FFFFFF' }]]}
+                      accessibilityRole="tab"
+                      accessibilityState={{ selected: themeMode === m }}
+                      testID={`theme-${m}`}
+                    >
+                      <Text style={[styles.segText, { color: colors.text }]}>{m === 'light' ? 'Claro' : 'Oscuro'}</Text>
+                    </Pressable>
+                  ))}
                 </View>
-                <View style={{ flex: 1 }}>
-                  <Text style={[styles.menuItemTitle, { color: colors.error }]}>Eliminar todos los datos</Text>
-                  <Text style={[styles.menuItemDescription, { color: colors.textSecondary }]}>Borra todos los pedidos, fabricantes y años</Text>
-                </View>
-              </Pressable>
-            </>
+              </View>
+              {Platform.OS !== 'web' && biometricAvailable && row({
+                icon: Fingerprint, tint: SystemTint.green, title: 'Acceso con huella', detail: 'Desbloquea la app con tu huella digital',
+                trailing: <Switch value={biometricEnabled} onValueChange={handleToggleBiometric} trackColor={{ false: colors.border, true: SystemTint.green }} />,
+              })}
+            </>,
           )}
 
-          {!isAdmin && (
-            <View style={styles.noAdminNotice}>
-              <Text style={[styles.noAdminText, { color: colors.textTertiary }]}>Solo los administradores pueden borrar datos o gestionar usuarios</Text>
-            </View>
+          {group(
+            'Resumen',
+            <>
+              {row({ icon: FileText, tint: SystemTint.blue, title: 'Pedidos', value: String(totalOrders), first: true })}
+              {row({ icon: Building2, tint: SystemTint.orange, title: 'Fabricantes', value: String(totalManufacturers) })}
+              {row({ icon: FolderOpen, tint: SystemTint.indigo, title: 'Años', value: String(totalYears) })}
+              <View style={[styles.row, { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.divider }]}>
+                <TintChip Icon={Euro} tint={SystemTint.green} size={30} />
+                <Text style={[styles.rowTitle, styles.rowText, { color: colors.text }]}>Facturación total</Text>
+                <Text style={[styles.totalValue, { color: colors.text }]}>{formatCurrency(totalAmount)}</Text>
+              </View>
+            </>,
+            'Suma del total con IVA de todos los pedidos guardados.',
           )}
-        </View>
 
-        <View style={[styles.section, { backgroundColor: colors.surface, borderColor: colors.borderLight, shadowColor: colors.cardShadow }]}>
-          <View style={styles.sectionTitleRow}>
-            <TintChip Icon={Monitor} tint={SystemTint.gray} size={28} />
-            <Text style={[styles.sectionTitle, { color: colors.text }]}>Plataforma</Text>
-          </View>
-          <View style={[styles.platformInfo, { backgroundColor: colors.surfaceAlt }]}>
-            <Text style={[styles.platformText, { color: colors.text }]}>
-              {Platform.OS === 'web' ? 'Navegador Web (PC/Mac)' : Platform.OS === 'ios' ? 'iOS' : 'Android'}
-            </Text>
-            <Text style={[styles.platformSubtext, { color: colors.textSecondary }]}>
-              {Platform.OS === 'web'
-                ? 'Optimizado para escritorio y pantallas grandes'
-                : 'Aplicación nativa móvil'}
-            </Text>
-          </View>
-        </View>
+          {isAdmin &&
+            group(
+              'Usuarios',
+              <>
+                {users.map((user, i) => (
+                  <Pressable
+                    key={user.id}
+                    onPress={() => openEditUser(user)}
+                    style={({ pressed, hovered }: { pressed: boolean; hovered?: boolean }) => [styles.row, i > 0 && { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.divider }, (pressed || hovered) && { backgroundColor: colors.fill }]}
+                    accessibilityRole="button"
+                    accessibilityLabel={`Editar ${user.displayName}`}
+                    testID={`user-row-${user.id}`}
+                  >
+                    <View style={[styles.userAvatarSmall, { backgroundColor: user.role === 'admin' ? SystemTint.blue : SystemTint.gray }]}>
+                      {user.role === 'admin' ? <Shield size={15} color="#FFFFFF" /> : <User size={15} color="#FFFFFF" />}
+                    </View>
+                    <View style={styles.rowText}>
+                      <Text style={[styles.rowTitle, { color: colors.text }]} numberOfLines={1}>{user.displayName}</Text>
+                      <Text style={[styles.rowDetail, { color: colors.textSecondary }]} numberOfLines={1}>
+                        {user.email} · {user.role === 'admin' ? 'Administrador' : 'Usuario'}{user.active ? '' : ' · Inactivo'}
+                      </Text>
+                    </View>
+                    {user.id !== currentUser?.id && (
+                      <Pressable onPress={() => handleDeleteUser(user)} style={({ hovered }: { pressed: boolean; hovered?: boolean }) => [styles.iconBtn, hovered && { backgroundColor: colors.errorBg }]} accessibilityRole="button" accessibilityLabel={`Eliminar ${user.displayName}`}>
+                        <Trash2 size={17} color={colors.error} />
+                      </Pressable>
+                    )}
+                    {chevron}
+                  </Pressable>
+                ))}
+                <Pressable
+                  onPress={openCreateUser}
+                  style={({ pressed, hovered }: { pressed: boolean; hovered?: boolean }) => [styles.row, users.length > 0 && { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.divider }, (pressed || hovered) && { backgroundColor: colors.fill }]}
+                  accessibilityRole="button"
+                  testID="add-user-btn"
+                >
+                  <UserPlus size={20} color={colors.primary} style={{ marginHorizontal: 5 }} />
+                  <Text style={[styles.rowTitle, styles.rowText, { color: colors.primary }]}>Añadir usuario</Text>
+                </Pressable>
+              </>,
+            )}
 
-        <View style={styles.footer}>
-          <View style={styles.footerBadge}>
-            <Info size={14} color={colors.textTertiary} />
-            <Text style={[styles.footerText, { color: colors.textSecondary }]}>AO Gestiones</Text>
+          {group(
+            'Cuenta',
+            row({ icon: KeyRound, tint: SystemTint.gray, title: 'Cambiar mi contraseña', detail: 'Te enviamos un enlace seguro por email', onPress: handleChangePassword, testID: 'change-password-btn', first: true }),
+          )}
+
+          {group(
+            'Datos',
+            <>
+              {Platform.OS === 'web' && row({ icon: Download, tint: SystemTint.green, title: 'Descargar copia completa', detail: 'Excel con pedidos, líneas, envíos y fabricantes', onPress: () => void handleExportAll(), testID: 'export-all-btn', first: true, disabled: exporting || orders.length === 0 })}
+              {isAdmin && row({ icon: Trash2, tint: SystemTint.red, title: 'Eliminar todos los datos', detail: 'Borra pedidos, fabricantes y años para todos los usuarios', onPress: openDeleteAll, destructive: true, testID: 'delete-all-btn', first: Platform.OS !== 'web', disabled: deleting })}
+              {!isAdmin && Platform.OS !== 'web' && <Text style={[styles.rowDetail, { color: colors.textSecondary, padding: 16 }]}>Solo los administradores pueden borrar datos.</Text>}
+            </>,
+            isAdmin ? undefined : 'Solo los administradores pueden borrar datos o gestionar usuarios.',
+          )}
+
+          <View style={styles.group}>
+            <Pressable
+              onPress={handleLogout}
+              style={({ pressed, hovered }: { pressed: boolean; hovered?: boolean }) => [styles.groupCard, styles.logoutRow, { backgroundColor: (pressed || hovered) ? colors.surfaceAlt : colors.surface }, cardShadow(isDark)]}
+              accessibilityRole="button"
+              testID="logout-btn"
+            >
+              <Text style={[styles.rowTitle, { color: colors.error }]}>Cerrar sesión</Text>
+            </Pressable>
           </View>
-          <Text style={[styles.footerSubtext, { color: colors.textTertiary }]}>Pedidos en movimiento · Multiplataforma</Text>
-        </View>
         </View>
       </ScrollView>
+
+      <Modal visible={deleteOpen} transparent animationType="fade" onRequestClose={() => setDeleteOpen(false)}>
+        <View style={[styles.modalOverlay, { backgroundColor: colors.overlay }]}>
+          <View style={[styles.modalContent, { backgroundColor: colors.surface }]} accessibilityViewIsModal>
+            <Text style={[styles.modalTitle, { color: colors.text }]}>Eliminar todos los datos</Text>
+            <Text style={[styles.deleteText, { color: colors.text }]}>
+              Se borrarán {orders.length} pedidos, {manufacturers.length} fabricantes y {years.length} años para todos los usuarios. No se puede deshacer.
+            </Text>
+            {Platform.OS === 'web' && orders.length > 0 && (
+              <Pressable onPress={() => void handleExportAll()} disabled={exporting} style={({ hovered }: { pressed: boolean; hovered?: boolean }) => [styles.deleteBackup, { backgroundColor: hovered ? colors.primarySoftAlt : colors.primarySoft }]} accessibilityRole="button" testID="delete-backup-btn">
+                <Download size={17} color={colors.primary} />
+                <Text style={[styles.deleteBackupText, { color: colors.primary }]}>{exporting ? 'Descargando…' : 'Descargar una copia antes (Excel)'}</Text>
+              </Pressable>
+            )}
+            <Text style={[styles.modalLabel, { color: colors.textSecondary }]}>Escribe ELIMINAR para confirmar</Text>
+            <TextInput
+              style={[styles.modalInput, { backgroundColor: colors.fill, borderColor: deleteConfirm && deleteConfirm !== 'ELIMINAR' ? colors.error : 'transparent', color: colors.text }]}
+              value={deleteConfirm}
+              onChangeText={t => setDeleteConfirm(t.toUpperCase())}
+              placeholder="ELIMINAR"
+              placeholderTextColor={colors.textTertiary}
+              autoCapitalize="characters"
+              autoCorrect={false}
+              accessibilityLabel="Escribe ELIMINAR para confirmar"
+              testID="delete-confirm-input"
+            />
+            <View style={styles.deleteActions}>
+              <Pressable onPress={() => setDeleteOpen(false)} style={[styles.deleteBtn, { backgroundColor: colors.fill }]} accessibilityRole="button" testID="delete-cancel-btn">
+                <Text style={[styles.deleteBtnText, { color: colors.text }]}>Cancelar</Text>
+              </Pressable>
+              <Pressable
+                onPress={() => void confirmDeleteAll()}
+                disabled={deleteConfirm !== 'ELIMINAR' || deleting}
+                style={[styles.deleteBtn, { backgroundColor: SystemTint.red, opacity: deleteConfirm === 'ELIMINAR' && !deleting ? 1 : 0.4 }]}
+                accessibilityRole="button"
+                accessibilityState={{ disabled: deleteConfirm !== 'ELIMINAR' || deleting }}
+                testID="delete-confirm-btn"
+              >
+                <Text style={[styles.deleteBtnText, { color: '#FFFFFF' }]}>{deleting ? 'Eliminando…' : 'Eliminar todo'}</Text>
+              </Pressable>
+            </View>
+          </View>
+        </View>
+      </Modal>
 
       <Modal visible={userModalOpen} transparent animationType="fade" onRequestClose={() => setUserModalOpen(false)}>
         <View style={[styles.modalOverlay, { backgroundColor: colors.overlay }]}>
@@ -880,4 +850,31 @@ const styles = StyleSheet.create({
   modalCancelText: { fontSize: 15, fontWeight: '600' as const, },
   modalConfirmBtn: { paddingHorizontal: 22, paddingVertical: 11, borderRadius: 999, },
   modalConfirmText: { fontSize: 15, fontWeight: '600' as const, color: '#FFFFFF', },
+  group: { marginBottom: 28 },
+  groupTitle: { fontSize: 20, fontWeight: '700' as const, letterSpacing: -0.4, marginBottom: 8, paddingHorizontal: 4 },
+  groupCard: { borderRadius: 14, overflow: 'hidden' },
+  groupFooter: { fontSize: 13, lineHeight: 18, marginTop: 8, paddingHorizontal: 16 },
+  row: { flexDirection: 'row', alignItems: 'center', gap: 12, minHeight: 52, paddingHorizontal: 14, paddingVertical: 10 },
+  rowText: { flex: 1, minWidth: 0 },
+  rowTitle: { fontSize: 16, letterSpacing: -0.2 },
+  rowDetail: { fontSize: 13, lineHeight: 18, marginTop: 1 },
+  rowValue: { fontSize: 16, fontVariant: ['tabular-nums'] },
+  totalValue: { fontSize: 18, fontWeight: '700' as const, letterSpacing: -0.3, fontVariant: ['tabular-nums'] },
+  profile: { flexDirection: 'row', alignItems: 'center', gap: 14, padding: 16, marginBottom: 28 },
+  profileAvatar: { width: 56, height: 56, borderRadius: 28, alignItems: 'center', justifyContent: 'center' },
+  profileInitial: { fontSize: 24, fontWeight: '600' as const },
+  profileName: { fontSize: 20, fontWeight: '600' as const, letterSpacing: -0.4 },
+  segment: { flexDirection: 'row', borderRadius: 9, padding: 2, gap: 2 },
+  segBtn: { minHeight: 32, paddingHorizontal: 16, borderRadius: 7, alignItems: 'center', justifyContent: 'center' },
+  segOn: { ...(Platform.OS === 'web' ? ({ boxShadow: '0 1px 3px rgba(0,0,0,0.14)' } as object) : { elevation: 1 }) },
+  segText: { fontSize: 14, fontWeight: '600' as const },
+  userAvatarSmall: { width: 30, height: 30, borderRadius: 15, alignItems: 'center', justifyContent: 'center' },
+  iconBtn: { width: 40, height: 40, borderRadius: 20, alignItems: 'center', justifyContent: 'center' },
+  logoutRow: { minHeight: 52, alignItems: 'center', justifyContent: 'center' },
+  deleteText: { fontSize: 15, lineHeight: 21, marginBottom: 16 },
+  deleteBackup: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, minHeight: 44, borderRadius: 12, marginBottom: 18 },
+  deleteBackupText: { fontSize: 15, fontWeight: '600' as const },
+  deleteActions: { flexDirection: 'row', gap: 10, marginTop: 6 },
+  deleteBtn: { flex: 1, minHeight: 48, borderRadius: 999, alignItems: 'center', justifyContent: 'center' },
+  deleteBtnText: { fontSize: 16, fontWeight: '600' as const },
 });

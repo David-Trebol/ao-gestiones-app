@@ -14,7 +14,8 @@ import {
   Animated,
 } from 'react-native';
 import { useLocalSearchParams, useRouter, Stack } from 'expo-router';
-import { Plus, Trash2, ScanLine, X } from 'lucide-react-native';
+import { ChevronDown, Plus, Trash2, ScanLine, X } from 'lucide-react-native';
+import SelectSheet from '@/components/SelectSheet';
 import { LightColors as StaticColors } from '@/constants/colors';
 import { PAGE_MAX, usePageLayout } from '@/components/Page';
 import { canvas, cardShadow, glass, webInputReset } from '@/constants/theme';
@@ -114,6 +115,7 @@ export default function OrderFormScreen() {
   });
 
   const [selectedManufacturerIndex, setSelectedManufacturerIndex] = useState<number>(-1);
+  const [mfSheetOpen, setMfSheetOpen] = useState(false);
   const [selectedStatusIndex, setSelectedStatusIndex] = useState<number>(0);
   const [scan, setScan] = useState<{ step: string; fraction?: number; fileName: string } | null>(null);
   const isExtracting = !!scan;
@@ -553,22 +555,26 @@ export default function OrderFormScreen() {
                 <Text style={[styles.fieldLabel, { color: colors.textSecondary }]}>
                   Fabricante <Text style={{ color: colors.error }}>*</Text>
                 </Text>
-                <View style={styles.chipWrap} accessibilityRole="radiogroup" accessibilityLabel="Fabricante">
-                  {manufacturers.map((m, i) => (
-                    <Pressable
-                      key={m.id}
-                      style={[styles.chip, { backgroundColor: colors.fill, borderColor: err('manufacturer') ? colors.error : 'transparent' }, selectedManufacturerIndex === i && { backgroundColor: colors.primary, borderColor: colors.primary }]}
-                      onPress={() => selectManufacturer(i)}
-                      accessibilityRole="radio"
-                      accessibilityState={{ selected: selectedManufacturerIndex === i }}
-                    >
-                      <Text style={[styles.chipText, { color: colors.text }, selectedManufacturerIndex === i && { color: '#FFFFFF' }]}>
-                        {m.name} ({m.code})
-                      </Text>
-                    </Pressable>
-                  ))}
-                  {manufacturers.length === 0 && <Text style={[styles.help, { color: colors.textSecondary }]}>No hay fabricantes: créalos en la pestaña Fabricantes.</Text>}
-                </View>
+                {manufacturers.length === 0 ? (
+                  <Text style={[styles.help, { color: colors.textSecondary, marginBottom: 14 }]}>No hay fabricantes: créalos en la pestaña Fabricantes.</Text>
+                ) : (
+                  <Pressable
+                    onPress={() => setMfSheetOpen(true)}
+                    style={({ hovered }: { pressed: boolean; hovered?: boolean }) => [
+                      styles.selectField,
+                      { backgroundColor: colors.fill, borderColor: err('manufacturer') ? colors.error : 'transparent' },
+                      hovered && { opacity: 0.85 },
+                    ]}
+                    accessibilityRole="button"
+                    accessibilityLabel={`Fabricante: ${manufacturers[selectedManufacturerIndex] ? manufacturers[selectedManufacturerIndex].name : 'sin elegir'}. Cambiar`}
+                    testID="manufacturer-select"
+                  >
+                    <Text style={[styles.selectText, { color: manufacturers[selectedManufacturerIndex] ? colors.text : colors.textTertiary }]} numberOfLines={1}>
+                      {manufacturers[selectedManufacturerIndex] ? `${manufacturers[selectedManufacturerIndex].name} (${manufacturers[selectedManufacturerIndex].code})` : 'Elige el fabricante'}
+                    </Text>
+                    <ChevronDown size={18} color={colors.textSecondary} />
+                  </Pressable>
+                )}
                 {!!err('manufacturer') && <Text style={[styles.errorText, { color: colors.error }]}>{err('manufacturer')}</Text>}
 
                 <View style={styles.fieldRow}>
@@ -836,6 +842,19 @@ export default function OrderFormScreen() {
           </View>
         </View>
       </KeyboardAvoidingView>
+      <SelectSheet
+        visible={mfSheetOpen}
+        title="Fabricante"
+        options={manufacturers.map(m => ({ value: m.id, label: `${m.name} (${m.code})` }))}
+        selected={manufacturers[selectedManufacturerIndex]?.id}
+        onSelect={id => {
+          const i = manufacturers.findIndex(m => m.id === id);
+          if (i !== -1) selectManufacturer(i);
+        }}
+        onClose={() => setMfSheetOpen(false)}
+        searchable={manufacturers.length > 5}
+        searchPlaceholder="Buscar por nombre o código"
+      />
       {review && (
         <DocumentReview
           visible
@@ -1374,4 +1393,6 @@ const styles = StyleSheet.create({
   },
   submitBtnText: { color: StaticColors.white, fontSize: 17, fontWeight: '600' as const, letterSpacing: -0.2,
   },
+  selectField: { flexDirection: 'row', alignItems: 'center', gap: 8, minHeight: 44, borderRadius: 10, borderWidth: 1.5, paddingHorizontal: 12, marginBottom: 14 },
+  selectText: { flex: 1, minWidth: 0, fontSize: 16, letterSpacing: -0.2 },
 });
