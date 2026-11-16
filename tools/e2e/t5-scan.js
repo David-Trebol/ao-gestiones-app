@@ -9,10 +9,16 @@ const { boot } = require('./e2e-lib');
   try {
     await p.goto(`http://localhost:${process.env.PORT}/order-form`, { waitUntil: 'networkidle' }); await wait(1500);
     const [fc] = await Promise.all([p.waitForEvent('filechooser'), p.getByTestId('scan-document-btn').click()]);
+    // Vigila la página desde antes de elegir el archivo: con PDF de texto el aviso dura menos de medio segundo
+    await p.evaluate(() => {
+      window.__vioProgreso = false;
+      const mo = new MutationObserver(() => { if (/Leyendo documento/.test(document.body.innerText)) { window.__vioProgreso = true; mo.disconnect(); } });
+      mo.observe(document.body, { childList: true, subtree: true, characterData: true });
+    });
     const t0 = Date.now();
     await fc.setFiles(file);
     await wait(400);
-    ok('muestra progreso', /Leyendo documento/.test(await p.evaluate(() => document.body.innerText)));
+    ok('muestra progreso', await p.evaluate(() => window.__vioProgreso || /Leyendo documento/.test(document.body.innerText)));
     await p.getByText('Revisar datos del documento').waitFor({ timeout: 240000 });
     results.push(`     tiempo de lectura: ${((Date.now() - t0) / 1000).toFixed(1)} s`);
     await wait(800);

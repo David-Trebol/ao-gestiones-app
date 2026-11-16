@@ -12,9 +12,10 @@ import {
   Platform,
   ActivityIndicator,
   Animated,
+  useWindowDimensions,
 } from 'react-native';
 import { useLocalSearchParams, useRouter, Stack } from 'expo-router';
-import { ChevronDown, Plus, Trash2, ScanLine, X } from 'lucide-react-native';
+import { ChevronDown, ChevronUp, Plus, Trash2, ScanLine, X } from 'lucide-react-native';
 import SelectSheet from '@/components/SelectSheet';
 import { LightColors as StaticColors } from '@/constants/colors';
 import { PAGE_MAX, usePageLayout } from '@/components/Page';
@@ -443,8 +444,30 @@ export default function OrderFormScreen() {
     }
   }, [formData, errors, editingOrder, addOrder, updateOrder, router, saving]);
 
+  const docsList = [
+    formData.customer.numero_referencia_pedido && `Pedido ${formData.customer.numero_referencia_pedido}`,
+    formData.customer.oferta_proforma && `Oferta ${formData.customer.oferta_proforma}`,
+    formData.customer.numero_factura && `Factura ${formData.customer.numero_factura}`,
+    formData.customer.numero_recibo && `Recibo ${formData.customer.numero_recibo}`,
+    formData.customer.condiciones_entrega && 'Condiciones de entrega',
+    formData.customer.condiciones_pago && 'Condiciones de pago',
+  ].filter(Boolean) as string[];
+  const docsHaveData = docsList.length > 0;
+  const docsSummary = docsHaveData ? docsList.join(' · ') : undefined;
+  const followList = [
+    formData.expected_date && `Previsto ${formatISODate(formData.expected_date)}`,
+    formData.owner && formData.owner,
+    formData.next_action && formData.next_action,
+  ].filter(Boolean) as string[];
+
   const documentsSection = (
-    <FormSection title="Documentos y condiciones" subtitle="Opcional">
+    <FormSection
+      title="Documentos y condiciones"
+      subtitle="Opcional"
+      collapsible
+      startOpen={docsHaveData}
+      summary={docsSummary}
+    >
       <View style={styles.fieldRow}>
         <FormField label="Nº pedido del cliente" value={formData.customer.numero_referencia_pedido} onChangeText={(v) => updateCustomer('numero_referencia_pedido', v)} half />
         <FormField label="Oferta / proforma" value={formData.customer.oferta_proforma} onChangeText={(v) => updateCustomer('oferta_proforma', v)} half />
@@ -610,7 +633,13 @@ export default function OrderFormScreen() {
                 </View>
               </FormSection>
 
-              <FormSection title="Seguimiento" subtitle="Opcional · sirve para avisar de pedidos retrasados en el inicio">
+              <FormSection
+                title="Seguimiento"
+                subtitle="Opcional · sirve para avisar de pedidos retrasados en el inicio"
+                collapsible
+                startOpen={followList.length > 0}
+                summary={followList.length ? followList.join(' · ') : undefined}
+              >
                 <View style={[styles.fieldRow, { flexWrap: 'wrap' }]}>
                   <DateField
                     label="Fecha prevista"
@@ -937,8 +966,21 @@ function FormField({ label, value, onChangeText, placeholder, keyboardType, mult
   );
 }
 
-function FormSection({ title, subtitle, action, children }: { title: string; subtitle?: string; action?: React.ReactNode; children: React.ReactNode }) {
+/**
+ * Sección agrupada del formulario. Con `collapsible`, en móvil se puede plegar (empieza plegada salvo `startOpen`)
+ * y muestra `summary` mientras está cerrada; en tablet y ordenador siempre está abierta.
+ */
+function FormSection({ title, subtitle, action, children, collapsible, startOpen, summary }: { title: string; subtitle?: string; action?: React.ReactNode; children: React.ReactNode; collapsible?: boolean; startOpen?: boolean; summary?: string }) {
   const { colors, isDark } = useTheme();
+  const { width } = useWindowDimensions();
+  const canCollapse = !!collapsible && width < 768;
+  const [open, setOpen] = useState(!!startOpen);
+  // Al editar, los datos llegan después del primer render: abrir si los hay (salvo que el usuario ya la haya tocado)
+  const touched = useRef(false);
+  useEffect(() => {
+    if (startOpen && !touched.current) setOpen(true);
+  }, [startOpen]);
+  const isOpen = !canCollapse || open;
   return (
     <View style={formFieldStyles.sectionWrap}>
       <View style={formFieldStyles.sectionHead}>
@@ -946,11 +988,28 @@ function FormSection({ title, subtitle, action, children }: { title: string; sub
           <Text style={[formFieldStyles.sectionTitle, { color: colors.text }]} accessibilityRole="header">
             {title}
           </Text>
-          {!!subtitle && <Text style={[formFieldStyles.sectionSub, { color: colors.textSecondary }]}>{subtitle}</Text>}
+          {!!subtitle && isOpen && <Text style={[formFieldStyles.sectionSub, { color: colors.textSecondary }]}>{subtitle}</Text>}
         </View>
-        {action}
+        {isOpen && action}
       </View>
-      <View style={[formFieldStyles.section, { backgroundColor: colors.surface }, cardShadow(isDark)]}>{children}</View>
+      <View style={[formFieldStyles.section, { backgroundColor: colors.surface }, cardShadow(isDark), !isOpen && { padding: 0, paddingBottom: 0 }]}>
+        {canCollapse && (
+          <Pressable
+            onPress={() => { touched.current = true; setOpen(!open); }}
+            style={({ pressed }) => [formFieldStyles.collapseRow, !isOpen && { paddingHorizontal: 16 }, pressed && { opacity: 0.7 }]}
+            accessibilityRole="button"
+            accessibilityState={{ expanded: isOpen }}
+            accessibilityLabel={`${isOpen ? 'Plegar' : 'Desplegar'} ${title.toLowerCase()}`}
+            testID={`section-toggle-${title}`}
+          >
+            <Text style={[formFieldStyles.collapseText, { color: isOpen ? colors.textSecondary : colors.text }]} numberOfLines={1}>
+              {isOpen ? 'Plegar' : summary || 'Sin datos · toca para rellenar'}
+            </Text>
+            {isOpen ? <ChevronUp size={18} color={colors.textSecondary} /> : <ChevronDown size={18} color={colors.textSecondary} />}
+          </Pressable>
+        )}
+        {isOpen && children}
+      </View>
     </View>
   );
 }
@@ -1010,6 +1069,8 @@ function NumberFormField({ label, value, onChangeValue, integer, emptyValue = 0,
 }
 
 const formFieldStyles = StyleSheet.create({
+  collapseRow: { flexDirection: 'row', alignItems: 'center', gap: 8, minHeight: 48, marginBottom: 4 },
+  collapseText: { flex: 1, minWidth: 0, fontSize: 16, letterSpacing: -0.2 },
   container: {
     marginBottom: 12,
   },
