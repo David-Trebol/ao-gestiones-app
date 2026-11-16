@@ -1,15 +1,17 @@
 import React, { useMemo, useState } from 'react';
-import { Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View, useWindowDimensions } from 'react-native';
+import { Alert, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { useRouter } from 'expo-router';
-import { AlertTriangle, ChevronDown, ChevronRight, Plus, Search, SlidersHorizontal, X } from 'lucide-react-native';
+import { AlertTriangle, ChevronDown, Download, Search, SlidersHorizontal, X } from 'lucide-react-native';
 import { useTheme } from '@/contexts/ThemeContext';
 import { useData } from '@/contexts/DataContext';
 import { ThemeColors } from '@/constants/colors';
 import { cardShadow, radius, webInputReset } from '@/constants/theme';
 import StatusBadge, { STATUS_ORDER, statusConfig } from '@/components/StatusBadge';
 import SelectSheet, { SheetOption } from '@/components/SelectSheet';
+import { usePageLayout } from '@/components/Page';
 import type { Order, OrderStatus } from '@/types';
 import { formatCurrency, formatDate } from '@/utils/calculations';
+import { exportOrdersToExcel } from '@/utils/exportExcel';
 import {
   ATTENTION_RULES,
   DEFAULT_FILTERS,
@@ -34,14 +36,15 @@ type SheetKind = 'manufacturer' | 'owner' | 'year' | 'period' | 'sort' | null;
 export default function OrdersDashboard() {
   const router = useRouter();
   const { colors, isDark } = useTheme();
-  const { width } = useWindowDimensions();
+  const { pad, width } = usePageLayout();
   const { orders, manufacturers, years } = useData();
-  const desktop = width >= 1024;
-  const tablet = width >= 768 && !desktop;
-  const wideTable = width >= 1240;
+  const table = width >= 1100; // tabla cuando cabe sin apretar (con la barra lateral)
+  const twoCols = width >= 700 && !table;
+  const wideTable = width >= 1400;
   const [filters, setFiltersState] = useState<OrderFilters>(savedFilters);
   const [visible, setVisibleState] = useState(savedVisible);
   const [sheet, setSheet] = useState<SheetKind>(null);
+  const [exporting, setExporting] = useState(false);
   const s = useMemo(() => makeStyles(colors), [colors]);
 
   const setFilters = (patch: Partial<OrderFilters>) => {
@@ -72,30 +75,41 @@ export default function OrdersDashboard() {
     }
     return c;
   }, [orders]);
-  const attention = useMemo(
-    () => orders.map(o => ({ o, reasons: attentionReasons(o, now) })).filter(x => x.reasons.length).sort((a, b) => new Date(a.o.updated_at).getTime() - new Date(b.o.updated_at).getTime()),
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- "now" cambia en cada render; basta con recalcular cuando cambian los pedidos
-    [orders],
-  );
-  const list = useMemo(() => filterOrders(orders, filters, now), [orders, filters]); // eslint-disable-line react-hooks/exhaustive-deps
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- "now" cambia en cada render; basta con recalcular cuando cambian los pedidos
+  const attentionCount = useMemo(() => orders.filter(o => attentionReasons(o, now).length).length, [orders]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  const lateCount = useMemo(() => orders.filter(o => (overdueDays(o, now) ?? 0) > 0).length, [orders]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  const list = useMemo(() => filterOrders(orders, filters, now), [orders, filters]);
   const shown = list.slice(0, visible);
   const nActive = activeFilterCount(filters);
-  const activeOrders = counts.pending.n + counts.processing.n + counts.shipped.n;
 
   const allYears = useMemo(() => Array.from(new Set([...years, ...orders.map(o => o.year)])).sort((a, b) => b - a), [years, orders]);
-  const mfName = manufacturers.find(m => m.id === filters.manufacturerId)?.name;
   const owners = useMemo(() => Array.from(new Set(orders.map(o => o.owner?.trim()).filter(Boolean) as string[])).sort((a, b) => a.localeCompare(b, 'es')), [orders]);
-  const lateCount = useMemo(() => orders.filter(o => (overdueDays(o, now) ?? 0) > 0).length, [orders]); // eslint-disable-line react-hooks/exhaustive-deps
+  const mfName = manufacturers.find(m => m.id === filters.manufacturerId)?.name;
+  const showReasons = filters.status === 'attention' || filters.status === 'overdue';
 
   const open = (o: Order) => router.push(`/order-detail?orderId=${o.id}` as never);
-  const newOrder = () => router.push('/order-form' as never);
+
+  const doExport = async () => {
+    if (!list.length) return;
+    setExporting(true);
+    try {
+      const name = await exportOrdersToExcel(list, manufacturers, nActive ? 'pedidos-filtrados' : 'pedidos');
+      Alert.alert('Excel descargado', `${name} · ${list.length} pedido${list.length === 1 ? '' : 's'}.`);
+    } catch (e) {
+      Alert.alert('No se pudo exportar', (e as Error).message);
+    } finally {
+      setExporting(false);
+    }
+  };
 
   const sheetProps = (): { title: string; options: SheetOption<string>[]; selected: string; onSelect: (v: string) => void } | null => {
     switch (sheet) {
       case 'manufacturer':
         return {
           title: 'Fabricante',
-          options: [{ value: '', label: 'Todos los fabricantes' }, ...manufacturers.map(m => ({ value: m.id, label: m.name, hint: m.code }))].map(o => ({ ...o, value: o.value || '__all' })),
+          options: [{ value: '__all', label: 'Todos los fabricantes' }, ...manufacturers.map(m => ({ value: m.id, label: m.name, hint: m.code }))],
           selected: filters.manufacturerId || '__all',
           onSelect: v => setFilters({ manufacturerId: v === '__all' ? '' : v }),
         };
@@ -137,10 +151,7 @@ export default function OrdersDashboard() {
     <Pressable
       key={kind}
       onPress={() => setSheet(kind)}
-      style={({ pressed, hovered }: { pressed: boolean; hovered?: boolean }) => [
-        s.chip,
-        active ? { backgroundColor: colors.primarySoftAlt } : { backgroundColor: hovered || pressed ? colors.fill : colors.surface },
-      ]}
+      style={({ pressed, hovered }: { pressed: boolean; hovered?: boolean }) => [s.chip, active ? { backgroundColor: colors.primarySoftAlt } : { backgroundColor: hovered || pressed ? colors.surfaceAlt : colors.surface }]}
       accessibilityRole="button"
       accessibilityLabel={`${label}. Cambiar`}
     >
@@ -151,132 +162,118 @@ export default function OrdersDashboard() {
     </Pressable>
   );
 
+  const listTitle =
+    filters.status === 'attention' ? 'Requieren atención' : filters.status === 'overdue' ? 'Con retraso' : filters.status !== 'all' ? statusConfig[filters.status].label : 'Todos los pedidos';
+
   return (
-    <View style={{ gap: 20 }}>
-      {/* 1. Buscar + nuevo pedido */}
-      <View style={s.topRow}>
-        <View style={[s.searchBox, { backgroundColor: isDark ? colors.surface : colors.surface }, cardShadow(isDark)]}>
-          <Search size={18} color={colors.textSecondary} />
-          <TextInput
-            value={filters.query}
-            onChangeText={t => setFilters({ query: t })}
-            placeholder={desktop ? 'Buscar por referencia, cliente, NIF, producto, nº de factura…' : 'Buscar pedidos'}
-            placeholderTextColor={colors.textTertiary}
-            style={s.searchInput}
-            accessibilityLabel="Buscar pedidos"
-            returnKeyType="search"
-            autoCorrect={false}
-            testID="home-search"
-          />
-          {!!filters.query && (
-            <Pressable onPress={() => setFilters({ query: '' })} hitSlop={10} accessibilityLabel="Borrar búsqueda" style={s.clearBtn}>
-              <X size={16} color={colors.textSecondary} />
-            </Pressable>
-          )}
-        </View>
-        <Pressable
-          onPress={newOrder}
-          style={({ pressed, hovered }: { pressed: boolean; hovered?: boolean }) => [s.newBtn, { backgroundColor: hovered ? colors.primaryDark : colors.primary, opacity: pressed ? 0.85 : 1 }]}
-          accessibilityRole="button"
-          accessibilityLabel="Nuevo pedido"
-          testID="new-order-btn"
-        >
-          <Plus size={18} color="#fff" strokeWidth={2.5} />
-          <Text style={s.newBtnText}>{width >= 420 ? 'Nuevo pedido' : 'Nuevo'}</Text>
-        </Pressable>
+    <View style={{ gap: 16 }}>
+      {/* Buscador */}
+      <View style={[s.searchBox, cardShadow(isDark)]}>
+        <Search size={18} color={colors.textSecondary} />
+        <TextInput
+          value={filters.query}
+          onChangeText={t => setFilters({ query: t })}
+          placeholder={width >= 700 ? 'Buscar por referencia, cliente, NIF, producto, nº de factura o responsable' : 'Buscar pedidos'}
+          placeholderTextColor={colors.textTertiary}
+          style={s.searchInput}
+          accessibilityLabel="Buscar pedidos"
+          returnKeyType="search"
+          autoCorrect={false}
+          testID="home-search"
+        />
+        {!!filters.query && (
+          <Pressable onPress={() => setFilters({ query: '' })} hitSlop={10} accessibilityLabel="Borrar búsqueda" style={s.clearBtn}>
+            <X size={16} color={colors.textSecondary} />
+          </Pressable>
+        )}
       </View>
 
-      {/* 2. Contadores por estado */}
-      <View>
-        <View style={s.sectionRow}>
-          <Text style={s.sectionTitle}>Estados · {activeOrders} en curso de {orders.length}</Text>
-          {lateCount > 0 && (
-            <Pressable onPress={() => setFilters({ status: filters.status === 'overdue' ? 'all' : 'overdue' })} hitSlop={8} accessibilityRole="button" testID="filter-overdue">
-              <Text style={[s.link, { color: colors.error }]}>
-                {filters.status === 'overdue' ? 'Ver todos' : `${lateCount} con retraso`}
-              </Text>
-            </Pressable>
-          )}
-        </View>
-        <ScrollView horizontal={!desktop} showsHorizontalScrollIndicator={false} contentContainerStyle={desktop ? s.countersGrid : s.countersScroll} style={!desktop ? { marginHorizontal: -20 } : undefined}>
-          {STATUS_ORDER.map(st => {
-            const sel = filters.status === st;
-            const cfg = statusConfig[st];
-            return (
-              <Pressable
-                key={st}
-                onPress={() => setFilters({ status: sel ? 'all' : st })}
-                style={({ hovered, pressed }: { pressed: boolean; hovered?: boolean }) => [
-                  s.counter,
-                  desktop ? { flex: 1 } : { width: 148 },
-                  { backgroundColor: colors.surface, borderColor: sel ? colors[cfg.textKey] : 'transparent' },
-                  cardShadow(isDark),
-                  (hovered || pressed) && !sel && { backgroundColor: colors.surfaceAlt },
-                ]}
-                accessibilityRole="button"
-                accessibilityState={{ selected: sel }}
-                accessibilityLabel={`${cfg.label}: ${counts[st].n} pedidos. ${sel ? 'Quitar filtro' : 'Ver estos pedidos'}`}
-                testID={`counter-${st}`}
-              >
+      {/* Contadores por estado: abren la lista filtrada */}
+      <View style={s.counters}>
+        {STATUS_ORDER.map(st => {
+          const sel = filters.status === st;
+          const cfg = statusConfig[st];
+          return (
+            <Pressable
+              key={st}
+              onPress={() => setFilters({ status: sel ? 'all' : st })}
+              style={({ hovered, pressed }: { pressed: boolean; hovered?: boolean }) => [
+                s.counter,
+                { flexBasis: width >= 700 ? '18%' : '30%', borderColor: sel ? colors[cfg.textKey] : 'transparent' },
+                cardShadow(isDark),
+                (hovered || pressed) && !sel && { backgroundColor: colors.surfaceAlt },
+              ]}
+              accessibilityRole="button"
+              accessibilityState={{ selected: sel }}
+              accessibilityLabel={`${cfg.label}: ${counts[st].n} pedidos. ${sel ? 'Quitar filtro' : 'Ver estos pedidos'}`}
+              testID={`counter-${st}`}
+            >
+              <View style={s.counterTop}>
                 <View style={[s.dot, { backgroundColor: colors[cfg.textKey] }]} />
-                <Text style={s.counterLabel}>{cfg.label}</Text>
-                <Text style={s.counterValue}>{counts[st].n}</Text>
-                <Text style={s.counterSub} numberOfLines={1}>{formatCurrency(counts[st].total)}</Text>
-              </Pressable>
-            );
-          })}
-        </ScrollView>
+                <Text style={s.counterLabel} numberOfLines={1}>
+                  {cfg.label}
+                </Text>
+              </View>
+              <Text style={s.counterValue}>{counts[st].n}</Text>
+              {width >= 700 && (
+                <Text style={s.counterSub} numberOfLines={1}>
+                  {formatCurrency(counts[st].total)}
+                </Text>
+              )}
+            </Pressable>
+          );
+        })}
       </View>
 
-      {/* 3. Requieren atención */}
-      {attention.length > 0 && (
-        <View>
-          <View style={s.sectionRow}>
-            <Text style={s.sectionTitle}>Requieren atención · {attention.length}</Text>
-            <Pressable onPress={() => setFilters({ status: filters.status === 'attention' ? 'all' : 'attention' })} hitSlop={8} accessibilityRole="button">
-              <Text style={s.link}>{filters.status === 'attention' ? 'Ver todos los pedidos' : 'Ver en la lista'}</Text>
-            </Pressable>
-          </View>
-          <View style={[s.card, cardShadow(isDark)]}>
-            {attention.slice(0, desktop ? 4 : 3).map(({ o, reasons }, i) => (
-              <Pressable
-                key={o.id}
-                onPress={() => open(o)}
-                style={({ hovered, pressed }: { pressed: boolean; hovered?: boolean }) => [s.attRow, i > 0 && s.rowBorder, (hovered || pressed) && { backgroundColor: colors.surfaceAlt }]}
-                accessibilityRole="link"
-                accessibilityLabel={`Pedido ${o.reference_number}: ${reasons.join(', ')}`}
-              >
-                <AlertTriangle size={16} color={colors.warning} />
-                <View style={{ flex: 1, minWidth: 0 }}>
-                  <Text style={s.attRef}>
-                    {o.reference_number}
-                    <Text style={s.attClient}>  {o.customer?.nombre_empresa || 'Sin cliente'}</Text>
-                  </Text>
-                  <Text style={s.attReason}>{reasons.join(' · ')}</Text>
-                </View>
-                <ChevronRight size={16} color={colors.textTertiary} />
-              </Pressable>
-            ))}
-            <Text style={s.ruleNote}>
-              Reglas: pendiente más de {ATTENTION_RULES.pendingDays} días sin cambios, procesando o enviado más de {ATTENTION_RULES.activeDays} días sin cambios, sin cliente o con importe 0 €.
+      {/* Atención: una sola línea que filtra la lista */}
+      {attentionCount > 0 && (
+        <View style={[s.attention, { backgroundColor: colors.warningBg, borderColor: colors.warningBorder }]}>
+          <AlertTriangle size={18} color={colors.warning} />
+          <Text style={[s.attentionText, { color: colors.text }]}>
+            <Text style={{ fontWeight: '600' }}>
+              {attentionCount} {attentionCount === 1 ? 'pedido requiere' : 'pedidos requieren'} atención
             </Text>
+            {lateCount > 0 ? <Text style={{ color: colors.error }}> · {lateCount} con retraso</Text> : null}
+          </Text>
+          <View style={s.attentionActions}>
+            {lateCount > 0 && (
+              <Pressable onPress={() => setFilters({ status: filters.status === 'overdue' ? 'all' : 'overdue' })} style={s.textBtn} accessibilityRole="button" testID="filter-overdue">
+                <Text style={[s.link, { color: colors.error }]}>{filters.status === 'overdue' ? 'Ver todos' : 'Ver retrasados'}</Text>
+              </Pressable>
+            )}
+            <Pressable onPress={() => setFilters({ status: filters.status === 'attention' ? 'all' : 'attention' })} style={s.textBtn} accessibilityRole="button" testID="filter-attention">
+              <Text style={s.link}>{filters.status === 'attention' ? 'Ver todos' : 'Ver'}</Text>
+            </Pressable>
           </View>
         </View>
       )}
 
-      {/* 4. Lista con filtros */}
+      {/* Lista */}
       <View>
-        <View style={s.sectionRow}>
+        <View style={s.listHead}>
           <Text style={s.sectionTitle}>
-            {filters.status === 'attention' ? 'Requieren atención' : filters.status === 'overdue' ? 'Con retraso' : filters.status !== 'all' ? statusConfig[filters.status].label : 'Todos los pedidos'} · {list.length}
+            {listTitle} · {list.length}
           </Text>
-          {nActive > 0 && (
-            <Pressable onPress={() => setFilters({ ...DEFAULT_FILTERS, sort: filters.sort })} hitSlop={8} accessibilityRole="button" testID="clear-filters">
-              <Text style={s.link}>Quitar filtros ({nActive})</Text>
-            </Pressable>
-          )}
+          <View style={s.listHeadActions}>
+            {nActive > 0 && (
+              <Pressable onPress={() => setFilters({ ...DEFAULT_FILTERS, sort: filters.sort })} style={s.textBtn} accessibilityRole="button" testID="clear-filters">
+                <Text style={s.link}>Quitar filtros ({nActive})</Text>
+              </Pressable>
+            )}
+            {Platform.OS === 'web' && list.length > 0 && (
+              <Pressable onPress={doExport} disabled={exporting} style={[s.textBtn, { flexDirection: 'row', gap: 6 }]} accessibilityRole="button" accessibilityLabel={`Exportar ${list.length} pedidos a Excel`} testID="export-excel">
+                <Download size={16} color={colors.primary} />
+                <Text style={s.link}>{exporting ? 'Exportando…' : 'Excel'}</Text>
+              </Pressable>
+            )}
+          </View>
         </View>
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={s.chips} style={{ marginHorizontal: -20 }}>
+        {showReasons && (
+          <Text style={s.ruleNote}>
+            Reglas: fecha prevista vencida; pendiente más de {ATTENTION_RULES.pendingDays} días sin cambios; procesando o enviado más de {ATTENTION_RULES.activeDays} días sin cambios; sin cliente o con importe 0 €.
+          </Text>
+        )}
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={[s.chips, { paddingHorizontal: pad }]} style={{ marginHorizontal: -pad }}>
           <View style={s.filterIcon}>
             <SlidersHorizontal size={16} color={colors.textSecondary} />
           </View>
@@ -300,80 +297,12 @@ export default function OrdersDashboard() {
               <Text style={[s.link, { fontWeight: '600' }]}>Quitar filtros</Text>
             </Pressable>
           </View>
-        ) : desktop ? (
-          <View style={[s.card, cardShadow(isDark)]} accessibilityRole={Platform.OS === 'web' ? ('table' as never) : undefined}>
-            <View style={[s.tr, s.th]}>
-              <Text style={[s.thText, s.cRef]}>Referencia</Text>
-              <Text style={[s.thText, s.cClient]}>Cliente</Text>
-              <Text style={[s.thText, s.cMf]}>Fabricante</Text>
-              <Text style={[s.thText, s.cStatus]}>Estado</Text>
-              <Text style={[s.thText, s.cDate]}>Creado</Text>
-              {wideTable && <Text style={[s.thText, s.cDate]}>Actualizado</Text>}
-              <Text style={[s.thText, s.cDate]}>Previsto</Text>
-              <Text style={[s.thText, s.cTotal]}>Total</Text>
-            </View>
-            {shown.map((o, i) => (
-              <Pressable
-                key={o.id}
-                onPress={() => open(o)}
-                style={({ hovered, pressed }: { pressed: boolean; hovered?: boolean }) => [s.tr, i > 0 && s.rowBorder, (hovered || pressed) && { backgroundColor: colors.surfaceAlt }, Platform.OS === 'web' && ({ cursor: 'pointer' } as object)]}
-                accessibilityRole="link"
-                accessibilityLabel={`Pedido ${o.reference_number}, ${o.customer?.nombre_empresa || 'sin cliente'}, ${statusConfig[o.status].label}, ${formatCurrency(o.total_with_vat)}`}
-                testID={`order-row-${o.id}`}
-              >
-                <View style={s.cRef}>
-                  <Text style={s.tdStrong}>{o.reference_number}</Text>
-                  {!!o.custom_reference && <Text style={s.tdSub} numberOfLines={1}>Ref. {o.custom_reference}</Text>}
-                </View>
-                <View style={s.cClient}>
-                  <Text style={s.td} numberOfLines={2}>{o.customer?.nombre_empresa || '—'}</Text>
-                  {!!o.customer?.numero_referencia_pedido && <Text style={s.tdSub}>Su pedido {o.customer.numero_referencia_pedido}</Text>}
-                </View>
-                <Text style={[s.td, s.cMf]} numberOfLines={2}>{o.manufacturer_name}</Text>
-                <View style={s.cStatus}>
-                  <StatusBadge status={o.status} size="sm" />
-                </View>
-                <Text style={[s.tdSub, s.cDate]}>{formatDate(o.created_at)}</Text>
-                {wideTable && <Text style={[s.tdSub, s.cDate]}>{formatDate(o.updated_at)}</Text>}
-                <View style={s.cDate}>
-                  <ExpectedText o={o} s={s} errorColor={colors.error} />
-                  {!!o.owner && <Text style={s.tdSub} numberOfLines={1}>{o.owner}</Text>}
-                </View>
-                <Text style={[s.tdStrong, s.cTotal]}>{formatCurrency(o.total_with_vat)}</Text>
-              </Pressable>
-            ))}
-          </View>
+        ) : table ? (
+          <OrderTable orders={shown} onOpen={open} showReasons={showReasons} showUpdated={wideTable} />
         ) : (
-          <View style={[s.cardsWrap, tablet && s.cardsWrapTablet]}>
+          <View style={[s.cardsWrap, twoCols && s.cardsWrapTwo]}>
             {shown.map(o => (
-              <Pressable
-                key={o.id}
-                onPress={() => open(o)}
-                style={({ pressed }) => [s.oCard, tablet && s.oCardTablet, cardShadow(isDark), pressed && { backgroundColor: colors.surfaceAlt }]}
-                accessibilityRole="link"
-                accessibilityLabel={`Pedido ${o.reference_number}, ${o.customer?.nombre_empresa || 'sin cliente'}, ${statusConfig[o.status].label}, ${formatCurrency(o.total_with_vat)}`}
-                testID={`order-card-${o.id}`}
-              >
-                <View style={s.oTop}>
-                  <Text style={s.oRef}>{o.reference_number}</Text>
-                  <StatusBadge status={o.status} size="sm" />
-                </View>
-                <Text style={s.oClient}>{o.customer?.nombre_empresa || 'Sin cliente'}</Text>
-                {!!o.custom_reference && <Text style={s.tdSub}>Ref. {o.custom_reference}</Text>}
-                {(!!o.expected_date || !!o.owner || !!o.next_action) && (
-                  <View style={s.follow}>
-                    {!!o.expected_date && <ExpectedText o={o} s={s} errorColor={colors.error} prefix="Previsto " />}
-                    {!!o.owner && <Text style={s.tdSub}>{o.owner}</Text>}
-                    {!!o.next_action && <Text style={[s.tdSub, { flexBasis: '100%' }]} numberOfLines={2}>→ {o.next_action}</Text>}
-                  </View>
-                )}
-                <View style={s.oBottom}>
-                  <Text style={s.oMeta} numberOfLines={2}>
-                    {o.manufacturer_name} · {formatDate(o.created_at)} · {o.items.length} {o.items.length === 1 ? 'producto' : 'productos'}
-                  </Text>
-                  <Text style={s.oTotal}>{formatCurrency(o.total_with_vat)}</Text>
-                </View>
-              </Pressable>
+              <OrderCardItem key={o.id} order={o} onOpen={open} twoCols={twoCols} showReasons={showReasons} />
             ))}
           </View>
         )}
@@ -391,12 +320,16 @@ export default function OrdersDashboard() {
   );
 }
 
-function ExpectedText({ o, s, errorColor, prefix = '' }: { o: Order; s: ReturnType<typeof makeStyles>; errorColor: string; prefix?: string }) {
+// ------------------------------------------------------------------ piezas reutilizables
+
+export function ExpectedText({ o, prefix = '' }: { o: Order; prefix?: string }) {
+  const { colors } = useTheme();
+  const s = useMemo(() => makeStyles(colors), [colors]);
   if (!o.expected_date) return <Text style={s.tdSub}>—</Text>;
   const late = overdueDays(o);
   const isLate = late !== null && late > 0;
   return (
-    <Text style={[s.tdSub, isLate && { color: errorColor, fontWeight: '600' }]} accessibilityLabel={isLate ? `Previsto ${formatISODate(o.expected_date)}, retrasado ${late} días` : undefined}>
+    <Text style={[s.tdSub, isLate && { color: colors.error, fontWeight: '600' }]} accessibilityLabel={isLate ? `Previsto ${formatISODate(o.expected_date)}, retrasado ${late} días` : undefined}>
       {prefix}
       {formatISODate(o.expected_date)}
       {isLate ? ` · ${late} d de retraso` : late === 0 ? ' · hoy' : ''}
@@ -404,55 +337,165 @@ function ExpectedText({ o, s, errorColor, prefix = '' }: { o: Order; s: ReturnTy
   );
 }
 
+export function OrderTable({ orders, onOpen, showReasons, showUpdated }: { orders: Order[]; onOpen: (o: Order) => void; showReasons?: boolean; showUpdated?: boolean }) {
+  const { colors, isDark } = useTheme();
+  const s = useMemo(() => makeStyles(colors), [colors]);
+  return (
+    <View style={[s.card, cardShadow(isDark)]}>
+      <View style={[s.tr, s.th]}>
+        <Text style={[s.thText, s.cRef]}>Referencia</Text>
+        <Text style={[s.thText, s.cClient]}>Cliente</Text>
+        <Text style={[s.thText, s.cMf]}>Fabricante</Text>
+        <Text style={[s.thText, s.cStatus]}>Estado</Text>
+        <Text style={[s.thText, s.cDate]}>Creado</Text>
+        {showUpdated && <Text style={[s.thText, s.cDate]}>Actualizado</Text>}
+        <Text style={[s.thText, s.cDate]}>Previsto</Text>
+        <Text style={[s.thText, s.cTotal]}>Total</Text>
+      </View>
+      {orders.map((o, i) => {
+        const reasons = showReasons ? attentionReasons(o) : [];
+        return (
+          <Pressable
+            key={o.id}
+            onPress={() => onOpen(o)}
+            style={({ hovered, pressed }: { pressed: boolean; hovered?: boolean }) => [s.tr, i > 0 && s.rowBorder, (hovered || pressed) && { backgroundColor: colors.surfaceAlt }, Platform.OS === 'web' && ({ cursor: 'pointer' } as object)]}
+            accessibilityRole="link"
+            accessibilityLabel={`Pedido ${o.reference_number}, ${o.customer?.nombre_empresa || 'sin cliente'}, ${statusConfig[o.status].label}, ${formatCurrency(o.total_with_vat)}`}
+            testID={`order-row-${o.id}`}
+          >
+            <View style={s.cRef}>
+              <Text style={s.tdStrong}>{o.reference_number}</Text>
+              {!!o.custom_reference && (
+                <Text style={s.tdSub} numberOfLines={1}>
+                  Ref. {o.custom_reference}
+                </Text>
+              )}
+            </View>
+            <View style={s.cClient}>
+              <Text style={s.td} numberOfLines={2}>
+                {o.customer?.nombre_empresa || '—'}
+              </Text>
+              {reasons.length > 0 ? (
+                <Text style={[s.tdSub, { color: colors.warning }]} numberOfLines={2}>
+                  {reasons.join(' · ')}
+                </Text>
+              ) : o.customer?.numero_referencia_pedido ? (
+                <Text style={s.tdSub} numberOfLines={1}>
+                  Su pedido {o.customer.numero_referencia_pedido}
+                </Text>
+              ) : null}
+            </View>
+            <Text style={[s.td, s.cMf]} numberOfLines={2}>
+              {o.manufacturer_name}
+            </Text>
+            <View style={s.cStatus}>
+              <StatusBadge status={o.status} size="sm" />
+            </View>
+            <Text style={[s.tdSub, s.cDate]}>{formatDate(o.created_at)}</Text>
+            {showUpdated && <Text style={[s.tdSub, s.cDate]}>{formatDate(o.updated_at)}</Text>}
+            <View style={s.cDate}>
+              <ExpectedText o={o} />
+              {!!o.owner && (
+                <Text style={s.tdSub} numberOfLines={1}>
+                  {o.owner}
+                </Text>
+              )}
+            </View>
+            <Text style={[s.tdStrong, s.cTotal]}>{formatCurrency(o.total_with_vat)}</Text>
+          </Pressable>
+        );
+      })}
+    </View>
+  );
+}
+
+export function OrderCardItem({ order: o, onOpen, twoCols, showReasons }: { order: Order; onOpen: (o: Order) => void; twoCols?: boolean; showReasons?: boolean }) {
+  const { colors, isDark } = useTheme();
+  const s = useMemo(() => makeStyles(colors), [colors]);
+  const reasons = showReasons ? attentionReasons(o) : [];
+  return (
+    <Pressable
+      onPress={() => onOpen(o)}
+      style={({ pressed, hovered }: { pressed: boolean; hovered?: boolean }) => [s.oCard, twoCols && s.oCardTwo, cardShadow(isDark), (pressed || hovered) && { backgroundColor: colors.surfaceAlt }]}
+      accessibilityRole="link"
+      accessibilityLabel={`Pedido ${o.reference_number}, ${o.customer?.nombre_empresa || 'sin cliente'}, ${statusConfig[o.status].label}, ${formatCurrency(o.total_with_vat)}`}
+      testID={`order-card-${o.id}`}
+    >
+      <View style={s.oTop}>
+        <Text style={s.oRef}>{o.reference_number}</Text>
+        <StatusBadge status={o.status} size="sm" />
+      </View>
+      <Text style={s.oClient}>{o.customer?.nombre_empresa || 'Sin cliente'}</Text>
+      {!!o.custom_reference && <Text style={s.tdSub}>Ref. {o.custom_reference}</Text>}
+      {reasons.length > 0 && <Text style={[s.tdSub, { color: colors.warning }]}>{reasons.join(' · ')}</Text>}
+      {(!!o.expected_date || !!o.owner || !!o.next_action) && (
+        <View style={s.follow}>
+          {!!o.expected_date && <ExpectedText o={o} prefix="Previsto " />}
+          {!!o.owner && <Text style={s.tdSub}>{o.owner}</Text>}
+          {!!o.next_action && (
+            <Text style={[s.tdSub, { flexBasis: '100%' }]} numberOfLines={2}>
+              → {o.next_action}
+            </Text>
+          )}
+        </View>
+      )}
+      <View style={s.oBottom}>
+        <Text style={s.oMeta} numberOfLines={2}>
+          {o.manufacturer_name} · {formatDate(o.created_at)} · {o.items.length} {o.items.length === 1 ? 'producto' : 'productos'}
+        </Text>
+        <Text style={s.oTotal}>{formatCurrency(o.total_with_vat)}</Text>
+      </View>
+    </Pressable>
+  );
+}
+
 function makeStyles(c: ThemeColors) {
   return StyleSheet.create({
-    topRow: { flexDirection: 'row', gap: 10, alignItems: 'center' },
-    searchBox: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 14, height: 48, borderRadius: radius.md, minWidth: 0 },
+    searchBox: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 14, height: 48, borderRadius: radius.md, backgroundColor: c.surface },
     searchInput: { flex: 1, minWidth: 0, fontSize: 16, color: c.text, height: 48, ...webInputReset },
-    clearBtn: { width: 32, height: 32, alignItems: 'center', justifyContent: 'center' },
-    newBtn: { flexDirection: 'row', alignItems: 'center', gap: 6, height: 48, paddingHorizontal: 16, borderRadius: radius.pill },
-    newBtnText: { color: '#fff', fontSize: 15, fontWeight: '600' },
-    sectionRow: { flexDirection: 'row', alignItems: 'baseline', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' },
-    sectionTitle: { fontSize: 13, fontWeight: '600', color: c.textSecondary, textTransform: 'uppercase', letterSpacing: 0.4, marginBottom: 8, paddingHorizontal: 4 },
-    link: { fontSize: 14, color: c.primary, fontWeight: '500' },
-    countersGrid: { flexDirection: 'row', gap: 12 },
-    countersScroll: { flexDirection: 'row', gap: 10, paddingHorizontal: 20, paddingVertical: 4 },
-    counter: { borderRadius: radius.lg, padding: 14, borderWidth: 2, minHeight: 104 },
-    dot: { width: 8, height: 8, borderRadius: 4, marginBottom: 8 },
-    counterLabel: { fontSize: 14, color: c.textSecondary, fontWeight: '500' },
-    counterValue: { fontSize: 26, fontWeight: '700', color: c.text, letterSpacing: -0.5, fontVariant: ['tabular-nums'], marginTop: 2 },
+    clearBtn: { width: 36, height: 36, alignItems: 'center', justifyContent: 'center' },
+    counters: { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
+    counter: { flexGrow: 1, borderRadius: radius.lg, paddingHorizontal: 14, paddingVertical: 12, borderWidth: 2, backgroundColor: c.surface, minHeight: 72 },
+    counterTop: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+    dot: { width: 8, height: 8, borderRadius: 4 },
+    counterLabel: { fontSize: 13, color: c.textSecondary, fontWeight: '500', flexShrink: 1 },
+    counterValue: { fontSize: 24, fontWeight: '700', color: c.text, letterSpacing: -0.5, fontVariant: ['tabular-nums'], marginTop: 2 },
     counterSub: { fontSize: 12, color: c.textSecondary, fontVariant: ['tabular-nums'] },
-    card: { backgroundColor: c.surface, borderRadius: radius.lg, overflow: 'hidden' },
-    attRow: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 16, paddingVertical: 12, minHeight: 56 },
-    rowBorder: { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: c.divider },
-    attRef: { fontSize: 15, fontWeight: '600', color: c.text },
-    attClient: { fontWeight: '400', color: c.textSecondary },
-    attReason: { fontSize: 13, color: c.warning, marginTop: 2 },
-    ruleNote: { fontSize: 12, color: c.textTertiary, paddingHorizontal: 16, paddingVertical: 10, borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: c.divider },
-    chips: { flexDirection: 'row', gap: 8, paddingHorizontal: 20, paddingBottom: 12, alignItems: 'center' },
-    filterIcon: { width: 28, alignItems: 'center' },
-    chip: { flexDirection: 'row', alignItems: 'center', gap: 4, height: 36, paddingHorizontal: 14, borderRadius: radius.pill, maxWidth: 260 },
+    attention: { flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', gap: 10, paddingLeft: 14, paddingRight: 6, paddingVertical: 4, borderRadius: radius.lg, borderWidth: 1, minHeight: 52 },
+    attentionText: { flex: 1, minWidth: 180, fontSize: 15 },
+    attentionActions: { flexDirection: 'row', alignItems: 'center' },
+    textBtn: { minHeight: 44, paddingHorizontal: 10, alignItems: 'center', justifyContent: 'center', borderRadius: radius.sm },
+    listHead: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 8, flexWrap: 'wrap' },
+    listHeadActions: { flexDirection: 'row', alignItems: 'center' },
+    sectionTitle: { fontSize: 13, fontWeight: '600', color: c.textSecondary, textTransform: 'uppercase', letterSpacing: 0.4, paddingHorizontal: 4 },
+    link: { fontSize: 14, color: c.primary, fontWeight: '600' },
+    ruleNote: { fontSize: 12.5, lineHeight: 17, color: c.textSecondary, paddingHorizontal: 4, marginBottom: 4 },
+    chips: { flexDirection: 'row', gap: 8, paddingBottom: 12, paddingTop: 4, alignItems: 'center' },
+    filterIcon: { width: 24, alignItems: 'center' },
+    chip: { flexDirection: 'row', alignItems: 'center', gap: 4, height: 40, paddingHorizontal: 14, borderRadius: radius.pill, maxWidth: 260 },
     chipText: { fontSize: 14, color: c.text, fontWeight: '500' },
+    card: { backgroundColor: c.surface, borderRadius: radius.lg, overflow: 'hidden' },
     empty: { padding: 28, alignItems: 'center', gap: 6 },
     emptyTitle: { fontSize: 17, fontWeight: '600', color: c.text },
     emptyText: { fontSize: 14, color: c.textSecondary, textAlign: 'center' },
-    emptyBtn: { marginTop: 8, paddingHorizontal: 16, minHeight: 40, justifyContent: 'center', borderRadius: radius.pill },
+    emptyBtn: { marginTop: 8, paddingHorizontal: 16, minHeight: 44, justifyContent: 'center', borderRadius: radius.pill },
     tr: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 16, paddingVertical: 12, minHeight: 56 },
     th: { minHeight: 40, paddingVertical: 10, backgroundColor: c.surfaceAlt },
+    rowBorder: { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: c.divider },
     thText: { fontSize: 12, fontWeight: '600', color: c.textSecondary, textTransform: 'uppercase', letterSpacing: 0.3 },
     td: { fontSize: 14, color: c.text },
     tdStrong: { fontSize: 14, color: c.text, fontWeight: '600', fontVariant: ['tabular-nums'] },
     tdSub: { fontSize: 13, color: c.textSecondary, fontVariant: ['tabular-nums'] },
-    cRef: { flex: 1.4, minWidth: 0 },
-    cClient: { flex: 1.9, minWidth: 0 },
+    cRef: { flex: 1.3, minWidth: 0 },
+    cClient: { flex: 2, minWidth: 0 },
     cMf: { flex: 1.2, minWidth: 0 },
     cStatus: { flex: 1.1, minWidth: 0 },
-    cDate: { flex: 0.95, minWidth: 0 },
+    cDate: { flex: 1, minWidth: 0 },
     cTotal: { flex: 1.1, minWidth: 120, textAlign: 'right' },
     cardsWrap: { gap: 10 },
-    cardsWrapTablet: { flexDirection: 'row', flexWrap: 'wrap', gap: 12 },
+    cardsWrapTwo: { flexDirection: 'row', flexWrap: 'wrap', gap: 12 },
     oCard: { backgroundColor: c.surface, borderRadius: radius.lg, padding: 16, gap: 4 },
-    oCardTablet: { width: '48.8%' as unknown as number },
+    oCardTwo: { width: '48.8%' as unknown as number },
     oTop: { flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between', gap: 10 },
     oRef: { flex: 1, fontSize: 16, fontWeight: '600', color: c.text, fontVariant: ['tabular-nums'] },
     oClient: { fontSize: 15, color: c.text },

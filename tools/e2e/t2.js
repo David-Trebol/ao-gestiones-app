@@ -30,7 +30,8 @@ const check = (name, ok, extra = '') => { results.push((ok ? 'OK  ' : 'FAIL') + 
   // 3. Pedido nuevo con decimales y descuento
   await tab('Pedidos');
   await p.getByTestId('home-mode-lista').click(); await wait(800);
-  await p.getByTestId('new-order-btn').click(); await wait(1800);
+  // En móvil, «Nuevo» está en la cabecera de Pedidos (en tablet/ordenador, en la barra lateral: nav-new-order)
+  await p.getByTestId('header-new-order').click(); await wait(1800);
   // validación junto a los campos
   await p.getByTestId('submit-order-btn').click(); await wait(600);
   const vt = await text();
@@ -41,7 +42,7 @@ const check = (name, ok, extra = '') => { results.push((ok ? 'OK  ' : 'FAIL') + 
   await p.getByText('Acme Industries (ACM)').click();
   const yr = p.getByLabel('Año', { exact: true }).first(); await yr.fill(''); await yr.pressSequentially('2026');
   await f('Producto', 'Motor 5HP');
-  const typeNum = async (ph, v) => { const el = p.getByLabel(ph, { exact: true }).first(); await el.click(); await el.press('Control+a'); await el.press('Backspace'); await el.pressSequentially(v, { delay: 40 }); };
+  const typeNum = async (ph, v) => { const el = p.getByLabel(ph, { exact: true }).first(); await el.click(); await el.press('ControlOrMeta+a'); await el.press('Backspace'); await el.pressSequentially(v, { delay: 40 }); };
   await typeNum('Cantidad', '2'); await typeNum('Coste unitario (fabricante)', '120,50'); await typeNum('Importe línea antes de dto.', '300'); await typeNum('Descuento %', '10'); await typeNum('IVA %', '21');
   check('se pueden escribir decimales con coma', (await p.getByLabel('Coste unitario (fabricante)', { exact: true }).first().inputValue()) === '120,50');
   const ft = await text();

@@ -26,12 +26,14 @@ const mkOrder = (id, ref, m, year, extra = {}) => ({ id, reference_number: ref, 
   check('año 2027 creado', db.years.some(y => y.year === 2027));
   const okb = p.getByTestId('web-alert-btn-OK'); if (await okb.count()) await okb.click(); await wait(500);
   // Búsqueda
-  await tab('Buscar');
-  await p.locator('input').first().fill('garcía'); await wait(1200);
+  // La pestaña Buscar se retiró (fase 1): el buscador de Pedidos busca en todo
+  await p.getByTestId('home-mode-lista').click(); await wait(800);
+  await p.getByTestId('home-search').fill('garcía'); await wait(1200);
   const st = await text();
-  check('búsqueda por contacto (6 resultados)', /6 resultados/.test(st), (st.match(/\d+ resultados?/) || [''])[0]);
-  await p.locator('input').first().fill('F-o1'); await wait(1000);
-  check('búsqueda por nº factura', /1 resultado/.test(await text()));
+  check('búsqueda por contacto (6 pedidos)', /PEDIDOS · 6\b/i.test(st), (st.match(/PEDIDOS · \d+/i) || [''])[0]);
+  await p.getByTestId('home-search').fill('F-o1'); await wait(1000);
+  check('búsqueda por nº factura (1 pedido)', /PEDIDOS · 1\b/i.test(await text()), ((await text()).match(/PEDIDOS · \d+/i) || [''])[0]);
+  await p.getByTestId('home-search').fill(''); await wait(600);
   // Fabricantes: editar nombre se propaga a pedidos
   await tab('Fabricantes');
   await p.getByTestId('edit-manufacturer-m1').click(); await wait(800);
