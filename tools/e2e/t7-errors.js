@@ -7,7 +7,7 @@ const { boot } = require('./e2e-lib');
     await pick(require('path').join(__dirname, '../samples') + '/errores/' + f);
     await p.waitForFunction(() => /Reintentar|Elegir otro archivo/.test(document.body.innerText), null, { timeout: 120000 }).catch(() => {});
     const t = await p.evaluate(() => document.body.innerText);
-    const m = /Leer datos de un documento[\s\S]*?\n([^\n]*?)\n\s*Reintentar/.exec(t);
+    const m = /\n([^\n]+?)\n\s*(?:Reintentar|Elegir otro archivo)/.exec(t); // el aviso va justo antes de sus botones
     console.log(f, '→', m ? m[1] : t.slice(0, 300).replace(/\n+/g, ' | '));
     await p.screenshot({ path: `${require("path").join(__dirname, "../out")}/error-${f}.png` });
     await p.getByText('Cerrar', { exact: true }).click().catch(() => {}); await wait(300);

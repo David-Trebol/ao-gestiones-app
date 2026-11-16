@@ -44,7 +44,12 @@ Pedido del propietario el 16/11/2026: estética de Apple (tipografía, colores, 
 - [x] Pedidos: contadores como las listas de Recordatorios (en móvil, desplazables en horizontal), buscador de iOS, lista agrupada en móvil, títulos sin mayúsculas.
 - [x] Ajustes: iconos en cuadrados de color. Entrada rehecha con el estilo de la app (se quita «Análisis · Métricas en vivo», que no existía).
 - [x] Aprobado por el propietario y fusionado con `main`.
-- [ ] Siguiente: adaptar ficha del pedido y formulario; revisar modo oscuro y un iPhone real.
+- [x] Ficha del pedido: cabecera de iOS («‹ Pedidos», duplicar y «…»), título grande, estado que se toca para cambiarlo, total arriba, secciones agrupadas (resumen económico como lista, no bloque negro). En móvil los productos se ven en la primera pantalla.
+- [x] Formulario: barra de hoja de iOS (Cancelar · título · Leer documento), secciones agrupadas, un solo botón de guardar (abajo, con el total).
+- [x] Modo oscuro arreglado: el tema de la navegación pintaba un gris claro fijo detrás de las pantallas (`app/_layout.tsx`).
+- [x] Arreglado: al abrir el formulario por enlace directo, el fabricante no salía marcado si los pedidos llegaban antes que los fabricantes.
+- [ ] Probar en un iPhone real (Safari) y con el teclado abierto.
+- Nota: en `t5-scan.js`, «muestra progreso» falla por tiempos (el PDF de muestra se lee en menos de 0,4 s); el resto pasa.
 
 ## Fase 2 · Pantalla por pantalla
 
