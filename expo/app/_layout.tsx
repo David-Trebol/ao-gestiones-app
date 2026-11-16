@@ -13,6 +13,8 @@ import ResetPasswordScreen from "@/components/ResetPasswordScreen";
 import WebAlertHost from "@/components/WebAlertHost";
 import WebGlobalStyles from "@/components/WebGlobalStyles";
 import { headerOptions } from "@/constants/navigation";
+import { canvas } from "@/constants/theme";
+import { DarkTheme, DefaultTheme, ThemeProvider as NavThemeProvider } from "@react-navigation/native";
 
 SplashScreen.preventAutoHideAsync();
 
@@ -53,16 +55,26 @@ function AuthGate() {
 }
 
 function RootLayoutNav() {
-  const { colors } = useTheme();
+  const { colors, isDark } = useTheme();
+  // Tema de la navegación con los colores de la app (el de por defecto pinta un gris claro fijo detrás de las pantallas)
+  const navTheme = React.useMemo(() => {
+    const base = isDark ? DarkTheme : DefaultTheme;
+    return {
+      ...base,
+      colors: { ...base.colors, background: canvas(colors), card: colors.headerBackground, text: colors.text, border: colors.divider, primary: colors.primary },
+    };
+  }, [colors, isDark]);
 
   return (
-    <Stack screenOptions={headerOptions(colors)}>
-      <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-      <Stack.Screen
-        name="login"
-        options={{ headerShown: false }}
-      />
-    </Stack>
+    <NavThemeProvider value={navTheme}>
+      <Stack screenOptions={headerOptions(colors)}>
+        <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+        <Stack.Screen
+          name="login"
+          options={{ headerShown: false }}
+        />
+      </Stack>
+    </NavThemeProvider>
   );
 }
 

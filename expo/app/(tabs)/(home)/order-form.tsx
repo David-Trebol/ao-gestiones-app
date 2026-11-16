@@ -14,10 +14,10 @@ import {
   Animated,
 } from 'react-native';
 import { useLocalSearchParams, useRouter, Stack } from 'expo-router';
-import { Plus, Trash2, FileText, ScanLine, X } from 'lucide-react-native';
+import { Plus, Trash2, ScanLine, X } from 'lucide-react-native';
 import { LightColors as StaticColors } from '@/constants/colors';
 import { PAGE_MAX, usePageLayout } from '@/components/Page';
-import { canvas , cardShadow, webInputReset } from '@/constants/theme';
+import { canvas, cardShadow, glass, webInputReset } from '@/constants/theme';
 import { useTheme } from '@/contexts/ThemeContext';
 import { useData } from '@/contexts/DataContext';
 import { OrderFormData, OrderFormItem, ShippingFormItem, OrderStatus, Customer } from '@/types';
@@ -191,6 +191,13 @@ export default function OrderFormScreen() {
     }
     if (!editingOrder && manufacturers.length > 0) initializedRef.current = initKey;
   }, [editingOrder, manufacturerId, manufacturers]);
+
+  // Si el pedido llegó antes que la lista de fabricantes, marcar su fabricante en cuanto llegue
+  useEffect(() => {
+    if (selectedManufacturerIndex !== -1 || !formData.manufacturer_id || manufacturers.length === 0) return;
+    const mIdx = manufacturers.findIndex(m => m.id === formData.manufacturer_id);
+    if (mIdx !== -1) setSelectedManufacturerIndex(mIdx);
+  }, [selectedManufacturerIndex, formData.manufacturer_id, manufacturers]);
 
   const updateCustomer = useCallback((field: keyof Customer, value: string) => {
     setFormData(prev => ({
@@ -451,16 +458,35 @@ export default function OrderFormScreen() {
 
   return (
     <View style={[styles.container, { backgroundColor: canvas(colors) }]}>
-      <Stack.Screen
-        options={{
-          title: editingOrder ? 'Editar Pedido' : 'Nuevo Pedido',
-          headerRight: () => (
-            <Pressable onPress={handleSubmit} disabled={saving} style={[styles.saveBtn, { backgroundColor: colors.primary, opacity: saving ? 0.6 : 1 }]} testID="header-save-btn">
-              <Text style={styles.saveBtnText}>Guardar</Text>
-            </Pressable>
-          ),
-        }}
-      />
+      <Stack.Screen options={{ title: editingOrder ? 'Editar pedido' : 'Nuevo pedido', headerShown: false }} />
+
+      {/* Barra superior como la de una hoja de iOS: Cancelar · título · Leer documento. Guardar va abajo, con el total. */}
+      <View style={[styles.topBar, { paddingTop: insets.top, borderBottomColor: colors.divider }, glass(colors.headerBackground, 24)]}>
+        <View style={[styles.topBarInner, { maxWidth: PAGE_MAX, paddingHorizontal: pad - 8 }]}>
+          <Pressable
+            onPress={() => (router.canGoBack() ? router.back() : router.replace('/'))}
+            style={({ hovered }: { pressed: boolean; hovered?: boolean }) => [styles.topBtn, hovered && { backgroundColor: colors.fill }]}
+            accessibilityRole="button"
+            testID="form-cancel"
+          >
+            <Text style={[styles.topBtnText, { color: colors.primary }]}>Cancelar</Text>
+          </Pressable>
+          <Text style={[styles.topTitle, { color: colors.text }]} numberOfLines={1} accessibilityRole="header">
+            {editingOrder ? editingOrder.reference_number : 'Nuevo pedido'}
+          </Text>
+          <Pressable
+            onPress={handleScanAction}
+            disabled={!!scan}
+            style={({ hovered, pressed }: { pressed: boolean; hovered?: boolean }) => [styles.scanPill, { backgroundColor: hovered || pressed ? colors.primarySoftAlt : colors.primarySoft, opacity: scan ? 0.5 : 1 }]}
+            testID="scan-document-btn"
+            accessibilityRole="button"
+            accessibilityLabel="Leer datos de un documento (PDF o foto)"
+          >
+            <ScanLine size={17} color={colors.primary} />
+            {width >= 420 && <Text style={[styles.scanPillText, { color: colors.primary }]}>Leer documento</Text>}
+          </Pressable>
+        </View>
+      </View>
 
       <KeyboardAvoidingView
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
@@ -496,24 +522,7 @@ export default function OrderFormScreen() {
                 </View>
               )}
             </View>
-          ) : (
-            <Pressable
-              style={[styles.scanBtn, { backgroundColor: colors.surface, borderColor: colors.borderLight }]}
-              onPress={handleScanAction}
-              testID="scan-document-btn"
-              accessibilityRole="button"
-              accessibilityLabel="Leer datos de un documento"
-            >
-              <View style={[styles.scanBtnIconWrap, { backgroundColor: colors.primary }]}>
-                <ScanLine size={18} color="#FFFFFF" />
-              </View>
-              <View style={styles.scanBtnTextWrap}>
-                <Text style={[styles.scanBtnTitle, { color: colors.text }]}>Leer datos de un documento</Text>
-                <Text style={[styles.scanBtnSubtitle, { color: colors.textSecondary }]}>PDF, JPG o PNG · se lee en tu dispositivo, sin enviarlo a ningún servicio</Text>
-              </View>
-              <FileText size={16} color={colors.primaryLight} />
-            </Pressable>
-          )}
+          ) : null}
           {scanError && !scan && (
             <View style={[styles.scanErrorCard, { backgroundColor: colors.errorBg, borderColor: colors.errorBorder }]} accessibilityLiveRegion="assertive">
               <Text style={[styles.scanErrorText, { color: colors.text }]}>{scanError}</Text>
@@ -534,7 +543,8 @@ export default function OrderFormScreen() {
           )}
 
           <Text style={[styles.legend, { color: colors.textSecondary }]}>
-            <Text style={{ color: colors.error }}>*</Text> obligatorio · el resto es opcional · los importes marcados como «calculado» no se escriben
+            Los campos con <Text style={{ color: colors.error }}>*</Text> son obligatorios. Los importes marcados como «calculado» se rellenan solos.
+            {DOC_READ_SUPPORTED ? ' Con «Leer documento» puedes rellenarlo desde un PDF o una foto; se lee en tu dispositivo.' : ''}
           </Text>
 
           <View style={isDesktop ? styles.desktopFormRow : undefined}>
@@ -798,7 +808,7 @@ export default function OrderFormScreen() {
             </View>
           </View>
         </ScrollView>
-        <View style={[styles.saveBar, { backgroundColor: colors.headerBackground, borderTopColor: colors.border, paddingBottom: 10 + insets.bottom, paddingHorizontal: pad }]}>
+        <View style={[styles.saveBar, { borderTopColor: colors.divider, paddingBottom: 10 + insets.bottom, paddingHorizontal: pad }, glass(colors.headerBackground, 24)]}>
           <View style={[styles.saveBarInner, { maxWidth: PAGE_MAX - pad * 2 }]}>
             <View style={{ flex: 1, minWidth: 0 }}>
               {showErrors && errorCount > 0 ? (
@@ -813,7 +823,7 @@ export default function OrderFormScreen() {
               )}
             </View>
             <Pressable
-              style={({ pressed }) => [styles.submitBtn, { backgroundColor: colors.primary, opacity: saving ? 0.6 : pressed ? 0.85 : 1 }]}
+              style={({ pressed, hovered }: { pressed: boolean; hovered?: boolean }) => [styles.submitBtn, { backgroundColor: hovered ? colors.primaryDark : colors.primaryFill, opacity: saving ? 0.6 : pressed ? 0.85 : 1 }]}
               onPress={handleSubmit}
               disabled={saving}
               testID="submit-order-btn"
@@ -911,7 +921,7 @@ function FormField({ label, value, onChangeText, placeholder, keyboardType, mult
 function FormSection({ title, subtitle, action, children }: { title: string; subtitle?: string; action?: React.ReactNode; children: React.ReactNode }) {
   const { colors, isDark } = useTheme();
   return (
-    <View style={[formFieldStyles.section, { backgroundColor: colors.surface }, cardShadow(isDark)]}>
+    <View style={formFieldStyles.sectionWrap}>
       <View style={formFieldStyles.sectionHead}>
         <View style={{ flex: 1, minWidth: 0 }}>
           <Text style={[formFieldStyles.sectionTitle, { color: colors.text }]} accessibilityRole="header">
@@ -921,7 +931,7 @@ function FormSection({ title, subtitle, action, children }: { title: string; sub
         </View>
         {action}
       </View>
-      {children}
+      <View style={[formFieldStyles.section, { backgroundColor: colors.surface }, cardShadow(isDark)]}>{children}</View>
     </View>
   );
 }
@@ -991,9 +1001,10 @@ const formFieldStyles = StyleSheet.create({
     marginBottom: 0,
   },
   message: { fontSize: 12, lineHeight: 16, marginTop: 4 },
-  section: { borderRadius: 20, padding: 18, marginBottom: 16 },
-  sectionHead: { flexDirection: 'row', alignItems: 'flex-start', gap: 12, marginBottom: 14, flexWrap: 'wrap' },
-  sectionTitle: { fontSize: 19, fontWeight: '700' as const, letterSpacing: -0.3 },
+  sectionWrap: { marginBottom: 24 },
+  section: { borderRadius: 14, padding: 16, paddingBottom: 4 },
+  sectionHead: { flexDirection: 'row', alignItems: 'flex-end', gap: 12, marginBottom: 8, paddingHorizontal: 4, flexWrap: 'wrap' },
+  sectionTitle: { fontSize: 20, fontWeight: '700' as const, letterSpacing: -0.4 },
   sectionSub: { fontSize: 13, lineHeight: 18, marginTop: 2 },
   halfContainer: {
     flex: 1,
@@ -1345,6 +1356,13 @@ const styles = StyleSheet.create({
   },
   grandTotalValue: { fontSize: 28, fontWeight: '700' as const, color: StaticColors.primary, letterSpacing: -0.8, fontVariant: ['tabular-nums'],
   },
+  topBar: { zIndex: 10, borderBottomWidth: StyleSheet.hairlineWidth },
+  topBarInner: { width: '100%', alignSelf: 'center', height: 52, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 8 },
+  topBtn: { minHeight: 44, paddingHorizontal: 8, justifyContent: 'center', borderRadius: 10 },
+  topBtnText: { fontSize: 17, letterSpacing: -0.3 },
+  topTitle: { position: 'absolute', left: 110, right: 110, textAlign: 'center', fontSize: 17, fontWeight: '600' as const, letterSpacing: -0.3 },
+  scanPill: { flexDirection: 'row', alignItems: 'center', gap: 6, minHeight: 36, minWidth: 44, justifyContent: 'center', paddingHorizontal: 12, borderRadius: 999 },
+  scanPillText: { fontSize: 15, fontWeight: '600' as const, letterSpacing: -0.2 },
   submitBtn: {
     flexDirection: 'row',
     gap: 8,

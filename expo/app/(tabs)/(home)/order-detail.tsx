@@ -1,10 +1,10 @@
 import React, { useCallback, useMemo, useState } from 'react';
 import { Alert, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
-import { Check, ChevronDown, ChevronUp, Copy, MoreHorizontal, Pencil, X } from 'lucide-react-native';
+import { Check, ChevronDown, ChevronLeft, ChevronUp, Copy, MoreHorizontal, Pencil, X } from 'lucide-react-native';
 import * as Haptics from 'expo-haptics';
-import { usePageLayout } from '@/components/Page';
-import { canvas , cardShadow, radius, webInputReset } from '@/constants/theme';
+import { CompactTitleBar, useCollapsingTitle, usePageLayout } from '@/components/Page';
+import { canvas, cardShadow, type, webInputReset } from '@/constants/theme';
 import { useTheme } from '@/contexts/ThemeContext';
 import { useData } from '@/contexts/DataContext';
 import { ThemeColors } from '@/constants/colors';
@@ -22,6 +22,7 @@ export default function OrderDetailScreen() {
   const { orders, deleteOrder, updateOrderField, duplicateOrder } = useData();
   const { colors, isDark } = useTheme();
   const { width, content, bottomSpace } = usePageLayout();
+  const { shown: compactShown, scrollProps } = useCollapsingTitle(90);
   const desktop = width >= 1024;
   const s = useMemo(() => makeStyles(colors), [colors]);
   const order = useMemo(() => orders.find(o => o.id === orderId), [orders, orderId]);
@@ -141,132 +142,110 @@ export default function OrderDetailScreen() {
   ).filter(([, v]) => !!v?.trim());
 
   // ---------------------------------------------------------------- bloques
-  const summary = (
-    <View style={[s.card, s.summary, cardShadow(isDark)]}>
-      <View style={s.summaryTop}>
-        <View style={{ flexGrow: 1, flexBasis: 240, minWidth: 0 }}>
+  const lateTone = late !== null && late > 0;
+  const hasFollowUp = !!(order.expected_date || order.owner || order.next_action);
+
+  const header = (
+    <View style={s.top}>
+      <View style={s.topBar}>
+        <Pressable onPress={goBack} style={({ hovered }: { pressed: boolean; hovered?: boolean }) => [s.backBtn, hovered && { backgroundColor: colors.fill }]} accessibilityRole="button" accessibilityLabel="Volver a Pedidos" testID="detail-back">
+          <ChevronLeft size={24} color={colors.primary} strokeWidth={2.4} />
+          <Text style={s.backText}>Pedidos</Text>
+        </Pressable>
+        <View style={s.topActions}>
+          <Pressable onPress={handleDuplicate} style={({ pressed, hovered }: { pressed: boolean; hovered?: boolean }) => [s.roundBtn, (hovered || pressed) && { backgroundColor: colors.primarySoftAlt }]} accessibilityRole="button" accessibilityLabel="Duplicar pedido" testID="duplicate-order-btn">
+            <Copy size={18} color={colors.primary} />
+          </Pressable>
+          <Pressable onPress={() => setSheet('more')} style={({ pressed, hovered }: { pressed: boolean; hovered?: boolean }) => [s.roundBtn, (hovered || pressed) && { backgroundColor: colors.primarySoftAlt }]} accessibilityRole="button" accessibilityLabel="Más acciones" testID="more-actions-btn">
+            <MoreHorizontal size={20} color={colors.primary} />
+          </Pressable>
+        </View>
+      </View>
+
+      <View style={s.hero}>
+        <View style={{ flexGrow: 1, flexBasis: 260, minWidth: 0 }}>
           <Text style={s.caption}>Referencia</Text>
-          <Text style={s.ref} selectable>
+          <Text style={s.ref} selectable accessibilityRole="header">
             {order.reference_number}
           </Text>
-          {editingRef ? (
-            <View style={s.refEditRow}>
-              <TextInput
-                value={refValue}
-                onChangeText={setRefValue}
-                placeholder="Referencia manual"
-                placeholderTextColor={colors.textTertiary}
-                style={s.refInput}
-                autoFocus
-                onSubmitEditing={saveRef}
-                returnKeyType="done"
-                accessibilityLabel="Referencia manual"
-              />
-              <Pressable onPress={saveRef} disabled={busy} style={[s.iconBtn, { backgroundColor: colors.primary }]} accessibilityLabel="Guardar referencia manual">
-                <Check size={18} color="#fff" />
-              </Pressable>
-              <Pressable onPress={() => setEditingRef(false)} style={[s.iconBtn, { backgroundColor: colors.fill }]} accessibilityLabel="Cancelar">
-                <X size={18} color={colors.text} />
-              </Pressable>
-            </View>
-          ) : (
+          <View style={s.heroMeta}>
             <Pressable
-              onPress={() => {
-                setRefValue(order.custom_reference || '');
-                setEditingRef(true);
-              }}
-              style={({ hovered }: { pressed: boolean; hovered?: boolean }) => [s.refManual, hovered && { backgroundColor: colors.fill }]}
+              onPress={() => setSheet('status')}
+              disabled={busy}
+              style={({ hovered }: { pressed: boolean; hovered?: boolean }) => [s.statusBtn, hovered && { opacity: 0.85 }]}
               accessibilityRole="button"
-              accessibilityLabel="Editar referencia manual"
+              accessibilityLabel={`Estado: ${statusConfig[order.status].label}. Cambiar estado`}
+              testID="change-status"
             >
-              <Text style={s.muted}>
-                Ref. manual: <Text style={{ color: colors.text }}>{order.custom_reference || '—'}</Text>
-              </Text>
-              <Pencil size={13} color={colors.textSecondary} />
+              <StatusBadge status={order.status} />
+              <ChevronDown size={15} color={colors.textSecondary} />
             </Pressable>
-          )}
+            <Text style={s.heroSub} numberOfLines={1}>
+              {order.manufacturer_name} · {order.year}
+            </Text>
+          </View>
         </View>
         <View style={s.totalBox}>
-          <Text style={s.caption}>Total con IVA</Text>
-          <Text style={s.total} accessibilityLabel={`Total ${formatCurrency(order.total_with_vat)}`}>
+          <Text style={[s.caption, desktop && { textAlign: 'right' }]}>Total con IVA</Text>
+          <Text style={[s.total, desktop && { textAlign: 'right' }]} accessibilityLabel={`Total ${formatCurrency(order.total_with_vat)}`}>
             {formatCurrency(order.total_with_vat)}
           </Text>
         </View>
       </View>
 
-      <View style={s.statusRow}>
-        <StatusBadge status={order.status} />
-        <Pressable onPress={() => setSheet('status')} disabled={busy} style={({ hovered }: { pressed: boolean; hovered?: boolean }) => [s.linkBtn, hovered && { backgroundColor: colors.fill }]} accessibilityRole="button" accessibilityLabel="Cambiar estado" testID="change-status">
-          <Text style={s.link}>Cambiar estado</Text>
-          <ChevronDown size={14} color={colors.primary} />
-        </Pressable>
-      </View>
-
-      <View style={s.metaGrid}>
-        <Meta s={s} label="Fabricante" value={`${order.manufacturer_name} (${order.manufacturer_code})`} />
-        <Meta s={s} label="Año" value={String(order.year)} />
-        <Meta s={s} label="Creado" value={formatDate(order.created_at)} />
-        <Meta s={s} label="Última actualización" value={formatDate(order.updated_at)} />
-      </View>
-
-      <View style={[s.follow, late !== null && late > 0 && { backgroundColor: colors.errorBg, borderColor: colors.errorBorder }]}>
-        <Text style={s.caption}>Seguimiento</Text>
-        {order.expected_date || order.owner || order.next_action ? (
-          <View style={s.followGrid}>
-            <Meta s={s} label="Fecha prevista" value={order.expected_date ? `${formatISODate(order.expected_date)}${late !== null ? (late > 0 ? ` · ${late} día${late === 1 ? '' : 's'} de retraso` : ' · es hoy') : ''}` : '—'} tone={late !== null && late > 0 ? colors.error : undefined} />
-            <Meta s={s} label="Responsable" value={order.owner || '—'} />
-            <View style={[s.meta, { flexBasis: '100%' }]}>
-              <Text style={s.caption}>Siguiente acción</Text>
-              <Text style={s.metaValue}>{order.next_action || '—'}</Text>
-            </View>
-          </View>
-        ) : (
-          <Text style={[s.muted, { marginTop: 2 }]}>Sin fecha prevista, responsable ni siguiente acción. Puedes añadirlos en «Editar pedido».</Text>
-        )}
-      </View>
-
       <View style={s.actions}>
-        <Pressable onPress={handleEdit} style={({ pressed, hovered }: { pressed: boolean; hovered?: boolean }) => [s.btn, { backgroundColor: hovered ? colors.primaryDark : colors.primary, opacity: pressed ? 0.85 : 1 }]} accessibilityRole="button" testID="edit-order-btn">
+        <Pressable onPress={handleEdit} style={({ pressed, hovered }: { pressed: boolean; hovered?: boolean }) => [s.btn, { backgroundColor: hovered ? colors.primaryDark : colors.primaryFill, opacity: pressed ? 0.85 : 1 }]} accessibilityRole="button" testID="edit-order-btn">
           <Pencil size={16} color="#fff" />
           <Text style={[s.btnText, { color: '#fff' }]}>Editar pedido</Text>
         </Pressable>
-        <Pressable onPress={handleDuplicate} style={({ pressed }) => [s.btn, s.btnSecondary, width < 480 && s.btnIcon, { opacity: pressed ? 0.7 : 1 }]} accessibilityRole="button" accessibilityLabel="Duplicar pedido" testID="duplicate-order-btn">
-          <Copy size={16} color={colors.text} />
-          {width >= 480 && <Text style={[s.btnText, { color: colors.text }]}>Duplicar</Text>}
-        </Pressable>
-        <Pressable onPress={() => setSheet('more')} style={({ pressed }) => [s.btn, s.btnSecondary, s.btnIcon, { opacity: pressed ? 0.7 : 1 }]} accessibilityRole="button" accessibilityLabel="Más acciones" testID="more-actions-btn">
-          <MoreHorizontal size={18} color={colors.text} />
-        </Pressable>
       </View>
     </View>
   );
 
-  const finance = (
-    <View style={[s.card, s.finance, { backgroundColor: colors.heroTile }]}>
-      <Text style={[s.sectionTitleDark]}>Resumen económico</Text>
-      <FinRow s={s} label="Productos (sin IVA)" value={order.total_ex_vat} />
-      <FinRow s={s} label="IVA de los productos" value={order.total_vat} />
-      {shipTotal > 0 && <FinRow s={s} label="Gastos de envío (con IVA)" value={shipTotal} />}
-      {order.shipping_cost > 0 && <FinRow s={s} label="Envío extra (importe fijo)" value={order.shipping_cost} />}
-      <View style={s.finTotalRow}>
-        <Text style={s.finTotalLabel}>Total</Text>
-        <Text style={s.finTotal}>{formatCurrency(order.total_with_vat)}</Text>
+  const section = (title: string, body: React.ReactNode, opts: { trailing?: React.ReactNode; footer?: string } = {}) => (
+    <View style={s.section}>
+      <View style={s.sectionHead}>
+        <Text style={s.sectionTitle} accessibilityRole="header">{title}</Text>
+        {opts.trailing}
       </View>
-      {hasCost && (
-        <Text style={s.finNote}>
-          Beneficio bruto de los productos: <Text style={{ color: profit >= 0 ? '#7EE2A0' : '#FF8A80', fontWeight: '600' }}>{formatCurrency(profit)}</Text> (venta sin IVA − coste)
-        </Text>
-      )}
+      <View style={[s.card, cardShadow(isDark)]}>{body}</View>
+      {!!opts.footer && <Text style={s.footer}>{opts.footer}</Text>}
     </View>
   );
 
-  const products = (
-    <View style={[s.card, cardShadow(isDark)]}>
-      <View style={s.cardHead}>
-        <Text style={s.sectionTitle}>Productos · {order.items.length}</Text>
+  const followUp = section(
+    'Seguimiento',
+    order.expected_date || order.owner || order.next_action ? (
+      <>
+        <Row s={s} first label="Fecha prevista" value={order.expected_date ? `${formatISODate(order.expected_date)}${late !== null ? (late > 0 ? ` · ${late} día${late === 1 ? '' : 's'} de retraso` : ' · es hoy') : ''}` : '—'} tone={lateTone ? colors.error : undefined} />
+        <Row s={s} label="Responsable" value={order.owner || '—'} />
+        <Row s={s} label="Siguiente acción" value={order.next_action || '—'} stacked />
+      </>
+    ) : (
+      <Text style={[s.muted, s.pad]}>Sin fecha prevista, responsable ni siguiente acción. Puedes añadirlos en «Editar pedido».</Text>
+    ),
+  );
+
+  const finance = section(
+    'Resumen económico',
+    <>
+      <Row s={s} first label="Productos (sin IVA)" value={formatCurrency(order.total_ex_vat)} num />
+      <Row s={s} label="IVA de los productos" value={formatCurrency(order.total_vat)} num />
+      {shipTotal > 0 && <Row s={s} label="Gastos de envío (con IVA)" value={formatCurrency(shipTotal)} num />}
+      {order.shipping_cost > 0 && <Row s={s} label="Envío extra (importe fijo)" value={formatCurrency(order.shipping_cost)} num />}
+      <View style={[s.row, s.rowSep, s.totalRow]}>
+        <Text style={s.totalRowLabel}>Total</Text>
+        <Text style={s.totalRowValue}>{formatCurrency(order.total_with_vat)}</Text>
       </View>
+    </>,
+    { footer: hasCost ? `Beneficio bruto de los productos: ${formatCurrency(profit)} (venta sin IVA − coste).` : undefined },
+  );
+
+  const products = section(
+    `Productos`,
+    <>
       {order.items.map((it, i) => (
-        <View key={i} style={[s.item, i > 0 && s.rowBorder]}>
+        <View key={i} style={[s.item, i > 0 && s.rowSep]}>
           <View style={s.itemTop}>
             <Text style={s.itemName} selectable>
               {it.product_name || 'Sin nombre'}
@@ -285,16 +264,15 @@ export default function OrderDetailScreen() {
           </View>
         </View>
       ))}
-    </View>
+    </>,
+    { trailing: <Text style={s.sectionCount}>{order.items.length}</Text> },
   );
 
-  const shipping = shipLines.length > 0 && (
-    <View style={[s.card, cardShadow(isDark)]}>
-      <View style={s.cardHead}>
-        <Text style={s.sectionTitle}>Gastos de envío · {shipLines.length}</Text>
-      </View>
+  const shipping = shipLines.length > 0 && section(
+    'Gastos de envío',
+    <>
       {shipLines.map((x, i) => (
-        <View key={i} style={[s.item, i > 0 && s.rowBorder]}>
+        <View key={i} style={[s.item, i > 0 && s.rowSep]}>
           <View style={s.itemTop}>
             <Text style={s.itemName}>{x.description || 'Envío'}</Text>
             <Text style={s.itemTotal}>{formatCurrency(x.valor_con_iva)}</Text>
@@ -304,31 +282,35 @@ export default function OrderDetailScreen() {
           </Text>
         </View>
       ))}
-    </View>
+    </>,
+    { trailing: <Text style={s.sectionCount}>{shipLines.length}</Text> },
   );
 
+  /** Sección plegable en móvil (en ordenador siempre abierta) */
   const collapsible = (title: string, open: boolean, setOpen: (v: boolean) => void, preview: string, body: React.ReactNode) => {
     const isOpen = desktop || open;
     return (
-      <View style={[s.card, cardShadow(isDark)]}>
-        <Pressable
-          onPress={() => !desktop && setOpen(!open)}
-          disabled={desktop}
-          style={s.cardHeadPress}
-          accessibilityRole={desktop ? 'header' : 'button'}
-          accessibilityState={desktop ? undefined : { expanded: isOpen }}
-        >
-          <View style={{ flex: 1, minWidth: 0 }}>
-            <Text style={s.sectionTitle}>{title}</Text>
-            {!isOpen && !!preview && (
-              <Text style={s.preview} numberOfLines={1}>
-                {preview}
+      <View style={s.section}>
+        <View style={s.sectionHead}>
+          <Text style={s.sectionTitle} accessibilityRole="header">{title}</Text>
+        </View>
+        <View style={[s.card, cardShadow(isDark)]}>
+          {!desktop && (
+            <Pressable
+              onPress={() => setOpen(!open)}
+              style={({ hovered }: { pressed: boolean; hovered?: boolean }) => [s.row, hovered && { backgroundColor: colors.fill }]}
+              accessibilityRole="button"
+              accessibilityState={{ expanded: isOpen }}
+              accessibilityLabel={`${isOpen ? 'Ocultar' : 'Mostrar'} ${title.toLowerCase()}`}
+            >
+              <Text style={[s.rowValue, { flex: 1, textAlign: 'left', color: isOpen ? colors.textSecondary : colors.text }]} numberOfLines={1}>
+                {isOpen ? 'Ocultar' : preview}
               </Text>
-            )}
-          </View>
-          {!desktop && (isOpen ? <ChevronUp size={18} color={colors.textSecondary} /> : <ChevronDown size={18} color={colors.textSecondary} />)}
-        </Pressable>
-        {isOpen && body}
+              {isOpen ? <ChevronUp size={18} color={colors.textSecondary} /> : <ChevronDown size={18} color={colors.textSecondary} />}
+            </Pressable>
+          )}
+          {isOpen && <View style={!desktop ? s.rowSep : undefined}>{body}</View>}
+        </View>
       </View>
     );
   };
@@ -338,14 +320,14 @@ export default function OrderDetailScreen() {
     openClient,
     setOpenClient,
     [c.nombre_empresa, c.contacto].filter(Boolean).join(' · ') || 'Sin datos',
-    <View style={s.fields}>
-      <Field s={s} label="Empresa" value={c.nombre_empresa} />
-      <Field s={s} label="NIF" value={c.nif} />
-      <Field s={s} label="Contacto" value={[c.contacto, c.departamento].filter(Boolean).join(' · ')} />
-      <Field s={s} label="Dirección" value={[c.direccion_1, c.direccion_2, [c.codigo_postal, c.provincia].filter(Boolean).join(' '), c.pais].filter(Boolean).join('\n')} />
-      <Field s={s} label="Teléfono" value={[c.telefono_1, c.telefono_2].filter(Boolean).join(' · ')} />
-      <Field s={s} label="Email" value={c.email} />
-    </View>,
+    <>
+      <Row s={s} first label="Empresa" value={c.nombre_empresa || '—'} />
+      <Row s={s} label="NIF" value={c.nif || '—'} />
+      <Row s={s} label="Contacto" value={[c.contacto, c.departamento].filter(Boolean).join(' · ') || '—'} />
+      <Row s={s} label="Dirección" value={[c.direccion_1, c.direccion_2, [c.codigo_postal, c.provincia].filter(Boolean).join(' '), c.pais].filter(Boolean).join('\n') || '—'} stacked />
+      <Row s={s} label="Teléfono" value={[c.telefono_1, c.telefono_2].filter(Boolean).join(' · ') || '—'} />
+      <Row s={s} label="Email" value={c.email || '—'} />
+    </>,
   );
 
   const documents = collapsible(
@@ -354,40 +336,94 @@ export default function OrderDetailScreen() {
     setOpenDocs,
     docs.length ? docs.map(([k, v]) => `${k}: ${v}`).join(' · ') : 'Sin datos',
     docs.length ? (
-      <View style={s.fields}>
-        {docs.map(([k, v]) => (
-          <Field key={k} s={s} label={k} value={v} />
+      <>
+        {docs.map(([k, v], i) => (
+          <Row key={k} s={s} first={i === 0} label={k} value={v} />
         ))}
-      </View>
+      </>
     ) : (
-      <Text style={[s.muted, { paddingHorizontal: 16, paddingBottom: 16 }]}>No hay documentos ni condiciones en este pedido.</Text>
+      <Text style={[s.muted, s.pad]}>No hay documentos ni condiciones en este pedido.</Text>
     ),
+  );
+
+  const info = section(
+    'Datos del pedido',
+    <>
+      <Row s={s} first label="Fabricante" value={`${order.manufacturer_name} (${order.manufacturer_code})`} />
+      <Row s={s} label="Año" value={String(order.year)} />
+      <Pressable
+        onPress={() => {
+          setRefValue(order.custom_reference || '');
+          setEditingRef(true);
+        }}
+        style={({ hovered }: { pressed: boolean; hovered?: boolean }) => [s.row, s.rowSep, hovered && !editingRef && { backgroundColor: colors.fill }]}
+        disabled={editingRef}
+        accessibilityRole="button"
+        accessibilityLabel="Editar referencia manual"
+      >
+        <Text style={s.rowLabel}>Ref. manual</Text>
+        {editingRef ? (
+          <View style={s.refEditRow}>
+            <TextInput
+              value={refValue}
+              onChangeText={setRefValue}
+              placeholder="Referencia manual"
+              placeholderTextColor={colors.textTertiary}
+              style={s.refInput}
+              autoFocus
+              onSubmitEditing={saveRef}
+              returnKeyType="done"
+              accessibilityLabel="Referencia manual"
+            />
+            <Pressable onPress={saveRef} disabled={busy} style={[s.iconBtn, { backgroundColor: colors.primaryFill }]} accessibilityLabel="Guardar referencia manual">
+              <Check size={18} color="#fff" />
+            </Pressable>
+            <Pressable onPress={() => setEditingRef(false)} style={[s.iconBtn, { backgroundColor: colors.fill }]} accessibilityLabel="Cancelar">
+              <X size={18} color={colors.text} />
+            </Pressable>
+          </View>
+        ) : (
+          <View style={s.rowRight}>
+            <Text style={s.rowValue}>{order.custom_reference || '—'}</Text>
+            <Pencil size={14} color={colors.textSecondary} />
+          </View>
+        )}
+      </Pressable>
+      <Row s={s} label="Creado" value={formatDate(order.created_at)} />
+      <Row s={s} label="Última actualización" value={formatDate(order.updated_at)} />
+    </>,
   );
 
   return (
     <View style={s.root}>
-      <Stack.Screen options={{ title: order.reference_number }} />
-      <ScrollView contentContainerStyle={[s.content, content, { paddingBottom: bottomSpace }]}>
-        {summary}
+      <Stack.Screen options={{ title: order.reference_number, headerShown: false }} />
+      <CompactTitleBar title={order.reference_number} shown={compactShown} />
+      <ScrollView {...scrollProps} contentContainerStyle={[s.content, content, { paddingBottom: bottomSpace }]}>
+        {header}
         {desktop ? (
           <View style={s.cols}>
             <View style={s.colMain}>
               {products}
               {shipping}
+              {client}
+              {documents}
             </View>
             <View style={s.colSide}>
               {finance}
-              {client}
-              {documents}
+              {followUp}
+              {info}
             </View>
           </View>
         ) : (
           <>
-            {finance}
+            {hasFollowUp && followUp}
             {products}
             {shipping}
+            {finance}
+            {!hasFollowUp && followUp}
             {client}
             {documents}
+            {info}
           </>
         )}
       </ScrollView>
@@ -421,11 +457,13 @@ export default function OrderDetailScreen() {
   );
 }
 
-function Meta({ s, label, value, tone }: { s: Styles; label: string; value: string; tone?: string }) {
+function Row({ s, label, value, tone, first, num, stacked }: { s: Styles; label: string; value: string; tone?: string; first?: boolean; num?: boolean; stacked?: boolean }) {
   return (
-    <View style={s.meta}>
-      <Text style={s.caption}>{label}</Text>
-      <Text style={[s.metaValue, tone ? { color: tone, fontWeight: '600' } : null]}>{value}</Text>
+    <View style={[s.row, !first && s.rowSep, stacked && s.rowStacked]}>
+      <Text style={s.rowLabel}>{label}</Text>
+      <Text style={[s.rowValue, stacked && { textAlign: 'left' }, num && { fontVariant: ['tabular-nums'] }, tone ? { color: tone, fontWeight: '600' } : null]} selectable>
+        {value}
+      </Text>
     </View>
   );
 }
@@ -439,87 +477,65 @@ function Mini({ s, label, value, tone }: { s: Styles; label: string; value: stri
   );
 }
 
-function FinRow({ s, label, value }: { s: Styles; label: string; value: number }) {
-  return (
-    <View style={s.finRow}>
-      <Text style={s.finLabel}>{label}</Text>
-      <Text style={s.finValue}>{formatCurrency(value)}</Text>
-    </View>
-  );
-}
-
-function Field({ s, label, value }: { s: Styles; label: string; value?: string }) {
-  return (
-    <View style={s.field}>
-      <Text style={s.caption}>{label}</Text>
-      <Text style={[s.fieldValue, !value && { color: s.muted.color as string }]} selectable>
-        {value || '—'}
-      </Text>
-    </View>
-  );
-}
-
 type Styles = ReturnType<typeof makeStyles>;
 
 function makeStyles(c: ThemeColors) {
   return StyleSheet.create({
     root: { flex: 1, backgroundColor: canvas(c) },
     center: { alignItems: 'center', justifyContent: 'center', padding: 24 },
-    content: { padding: 16, gap: 16, width: '100%', alignSelf: 'center', paddingBottom: 48 },
-    cols: { flexDirection: 'row', gap: 16, alignItems: 'flex-start' },
-    colMain: { flex: 1.65, gap: 16, minWidth: 0 },
-    colSide: { flex: 1, gap: 16, minWidth: 0 },
-    card: { backgroundColor: c.surface, borderRadius: radius.lg, overflow: 'hidden' },
-    summary: { padding: 20, gap: 16 },
-    summaryTop: { flexDirection: 'row', flexWrap: 'wrap', gap: 16, alignItems: 'flex-start' },
-    caption: { fontSize: 12, fontWeight: '500', color: c.textSecondary, letterSpacing: 0.1 },
-    ref: { fontSize: 26, fontWeight: '700', color: c.text, letterSpacing: -0.5, marginTop: 2, fontVariant: ['tabular-nums'] },
-    refManual: { flexDirection: 'row', alignItems: 'center', gap: 6, alignSelf: 'flex-start', marginTop: 4, paddingVertical: 4, paddingHorizontal: 6, marginLeft: -6, borderRadius: 8, minHeight: 32 },
-    refEditRow: { flexDirection: 'row', gap: 8, alignItems: 'center', marginTop: 8 },
-    refInput: { flex: 1, minWidth: 0, height: 40, borderRadius: radius.sm, backgroundColor: c.fill, paddingHorizontal: 12, fontSize: 15, color: c.text, borderWidth: 1, borderColor: c.primary, ...webInputReset },
-    iconBtn: { width: 40, height: 40, borderRadius: radius.sm, alignItems: 'center', justifyContent: 'center' },
+    content: { gap: 24, width: '100%', alignSelf: 'center', paddingBottom: 48 },
+    cols: { flexDirection: 'row', gap: 24, alignItems: 'flex-start' },
+    colMain: { flex: 1.6, gap: 24, minWidth: 0 },
+    colSide: { flex: 1, gap: 24, minWidth: 0 },
+    // cabecera
+    top: { gap: 14 },
+    topBar: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingTop: 10, marginLeft: -8 },
+    backBtn: { flexDirection: 'row', alignItems: 'center', minHeight: 44, paddingRight: 10, paddingLeft: 2, borderRadius: 10 },
+    backText: { fontSize: 17, color: c.primary, letterSpacing: -0.3 },
+    topActions: { flexDirection: 'row', gap: 10 },
+    roundBtn: { width: 44, height: 44, borderRadius: 22, alignItems: 'center', justifyContent: 'center', backgroundColor: c.primarySoft },
+    hero: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'flex-end', gap: 12 },
+    caption: { fontSize: 13, fontWeight: '500', color: c.textSecondary },
+    ref: { ...type.largeTitle, color: c.text, fontVariant: ['tabular-nums'] },
+    heroMeta: { flexDirection: 'row', alignItems: 'center', gap: 10, marginTop: 8, flexWrap: 'wrap' },
+    statusBtn: { flexDirection: 'row', alignItems: 'center', gap: 4, minHeight: 44 },
+    heroSub: { fontSize: 15, color: c.textSecondary, flexShrink: 1 },
     totalBox: { alignItems: 'flex-start' },
-    total: { fontSize: 28, fontWeight: '700', color: c.text, letterSpacing: -0.6, fontVariant: ['tabular-nums'], marginTop: 2 },
-    statusRow: { flexDirection: 'row', alignItems: 'center', gap: 8, flexWrap: 'wrap' },
-    linkBtn: { flexDirection: 'row', alignItems: 'center', gap: 4, minHeight: 36, paddingHorizontal: 8, borderRadius: 8 },
-    link: { fontSize: 14, color: c.primary, fontWeight: '600' },
-    metaGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 12, paddingTop: 12, borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: c.divider },
-    meta: { flexGrow: 1, flexBasis: 150, minWidth: 0 },
-    metaValue: { fontSize: 15, color: c.text, marginTop: 2 },
+    total: { fontSize: 30, fontWeight: '700', color: c.text, letterSpacing: -0.7, fontVariant: ['tabular-nums'], marginTop: 2 },
     actions: { flexDirection: 'row', gap: 8, flexWrap: 'wrap' },
-    follow: { borderRadius: radius.md, padding: 12, backgroundColor: c.surfaceAlt, borderWidth: 1, borderColor: 'transparent' },
-    followGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 12, marginTop: 6 },
-    btn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, minHeight: 44, paddingHorizontal: 16, borderRadius: radius.pill },
+    btn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, minHeight: 44, paddingHorizontal: 18, borderRadius: 999 },
     btnSecondary: { backgroundColor: c.fill },
-    btnIcon: { width: 44, paddingHorizontal: 0 },
     btnText: { fontSize: 15, fontWeight: '600' },
-    finance: { padding: 20, gap: 10 },
-    sectionTitleDark: { fontSize: 13, fontWeight: '600', color: c.heroTileTextSecondary, textTransform: 'uppercase', letterSpacing: 0.4, marginBottom: 4 },
-    finRow: { flexDirection: 'row', justifyContent: 'space-between', gap: 12 },
-    finLabel: { fontSize: 15, color: c.heroTileTextSecondary, flex: 1 },
-    finValue: { fontSize: 15, color: c.heroTileText, fontVariant: ['tabular-nums'] },
-    finTotalRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'baseline', marginTop: 6, paddingTop: 12, borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: 'rgba(255,255,255,0.18)' },
-    finTotalLabel: { fontSize: 17, fontWeight: '600', color: c.heroTileText },
-    finTotal: { fontSize: 26, fontWeight: '700', color: c.heroTileText, fontVariant: ['tabular-nums'], letterSpacing: -0.5 },
-    finNote: { fontSize: 13, color: c.heroTileTextSecondary, marginTop: 4, lineHeight: 18 },
-    cardHead: { paddingHorizontal: 16, paddingTop: 16, paddingBottom: 8 },
-    cardHeadPress: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 16, paddingVertical: 14, minHeight: 52 },
-    sectionTitle: { fontSize: 13, fontWeight: '600', color: c.textSecondary, textTransform: 'uppercase', letterSpacing: 0.4 },
-    preview: { fontSize: 15, color: c.text, marginTop: 4 },
+    // secciones agrupadas (como Ajustes de iOS)
+    section: { gap: 8 },
+    sectionHead: { flexDirection: 'row', alignItems: 'baseline', gap: 8, paddingHorizontal: 4 },
+    sectionTitle: { fontSize: 20, fontWeight: '700', color: c.text, letterSpacing: -0.4 },
+    sectionCount: { fontSize: 20, color: c.textSecondary },
+    footer: { fontSize: 13, color: c.textSecondary, lineHeight: 18, paddingHorizontal: 16 },
+    card: { backgroundColor: c.surface, borderRadius: 14, overflow: 'hidden' },
+    pad: { padding: 16 },
+    row: { flexDirection: 'row', alignItems: 'center', gap: 12, minHeight: 48, paddingHorizontal: 16, paddingVertical: 11 },
+    rowStacked: { flexDirection: 'column', alignItems: 'flex-start', gap: 2 },
+    rowSep: { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: c.divider },
+    rowLabel: { fontSize: 15, color: c.textSecondary, letterSpacing: -0.2 },
+    rowValue: { flex: 1, minWidth: 0, fontSize: 16, color: c.text, textAlign: 'right', letterSpacing: -0.2, lineHeight: 21 },
+    rowRight: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'flex-end', gap: 8, minWidth: 0 },
+    totalRow: { minHeight: 56 },
+    totalRowLabel: { flex: 1, fontSize: 17, fontWeight: '600', color: c.text },
+    totalRowValue: { fontSize: 22, fontWeight: '700', color: c.text, letterSpacing: -0.4, fontVariant: ['tabular-nums'] },
+    refEditRow: { flex: 1, flexDirection: 'row', gap: 8, alignItems: 'center' },
+    refInput: { flex: 1, minWidth: 0, height: 40, borderRadius: 10, backgroundColor: c.fill, paddingHorizontal: 12, fontSize: 16, color: c.text, borderWidth: 2, borderColor: c.primary, ...webInputReset },
+    iconBtn: { width: 40, height: 40, borderRadius: 20, alignItems: 'center', justifyContent: 'center' },
+    // productos
     item: { paddingHorizontal: 16, paddingVertical: 14, gap: 4 },
-    rowBorder: { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: c.divider },
     itemTop: { flexDirection: 'row', gap: 12, alignItems: 'flex-start' },
-    itemName: { flex: 1, minWidth: 0, fontSize: 16, fontWeight: '500', color: c.text, lineHeight: 21 },
+    itemName: { flex: 1, minWidth: 0, fontSize: 16, fontWeight: '600', color: c.text, lineHeight: 21, letterSpacing: -0.2 },
     itemTotal: { fontSize: 16, fontWeight: '600', color: c.text, fontVariant: ['tabular-nums'] },
     itemGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 8 },
-    mini: { backgroundColor: c.fill, borderRadius: 8, paddingHorizontal: 10, paddingVertical: 6, flexGrow: 1, flexBasis: 120 },
-    miniLabel: { fontSize: 11, color: c.textSecondary },
+    mini: { backgroundColor: c.fill, borderRadius: 10, paddingHorizontal: 10, paddingVertical: 6, flexGrow: 1, flexBasis: 120 },
+    miniLabel: { fontSize: 12, color: c.textSecondary },
     miniValue: { fontSize: 14, color: c.text, fontWeight: '500', fontVariant: ['tabular-nums'], marginTop: 1 },
-    fields: { paddingHorizontal: 16, paddingBottom: 8 },
-    field: { paddingVertical: 10, borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: c.divider },
-    fieldValue: { fontSize: 15, color: c.text, marginTop: 2, lineHeight: 21 },
     muted: { fontSize: 13, color: c.textSecondary, lineHeight: 18 },
     h2: { fontSize: 20, fontWeight: '600', color: c.text, marginBottom: 6 },
   });
 }
-
