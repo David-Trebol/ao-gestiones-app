@@ -14,8 +14,8 @@ Diagnóstico: la app funciona y los datos son correctos, pero su estructura era 
 - [x] RPC `public.keepalive()` creada en Supabase (no lee ni escribe datos).
 - [ ] **Algo que la llame cada 3 días** para que el plan gratis no pause la base de datos. Propuesta preparada: workflow de GitHub Actions (`POST /rest/v1/rpc/keepalive` con la clave publicable). **Necesita la aprobación del propietario**; alternativa: plan Pro de Supabase (~25 $/mes).
 - [x] Exportar a Excel: `expo/utils/exportExcel.ts` (hojas Pedidos, Líneas, Envíos, Fabricantes; importes con formato €). Botón «Excel» en la lista de Pedidos (exporta lo filtrado). *En la rama.*
-- [ ] Ajustes → «Descargar copia completa (Excel)».
-- [ ] «Eliminar todos los datos»: ofrecer la descarga antes y pedir escribir `ELIMINAR` (modal propio; `Alert` no admite texto).
+- [x] Ajustes → «Descargar copia completa» (Excel con pedidos, líneas, envíos y fabricantes).
+- [x] «Eliminar todos los datos»: ventana propia que ofrece descargar la copia antes y solo se activa al escribir `ELIMINAR`.
 - [ ] Comprobar en el panel de Supabase (Auth → URL Configuration) que el Site URL es `https://ao-gestiones-pedidos.vercel.app` para el correo de recuperar contraseña. Activar la protección de contraseñas filtradas.
 - [ ] Idioma: `document.documentElement.lang = 'es'` (la web se sirve con `lang="en"`); hacerlo en `components/WebGlobalStyles.tsx`.
 
@@ -53,11 +53,13 @@ Pedido del propietario el 16/11/2026: estética de Apple (tipografía, colores, 
 
 ## Fase 2 · Pantalla por pantalla
 
-- [x] Pedidos (rama): contadores compactos que filtran, aviso de atención en una línea que filtra la lista (con «Ver retrasados»), la lista visible desde la primera pantalla, tabla desde 1.100 px y tarjetas en 1 o 2 columnas.
+- [x] Pedidos: contadores compactos que filtran, aviso de atención en una línea que filtra la lista (con «Ver retrasados»), la lista visible desde la primera pantalla, tabla desde 1.100 px y tarjetas en 1 o 2 columnas.
 - [ ] Ficha: cabecera compacta (referencia, estado, total y acciones en dos líneas); en móvil los productos deben verse en la primera pantalla.
-- [ ] Formulario: fabricante en desplegable con buscador (con muchos fabricantes los botones apilados no escalan; ampliar `SelectSheet` con búsqueda); «Leer documento» como botón compacto; un solo botón de guardar (quitar el de la cabecera); secciones plegables en móvil; versión compacta en horizontal (844×390).
-- [ ] Fabricantes: tabla en ordenador; acciones con nombre en un menú «…» (ahora 4 iconos sin texto de 30 px).
-- [ ] Ajustes: perfil → apariencia → resumen → usuarios → datos (copia y borrado) → salir al final. Quitar la tarjeta «Estado de pedidos» (solo remite al inicio) y la de «Plataforma». «Facturación total» sin pedidos cancelados (hoy los suma).
+- [x] Formulario: fabricante en un selector con buscador (`SelectSheet searchable`, sin acentos); «Leer documento» en la barra superior; un solo botón de guardar.
+- [ ] Formulario: secciones plegables en móvil; versión compacta en horizontal (844×390).
+- [x] Fabricantes: tabla en ordenador, lista agrupada en móvil; tocar la fila edita; acciones con nombre en el menú «…».
+- [x] Ajustes como Ajustes de iOS: perfil → apariencia → resumen → usuarios → cuenta → datos → cerrar sesión. Fuera «Estado de pedidos» y «Plataforma».
+- [ ] «Facturación total» sigue sumando los cancelados: cambiarlo **necesita el visto bueno del propietario** (cambia lo que significa la cifra).
 - [ ] Entrar (`app/login.tsx`): mismo estilo claro que la app; quitar «Análisis · Métricas en vivo» y similares, que no existen. Mantener alta del primer admin, recuperar contraseña y mostrar/ocultar contraseña.
 
 ## Fase 3 · Acabado y accesibilidad

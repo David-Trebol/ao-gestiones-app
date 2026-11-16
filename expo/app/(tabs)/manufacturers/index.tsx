@@ -12,42 +12,23 @@ import {
   Animated,
   Easing,
 } from 'react-native';
-import { Building2, Plus, Edit3, Trash2, Calendar, Check, Copy } from 'lucide-react-native';
+import { Building2, Plus, Check, MoreHorizontal } from 'lucide-react-native';
 import { PageHeader, usePageLayout } from '@/components/Page';
 import Button from '@/components/Button';
 import { canvas , webInputReset } from '@/constants/theme';
+import SelectSheet from '@/components/SelectSheet';
+import { SystemTint } from '@/constants/colors';
 import { useTheme } from '@/contexts/ThemeContext';
 import { useData } from '@/contexts/DataContext';
 import { Manufacturer } from '@/types';
 import * as Haptics from 'expo-haptics';
 
-function AnimatedManufacturerCard({ index, children }: { index: number; children: React.ReactNode }) {
-  const anim = useRef(new Animated.Value(0)).current;
-  const slideX = useRef(new Animated.Value(12)).current;
-  const scaleVal = useRef(new Animated.Value(0.96)).current;
-
-  useEffect(() => {
-    const delay = Math.min(index * 90, 450);
-    Animated.parallel([
-      Animated.spring(anim, { toValue: 1, friction: 5, tension: 40, delay, useNativeDriver: NATIVE_DRIVER }),
-      Animated.spring(slideX, { toValue: 0, friction: 5, tension: 40, delay, useNativeDriver: NATIVE_DRIVER }),
-      Animated.spring(scaleVal, { toValue: 1, friction: 4, tension: 50, delay, useNativeDriver: NATIVE_DRIVER }),
-    ]).start();
-  }, [anim, index, scaleVal, slideX]);
-
-  return (
-    <Animated.View style={{ opacity: anim, transform: [{ translateX: slideX }, { scale: scaleVal }] }}>
-      {children}
-    </Animated.View>
-  );
-}
-
 export default function ManufacturersScreen() {
   const { manufacturers, years, orders, addManufacturer, updateManufacturer, deleteManufacturer, duplicateManufacturer } = useData();
   const { colors } = useTheme();
   const { width, content, bottomSpace } = usePageLayout();
-  // Dos columnas cuando hay sitio (en ordenador las tarjetas a todo el ancho quedaban estiradas)
-  const columns = width >= 1024 ? 2 : 1;
+  // Tabla con columnas cuando hay sitio; en móvil, lista agrupada como en iOS
+  const table = width >= 1024;
 
   const [createDialogOpen, setCreateDialogOpen] = useState(false);
   const [editDialogOpen, setEditDialogOpen] = useState(false);
@@ -192,67 +173,79 @@ export default function ManufacturersScreen() {
     return orders.filter(o => o.manufacturer_id === mId).length;
   }, [orders]);
 
+  /** Años asignados a mano + años en los que ya tiene pedidos (estos, en gris) */
+  const yearChips = useCallback((item: Manufacturer) => {
+    const assigned = new Set(item.active_years ?? []);
+    const withOrders = new Set(orders.filter(o => o.manufacturer_id === item.id).map(o => o.year));
+    const all = Array.from(new Set([...assigned, ...withOrders])).sort((a, b) => b - a);
+    if (!all.length) return <Text style={[styles.noYears, { color: colors.textSecondary }]}>Sin años ni pedidos</Text>;
+    return all.map(year => {
+      const onlyOrders = !assigned.has(year);
+      return (
+        <View
+          key={year}
+          style={[styles.yearBadge, onlyOrders ? { backgroundColor: colors.fill, borderColor: 'transparent' } : { backgroundColor: colors.primarySoft, borderColor: 'transparent' }]}
+          accessibilityLabel={onlyOrders ? `${year}: tiene pedidos, sin asignar` : `${year}: asignado`}
+        >
+          <Text style={[styles.yearBadgeText, { color: onlyOrders ? colors.textSecondary : colors.primary }]}>{year}</Text>
+        </View>
+      );
+    });
+  }, [orders, colors]);
+
+  const [menuFor, setMenuFor] = useState<Manufacturer | null>(null);
+
   const renderItem = useCallback(({ item, index }: { item: Manufacturer; index: number }) => {
     const orderCount = getOrderCount(item.id);
-
+    const first = index === 0;
     return (
-      <AnimatedManufacturerCard index={index}>
-        <Pressable
-          style={({ pressed }) => [styles.manufacturerCard, { backgroundColor: colors.surfaceElevated, borderColor: colors.borderLight, shadowColor: colors.cardShadow, transform: [{ scale: pressed ? 0.97 : 1 }] }]}
-          onLongPress={() => handleDuplicate(item)}
-          delayLongPress={600}
-          testID={`manufacturer-row-${item.id}`}
-        >
-          <View style={styles.cardLeft}>
-            <View style={[styles.iconCircle, { backgroundColor: colors.primarySoft }]}>
-              <Building2 size={18} color={colors.primary} />
-            </View>
-            <View style={{ flex: 1 }}>
-              <Text style={[styles.mfName, { color: colors.text }]}>{item.name}</Text>
+      <Pressable
+        onPress={() => openEdit(item)}
+        style={({ pressed, hovered }: { pressed: boolean; hovered?: boolean }) => [
+          styles.mRow,
+          { backgroundColor: (pressed || hovered) ? colors.surfaceAlt : colors.surface },
+          !first && { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.divider },
+          first && styles.mRowFirst,
+          index === manufacturers.length - 1 && styles.mRowLast,
+        ]}
+        accessibilityRole="button"
+        accessibilityLabel={`${item.name}, código ${item.code}, ${orderCount} pedidos. Editar`}
+        testID={`edit-manufacturer-${item.id}`}
+      >
+        <View style={[styles.mIcon, { backgroundColor: SystemTint.orange }]}>
+          <Text style={styles.mIconText}>{item.code.slice(0, 3)}</Text>
+        </View>
+        {table ? (
+          <>
+            <View style={[styles.cName, { minWidth: 0 }]}>
+              <Text style={[styles.mfName, { color: colors.text }]} numberOfLines={1}>{item.name}</Text>
               <Text style={[styles.mfCode, { color: colors.textSecondary }]}>{item.code}</Text>
-              <View style={styles.yearBadges}>
-                {(() => {
-                  // Años asignados a mano + años en los que ya tiene pedidos (antes estos no se mostraban
-                  // y un fabricante con pedidos de 2026 aparecía como "Sin años asignados")
-                  const assigned = new Set(item.active_years ?? []);
-                  const withOrders = new Set(orders.filter(o => o.manufacturer_id === item.id).map(o => o.year));
-                  const all = Array.from(new Set([...assigned, ...withOrders])).sort((a, b) => b - a);
-                  if (!all.length) return <Text style={[styles.noYears, { color: colors.textTertiary }]}>Sin años ni pedidos</Text>;
-                  return all.map(year => {
-                    const onlyOrders = !assigned.has(year);
-                    return (
-                      <View
-                        key={year}
-                        style={[styles.yearBadge, onlyOrders ? { backgroundColor: colors.fill, borderColor: colors.fill } : { backgroundColor: colors.primarySoft, borderColor: colors.primarySoftAlt }]}
-                        accessibilityLabel={onlyOrders ? `${year}: tiene pedidos, sin asignar` : `${year}: asignado`}
-                      >
-                        <Text style={[styles.yearBadgeText, { color: onlyOrders ? colors.textSecondary : colors.primary }]}>{year}</Text>
-                      </View>
-                    );
-                  });
-                })()}
-              </View>
-              <Text style={[styles.orderCountText, { color: colors.textSecondary }]}>{orderCount} pedido{orderCount !== 1 ? 's' : ''}</Text>
             </View>
+            <View style={[styles.cYears, styles.yearBadges]}>{yearChips(item)}</View>
+            <Text style={[styles.cCount, styles.mCount, { color: colors.text }]}>{orderCount}</Text>
+          </>
+        ) : (
+          <View style={{ flex: 1, minWidth: 0, gap: 4 }}>
+            <View style={styles.mTop}>
+              <Text style={[styles.mfName, { color: colors.text, flex: 1 }]} numberOfLines={1}>{item.name}</Text>
+              <Text style={[styles.mfCode, { color: colors.textSecondary }]}>{orderCount} pedido{orderCount !== 1 ? 's' : ''}</Text>
+            </View>
+            <Text style={[styles.mfCode, { color: colors.textSecondary }]}>{item.code}</Text>
+            <View style={styles.yearBadges}>{yearChips(item)}</View>
           </View>
-          <View style={styles.cardActions}>
-            <Pressable onPress={() => handleDuplicate(item)} style={({ pressed }) => [styles.actionBtn, { backgroundColor: colors.fill, opacity: pressed ? 0.6 : 1 }]} hitSlop={8}>
-              <Copy size={15} color={colors.textSecondary} />
-            </Pressable>
-            <Pressable onPress={() => openYears(item)} style={({ pressed }) => [styles.actionBtn, { backgroundColor: colors.surfaceAlt, transform: [{ scale: pressed ? 0.8 : 1 }] }]} hitSlop={8} testID={`assign-years-${item.id}`}>
-              <Calendar size={15} color={colors.primary} />
-            </Pressable>
-            <Pressable onPress={() => openEdit(item)} style={({ pressed }) => [styles.actionBtn, { backgroundColor: colors.surfaceAlt, transform: [{ scale: pressed ? 0.8 : 1 }] }]} hitSlop={8} testID={`edit-manufacturer-${item.id}`}>
-              <Edit3 size={15} color={colors.textSecondary} />
-            </Pressable>
-            <Pressable onPress={() => handleDelete(item)} style={({ pressed }) => [styles.actionBtn, styles.deleteActionBtn, { backgroundColor: colors.errorBg, transform: [{ scale: pressed ? 0.8 : 1 }] }]} hitSlop={8} testID={`delete-manufacturer-${item.id}`}>
-              <Trash2 size={15} color={colors.error} />
-            </Pressable>
-          </View>
+        )}
+        <Pressable
+          onPress={() => setMenuFor(item)}
+          style={({ hovered }: { pressed: boolean; hovered?: boolean }) => [styles.menuBtn, { backgroundColor: hovered ? colors.primarySoftAlt : colors.primarySoft }]}
+          accessibilityRole="button"
+          accessibilityLabel={`Más acciones para ${item.name}`}
+          testID={`manufacturer-menu-${item.id}`}
+        >
+          <MoreHorizontal size={18} color={colors.primary} />
         </Pressable>
-      </AnimatedManufacturerCard>
+      </Pressable>
     );
-  }, [getOrderCount, openYears, openEdit, handleDelete, handleDuplicate, colors, orders]);
+  }, [getOrderCount, openEdit, colors, table, yearChips, manufacturers.length]);
 
   return (
     <View style={[styles.container, { backgroundColor: canvas(colors) }]}>
@@ -260,7 +253,7 @@ export default function ManufacturersScreen() {
         <Animated.View style={{ opacity: headerFade, transform: [{ translateY: headerSlide }, { scale: headerScale }] }}>
           <PageHeader
             title="Fabricantes"
-            subtitle={`${manufacturers.length} fabricante${manufacturers.length !== 1 ? 's' : ''} · años en naranja: asignados · en gris: con pedidos, sin asignar`}
+            subtitle={`${manufacturers.length} fabricante${manufacturers.length !== 1 ? 's' : ''}`}
             actions={
               <Button
                 label="Crear"
@@ -284,17 +277,50 @@ export default function ManufacturersScreen() {
           </View>
         ) : (
           <FlatList
-            key={`cols-${columns}`}
             data={manufacturers}
-            renderItem={columns > 1 ? (info) => <View style={{ flex: 1, maxWidth: 'calc(50% - 6px)' as any }}>{renderItem(info)}</View> : renderItem}
-            numColumns={columns}
-            columnWrapperStyle={columns > 1 ? { gap: 12 } : undefined}
+            renderItem={renderItem}
+            ListHeaderComponent={
+              table ? (
+                <View style={styles.tHead}>
+                  <View style={{ width: 36 }} />
+                  <Text style={[styles.cName, styles.th, { color: colors.textSecondary }]}>Fabricante</Text>
+                  <Text style={[styles.cYears, styles.th, { color: colors.textSecondary }]}>Años</Text>
+                  <Text style={[styles.cCount, styles.th, { color: colors.textSecondary }]}>Pedidos</Text>
+                  <View style={{ width: 40 }} />
+                </View>
+              ) : null
+            }
+            ListFooterComponent={
+              <Text style={[styles.listFooter, { color: colors.textSecondary }]}>
+                Años en azul: asignados al fabricante. En gris: tiene pedidos de ese año pero no está asignado.
+              </Text>
+            }
             keyExtractor={(item) => item.id}
             contentContainerStyle={[styles.listContent, { paddingBottom: bottomSpace }]}
             showsVerticalScrollIndicator={false}
           />
         )}
       </View>
+
+      <SelectSheet
+        visible={!!menuFor}
+        title={menuFor ? menuFor.name : ''}
+        options={[
+          { value: 'edit', label: 'Editar nombre y código' },
+          { value: 'years', label: 'Asignar años' },
+          { value: 'duplicate', label: 'Duplicar fabricante' },
+          { value: 'delete', label: 'Eliminar fabricante', destructive: true },
+        ]}
+        onSelect={v => {
+          const m = menuFor;
+          if (!m) return;
+          if (v === 'edit') openEdit(m);
+          else if (v === 'years') openYears(m);
+          else if (v === 'duplicate') void handleDuplicate(m);
+          else if (v === 'delete') handleDelete(m);
+        }}
+        onClose={() => setMenuFor(null)}
+      />
 
       <Modal visible={createDialogOpen} transparent animationType="none" onRequestClose={() => setCreateDialogOpen(false)}>
         <Animated.View style={[styles.modalOverlay, { backgroundColor: colors.overlay, opacity: modalOpacity }]}>
@@ -403,7 +429,7 @@ const styles = StyleSheet.create({
   },
   createBtn: { flexDirection: 'row', alignItems: 'center', gap: 5, paddingHorizontal: 16, paddingVertical: 9, borderRadius: 999 },
   createBtnText: { color: '#FFFFFF', fontWeight: '600' as const, fontSize: 15, letterSpacing: -0.2 },
-  listContent: { paddingTop: 4, paddingBottom: 40, gap: 12,
+  listContent: { paddingTop: 4, paddingBottom: 40,
   },
   manufacturerCard: {
     borderRadius: 20,
@@ -583,4 +609,18 @@ const styles = StyleSheet.create({
     fontSize: 15,
     fontWeight: '700' as const,
   },
+  mRow: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 14, paddingVertical: 12, minHeight: 64 },
+  mRowFirst: { borderTopLeftRadius: 14, borderTopRightRadius: 14 },
+  mRowLast: { borderBottomLeftRadius: 14, borderBottomRightRadius: 14 },
+  mIcon: { width: 36, height: 36, borderRadius: 9, alignItems: 'center', justifyContent: 'center' },
+  mIconText: { color: '#FFFFFF', fontSize: 11, fontWeight: '800' as const, letterSpacing: 0.2 },
+  mTop: { flexDirection: 'row', alignItems: 'baseline', gap: 8 },
+  mCount: { fontSize: 16, fontVariant: ['tabular-nums'] },
+  menuBtn: { width: 40, height: 40, borderRadius: 20, alignItems: 'center', justifyContent: 'center' },
+  tHead: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 14, paddingBottom: 8 },
+  th: { fontSize: 12.5, fontWeight: '600' as const },
+  cName: { flex: 2 },
+  cYears: { flex: 2 },
+  cCount: { width: 80, textAlign: 'right' },
+  listFooter: { fontSize: 13, lineHeight: 18, paddingHorizontal: 16, paddingTop: 10 },
 });
