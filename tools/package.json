@@ -1,0 +1,10 @@
+{
+  "name": "ao-gestiones-tools",
+  "private": true,
+  "description": "Pruebas de AO Gestiones: e2e con Supabase simulado, lector de documentos y cálculos",
+  "devDependencies": {
+    "playwright": "^1.48.0",
+    "pdfjs-dist": "3.11.174",
+    "serve": "^14.2.0"
+  }
+}

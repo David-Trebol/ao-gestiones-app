@@ -1,0 +1,76 @@
+# Plan de mejoras · estado al 16/11/2026
+
+Auditoría completa con capturas: https://claude.ai/artifact/MmmE6qeFAjeX4QpSss1KRu
+
+Diagnóstico: la app funciona y los datos son correctos, pero su estructura era la de una app de móvil estirada: en ordenador la navegación iba abajo, cada pantalla tenía un ancho distinto y había elementos repetidos o flotando. El plan arregla primero la estructura común y después cada pantalla. **Cada fase se publica en Vercel y el propietario la valida antes de pasar a la siguiente.**
+
+## Dónde está cada cosa
+
+- `main` = lo publicado (rediseño estilo Apple, inicio con filtros, seguimiento, lectura de documentos sin IA).
+- Rama **`fase-1-estructura`** = trabajo en curso (sin publicar): compila, `tsc` y `eslint` limpios, 34/34 en `tools/e2e/t9-home.js`. Falta terminar la fase 1 y probar t2/t4 antes de fusionar con `main`.
+
+## Fase 0 · Que no se caiga ni se pierda nada
+
+- [x] RPC `public.keepalive()` creada en Supabase (no lee ni escribe datos).
+- [ ] **Algo que la llame cada 3 días** para que el plan gratis no pause la base de datos. Propuesta preparada: workflow de GitHub Actions (`POST /rest/v1/rpc/keepalive` con la clave publicable). **Necesita la aprobación del propietario**; alternativa: plan Pro de Supabase (~25 $/mes).
+- [x] Exportar a Excel: `expo/utils/exportExcel.ts` (hojas Pedidos, Líneas, Envíos, Fabricantes; importes con formato €). Botón «Excel» en la lista de Pedidos (exporta lo filtrado). *En la rama.*
+- [ ] Ajustes → «Descargar copia completa (Excel)».
+- [ ] «Eliminar todos los datos»: ofrecer la descarga antes y pedir escribir `ELIMINAR` (modal propio; `Alert` no admite texto).
+- [ ] Comprobar en el panel de Supabase (Auth → URL Configuration) que el Site URL es `https://ao-gestiones-pedidos.vercel.app` para el correo de recuperar contraseña. Activar la protección de contraseñas filtradas.
+- [ ] Idioma: `document.documentElement.lang = 'es'` (la web se sirve con `lang="en"`); hacerlo en `components/WebGlobalStyles.tsx`.
+
+## Fase 1 · Estructura común
+
+Hecho en la rama:
+- [x] `components/AppNav.tsx`: barra lateral con textos y «Nuevo pedido» (≥ 1.200 px), lateral solo con iconos (768–1.199 px), barra inferior en móvil (se oculta en el formulario). Sustituye a la barra de pestañas por defecto (`app/(tabs)/_layout.tsx`, `tabBarPosition` dinámico).
+- [x] Ficha y formulario movidos a `app/(tabs)/(home)/` para que la navegación no desaparezca al abrir un pedido (`unstable_settings.initialRouteName = 'index'` para que «Atrás» funcione con enlace directo).
+- [x] Pestaña Buscar retirada (`href: null`; `/search` redirige a `/`): el buscador de Pedidos ya busca en todo.
+- [x] Cabeceras de navegación ocultas en Pedidos, Fabricantes y Ajustes (cada pantalla tendrá su propia cabecera).
+- [x] `components/Page.tsx` (`PageHeader`, `usePageLayout`, ancho común `PAGE_MAX = 1280`, márgenes 16/24/32) y `components/Button.tsx` (botón común de 44 px).
+
+Pendiente:
+- [ ] Usar `PageHeader` + `usePageLayout` en Pedidos (`(home)/index.tsx` aún usa su propio título y ancho 1.120), Fabricantes y Ajustes (720 px), y el mismo ancho en ficha y formulario.
+- [ ] En móvil, botón «+ Nuevo» en la cabecera de Pedidos (en ordenador está en la barra lateral). Quitar el botón flotante de la vista «Por año y fabricante».
+- [ ] Vista «Por año y fabricante»: quitar «Atrás» duplicado (dejar migas de pan), usar `OrderCardItem`/`OrderTable` de `components/home/OrdersDashboard.tsx` en vez de la tarjeta antigua con el cliente cortado. Pendiente de decisión si pasa a ser «agrupar por» dentro de la lista.
+- [ ] Probar t2, t4, t5, t7 con la nueva navegación y ajustar selectores (`nav-Pedidos`, `nav-new-order`…).
+
+## Fase 2 · Pantalla por pantalla
+
+- [x] Pedidos (rama): contadores compactos que filtran, aviso de atención en una línea que filtra la lista (con «Ver retrasados»), la lista visible desde la primera pantalla, tabla desde 1.100 px y tarjetas en 1 o 2 columnas.
+- [ ] Ficha: cabecera compacta (referencia, estado, total y acciones en dos líneas); en móvil los productos deben verse en la primera pantalla.
+- [ ] Formulario: fabricante en desplegable con buscador (con muchos fabricantes los botones apilados no escalan; ampliar `SelectSheet` con búsqueda); «Leer documento» como botón compacto; un solo botón de guardar (quitar el de la cabecera); secciones plegables en móvil; versión compacta en horizontal (844×390).
+- [ ] Fabricantes: tabla en ordenador; acciones con nombre en un menú «…» (ahora 4 iconos sin texto de 30 px).
+- [ ] Ajustes: perfil → apariencia → resumen → usuarios → datos (copia y borrado) → salir al final. Quitar la tarjeta «Estado de pedidos» (solo remite al inicio) y la de «Plataforma». «Facturación total» sin pedidos cancelados (hoy los suma).
+- [ ] Entrar (`app/login.tsx`): mismo estilo claro que la app; quitar «Análisis · Métricas en vivo» y similares, que no existen. Mantener alta del primer admin, recuperar contraseña y mostrar/ocultar contraseña.
+
+## Fase 3 · Acabado y accesibilidad
+
+- [ ] Contraste: `textTertiary` está en 2,9–3,3:1 en modo claro (mínimo 4,5:1); `success` 4,4:1.
+- [ ] Objetivos táctiles de 44 px (filtros 40 px, «Cambiar estado» 36 px, enlaces de texto).
+- [ ] Foco visible y navegación con teclado en todas las pantallas.
+- [ ] Revisar estados vacíos, de carga y de error.
+- [ ] Importes siempre con punto de miles (2.670,47 €) **si el propietario lo aprueba**.
+
+## Fase 4 · Propuestas de negocio (solo con aprobación)
+
+- [ ] Fichas de clientes reutilizables (hoy el cliente se copia en cada pedido).
+- [ ] Campos de la hoja original que faltan: Población y Vencimiento del recibo.
+
+## Decisiones pendientes del propietario
+
+1. Pausa de Supabase: ¿plan Pro o llamada automática (GitHub Actions)?
+2. ¿Vista «Por año y fabricante» como pantalla aparte o como «agrupar por» en la lista?
+3. ¿Importes con punto de miles siempre?
+4. ¿Exportación a Excel con las mismas columnas y orden que su hoja actual? (pedir una hoja vacía de ejemplo)
+5. ¿Fichas de clientes? ¿Población y Vencimiento del recibo como campos?
+6. ¿«Enviado» = enviado por el fabricante o entregado al cliente?
+7. Al leer documentos, ¿los precios son de venta o de coste? (hoy se asume venta, con opción de cambiar en la revisión)
+8. ¿Quién más usará la app y con qué permisos?
+
+## Cómo se da por terminada cada fase
+
+1. `npx tsc --noEmit` y `eslint` limpios.
+2. Pruebas de `tools/` en verde (e2e, cálculos y, si se toca el lector, `docread/check.ts`).
+3. Capturas con `tools/e2e/shots.js` en 6 tamaños, claro y oscuro, con 5 y con 300 pedidos: sin desplazamiento lateral, nada flotando ni tapado.
+4. Datos intactos en Supabase (contar pedidos y fabricantes antes y después).
+5. Push a `main`, despliegue en Vercel en estado READY y comprobación en https://ao-gestiones-pedidos.vercel.app.
