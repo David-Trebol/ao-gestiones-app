@@ -48,6 +48,7 @@ Pedido del propietario el 16/11/2026: estética de Apple (tipografía, colores, 
 - [x] Formulario: barra de hoja de iOS (Cancelar · título · Leer documento), secciones agrupadas, un solo botón de guardar (abajo, con el total).
 - [x] Modo oscuro arreglado: el tema de la navegación pintaba un gris claro fijo detrás de las pantallas (`app/_layout.tsx`).
 - [x] Arreglado: al abrir el formulario por enlace directo, el fabricante no salía marcado si los pedidos llegaban antes que los fabricantes.
+- [x] Arreglado (16/11/2026): las pantallas se veían unas encima de otras al cambiar de pestaña o volver atrás. Las escenas de la navegación tenían fondo transparente y las inactivas siguen pintadas debajo; ahora su fondo es opaco (`sceneBackground`). Prueba: `t11-solapes.js`.
 - [ ] Probar en un iPhone real (Safari) y con el teclado abierto.
 - Nota: en `t5-scan.js`, «muestra progreso» falla por tiempos (el PDF de muestra se lee en menos de 0,4 s); el resto pasa.
 

@@ -2,7 +2,7 @@ import React from 'react';
 import { Tabs } from 'expo-router';
 import { useWindowDimensions } from 'react-native';
 import { useTheme } from '@/contexts/ThemeContext';
-import { canvas } from '@/constants/theme';
+import { sceneBackground } from '@/constants/theme';
 import AppNav, { NAV_SIDE_MIN } from '@/components/AppNav';
 
 export default function TabLayout() {
@@ -16,7 +16,7 @@ export default function TabLayout() {
       screenOptions={{
         headerShown: false,
         tabBarPosition: side ? 'left' : 'bottom',
-        sceneStyle: { backgroundColor: canvas(colors) },
+        sceneStyle: sceneBackground(colors),
       }}
     >
       <Tabs.Screen name="(home)" options={{ title: 'Pedidos' }} />
