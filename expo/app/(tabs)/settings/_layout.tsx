@@ -10,7 +10,7 @@ export default function SettingsLayout() {
     <Stack
       screenOptions={headerOptions(colors)}
     >
-      <Stack.Screen name="index" options={{ title: 'Ajustes' }} />
+      <Stack.Screen name="index" options={{ headerShown: false, title: 'Ajustes' }} />
     </Stack>
   );
 }

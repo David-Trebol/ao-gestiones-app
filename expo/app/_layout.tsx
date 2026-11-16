@@ -59,19 +59,6 @@ function RootLayoutNav() {
     <Stack screenOptions={headerOptions(colors)}>
       <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
       <Stack.Screen
-        name="order-detail"
-        options={{
-          title: "Detalle del Pedido",
-        }}
-      />
-      <Stack.Screen
-        name="order-form"
-        options={{
-          presentation: 'modal',
-          title: 'Nuevo Pedido',
-        }}
-      />
-      <Stack.Screen
         name="login"
         options={{ headerShown: false }}
       />
