@@ -59,7 +59,9 @@ export default function SettingsScreen() {
   const totalOrders = orders.length;
   const totalManufacturers = manufacturers.length;
   const totalYears = years.length;
-  const totalAmount = orders.reduce((sum, o) => sum + o.total_with_vat, 0);
+  // Facturación: sin los pedidos cancelados (decisión del propietario, 16/11/2026)
+  const totalAmount = orders.filter(o => o.status !== 'cancelled').reduce((sum, o) => sum + o.total_with_vat, 0);
+  const cancelledCount = orders.filter(o => o.status === 'cancelled').length;
 
 
   const [deleteOpen, setDeleteOpen] = useState(false);
@@ -332,7 +334,7 @@ export default function SettingsScreen() {
                 <Text style={[styles.totalValue, { color: colors.text }]}>{formatCurrency(totalAmount)}</Text>
               </View>
             </>,
-            'Suma del total con IVA de todos los pedidos guardados.',
+            `Suma del total con IVA de los pedidos que no están cancelados${cancelledCount ? ` (no cuenta ${cancelledCount} cancelado${cancelledCount === 1 ? '' : 's'})` : ''}.`,
           )}
 
           {isAdmin &&

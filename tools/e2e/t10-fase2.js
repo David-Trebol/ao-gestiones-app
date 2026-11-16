@@ -33,6 +33,12 @@ const check = (name, ok, extra = '') => results.push((ok ? 'OK  ' : 'FAIL') + ' 
 
   // --- Ajustes: copia completa
   await p.goto(`http://localhost:${process.env.PORT}/settings`, { waitUntil: 'networkidle' }); await wait(1500);
+  {
+    const expected = mock.db.orders.filter(o => o.status !== 'cancelled').reduce((x, o) => x + o.total_with_vat, 0);
+    const fmt = new Intl.NumberFormat('es-ES', { style: 'currency', currency: 'EUR' }).format(expected).replace(/\s/g, ' ');
+    const st = (await text()).replace(/\s/g, ' ');
+    check('facturación total sin cancelados', st.includes(fmt) && /no cuenta 1 cancelado/.test(st), fmt);
+  }
   const [dl] = await Promise.all([p.waitForEvent('download', { timeout: 15000 }).catch(() => null), p.getByTestId('export-all-btn').click()]);
   check('descarga la copia completa en Excel', !!dl && /\.xlsx$/.test(dl.suggestedFilename()), dl ? dl.suggestedFilename() : 'sin descarga');
   if (await okb.count()) { await okb.click(); await wait(300); }

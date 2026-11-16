@@ -59,7 +59,7 @@ Pedido del propietario el 16/11/2026: estética de Apple (tipografía, colores, 
 - [ ] Formulario: secciones plegables en móvil; versión compacta en horizontal (844×390).
 - [x] Fabricantes: tabla en ordenador, lista agrupada en móvil; tocar la fila edita; acciones con nombre en el menú «…».
 - [x] Ajustes como Ajustes de iOS: perfil → apariencia → resumen → usuarios → cuenta → datos → cerrar sesión. Fuera «Estado de pedidos» y «Plataforma».
-- [ ] «Facturación total» sigue sumando los cancelados: cambiarlo **necesita el visto bueno del propietario** (cambia lo que significa la cifra).
+- [x] «Facturación total» ya no suma los pedidos cancelados (aprobado por el propietario el 16/11/2026); la nota de debajo dice cuántos no cuenta.
 - [ ] Entrar (`app/login.tsx`): mismo estilo claro que la app; quitar «Análisis · Métricas en vivo» y similares, que no existen. Mantener alta del primer admin, recuperar contraseña y mostrar/ocultar contraseña.
 
 ## Fase 3 · Acabado y accesibilidad
