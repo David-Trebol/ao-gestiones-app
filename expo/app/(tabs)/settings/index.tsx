@@ -7,7 +7,6 @@ import {
   Pressable,
   Alert,
   Platform,
-  useWindowDimensions,
   Modal,
   TextInput,
   Switch,
@@ -31,6 +30,7 @@ import {
   Sun,
   Fingerprint,
 } from 'lucide-react-native';
+import { PageHeader, usePageLayout } from '@/components/Page';
 import { useTheme } from '@/contexts/ThemeContext';
 import { useData } from '@/contexts/DataContext';
 import { useAuth, AppUser } from '@/contexts/AuthContext';
@@ -46,10 +46,8 @@ export default function SettingsScreen() {
   const { colors, isDark, themeMode, setTheme } = useTheme();
   const [deleting, setDeleting] = useState(false);
   const [savingUser, setSavingUser] = useState(false);
-  const { width } = useWindowDimensions();
-  const isDesktop = width >= 1024;
+  const { width, content, desktop: isDesktop } = usePageLayout();
   const isCompact = width < 480;
-  const contentMaxWidth = isDesktop ? 760 : width;
 
   const [userModalOpen, setUserModalOpen] = useState(false);
   const [editingUser, setEditingUser] = useState<AppUser | null>(null);
@@ -229,7 +227,10 @@ export default function SettingsScreen() {
 
   return (
     <View style={[styles.outerContainer, { backgroundColor: colors.background }]}>
-      <ScrollView style={styles.container} contentContainerStyle={[styles.content, { maxWidth: contentMaxWidth, alignSelf: 'center' as const, width: '100%' as any }]} showsVerticalScrollIndicator={false}>
+      <ScrollView style={styles.container} contentContainerStyle={[content, styles.content]} showsVerticalScrollIndicator={false}>
+        <PageHeader title="Ajustes" />
+        {/* Columna de lectura: mismo margen izquierdo que el resto de pantallas, sin estirarse a 1.280 px */}
+        <View style={styles.column}>
 
         <View style={[styles.userBanner, isCompact && styles.userBannerCompact, { backgroundColor: colors.surface, borderColor: colors.borderLight, shadowColor: colors.cardShadow }]}>
           <View style={styles.userBannerLeft}>
@@ -471,6 +472,7 @@ export default function SettingsScreen() {
           </View>
           <Text style={[styles.footerSubtext, { color: colors.textTertiary }]}>Pedidos en movimiento · Multiplataforma</Text>
         </View>
+        </View>
       </ScrollView>
 
       <Modal visible={userModalOpen} transparent animationType="fade" onRequestClose={() => setUserModalOpen(false)}>
@@ -579,8 +581,11 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   content: {
-    padding: 20,
     paddingBottom: 40,
+  },
+  column: {
+    width: '100%' as any,
+    maxWidth: 820,
   },
   userBanner: { borderRadius: 20, padding: 20, marginBottom: 16, borderWidth: 0,
     flexDirection: 'row',

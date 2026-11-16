@@ -12,11 +12,11 @@ import {
   Platform,
   ActivityIndicator,
   Animated,
-  useWindowDimensions,
 } from 'react-native';
 import { useLocalSearchParams, useRouter, Stack } from 'expo-router';
 import { Plus, Trash2, FileText, ScanLine, X } from 'lucide-react-native';
 import { LightColors as StaticColors } from '@/constants/colors';
+import { PAGE_MAX, usePageLayout } from '@/components/Page';
 import { useTheme } from '@/contexts/ThemeContext';
 import { useData } from '@/contexts/DataContext';
 import { OrderFormData, OrderFormItem, ShippingFormItem, OrderStatus, Customer } from '@/types';
@@ -89,9 +89,9 @@ export default function OrderFormScreen() {
   }>();
   const router = useRouter();
   const { orders, manufacturers, addOrder, updateOrder } = useData();
-  const { width, height } = useWindowDimensions();
+  const { width, height, pad } = usePageLayout();
   const isDesktop = width >= 1024;
-  const contentMaxWidth = isDesktop ? 1040 : width;
+  // Mismo ancho máximo que el resto de pantallas
   const insets = useSafeAreaInsets();
 
   const editingOrder = useMemo(
@@ -468,7 +468,7 @@ export default function OrderFormScreen() {
         keyboardVerticalOffset={100}
       >
         <ScrollView
-          contentContainerStyle={[styles.scrollContent, { maxWidth: contentMaxWidth, alignSelf: 'center' as const, width: '100%' as any }]}
+          contentContainerStyle={[styles.scrollContent, { maxWidth: PAGE_MAX, alignSelf: 'center' as const, width: '100%' as any, paddingHorizontal: pad }]}
           showsVerticalScrollIndicator={false}
           keyboardShouldPersistTaps="handled"
         >
@@ -798,8 +798,8 @@ export default function OrderFormScreen() {
             </View>
           </View>
         </ScrollView>
-        <View style={[styles.saveBar, { backgroundColor: colors.headerBackground, borderTopColor: colors.border, paddingBottom: 10 + insets.bottom }]}>
-          <View style={[styles.saveBarInner, { maxWidth: contentMaxWidth }]}>
+        <View style={[styles.saveBar, { backgroundColor: colors.headerBackground, borderTopColor: colors.border, paddingBottom: 10 + insets.bottom, paddingHorizontal: pad }]}>
+          <View style={[styles.saveBarInner, { maxWidth: PAGE_MAX - pad * 2 }]}>
             <View style={{ flex: 1, minWidth: 0 }}>
               {showErrors && errorCount > 0 ? (
                 <Text style={[styles.saveBarError, { color: colors.error }]} numberOfLines={2} accessibilityLiveRegion="assertive">

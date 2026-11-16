@@ -9,11 +9,12 @@ import {
   Alert,
   TextInput,
   Modal,
-  useWindowDimensions,
   Animated,
   Easing,
 } from 'react-native';
 import { Building2, Plus, Edit3, Trash2, Calendar, Check, Copy } from 'lucide-react-native';
+import { PageHeader, usePageLayout } from '@/components/Page';
+import Button from '@/components/Button';
 import { useTheme } from '@/contexts/ThemeContext';
 import { webInputReset } from '@/constants/theme';
 import { useData } from '@/contexts/DataContext';
@@ -43,10 +44,10 @@ function AnimatedManufacturerCard({ index, children }: { index: number; children
 
 export default function ManufacturersScreen() {
   const { manufacturers, years, orders, addManufacturer, updateManufacturer, deleteManufacturer, duplicateManufacturer } = useData();
-  const { width } = useWindowDimensions();
   const { colors } = useTheme();
-  const isDesktop = width >= 1024;
-  const contentMaxWidth = isDesktop ? 760 : width;
+  const { width, content } = usePageLayout();
+  // Dos columnas cuando hay sitio (en ordenador las tarjetas a todo el ancho quedaban estiradas)
+  const columns = width >= 1024 ? 2 : 1;
 
   const [createDialogOpen, setCreateDialogOpen] = useState(false);
   const [editDialogOpen, setEditDialogOpen] = useState(false);
@@ -255,20 +256,22 @@ export default function ManufacturersScreen() {
 
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
-      <View style={[styles.innerContainer, { maxWidth: contentMaxWidth }]}>
-        <Animated.View style={[styles.headerBar, { opacity: headerFade, transform: [{ translateY: headerSlide }, { scale: headerScale }] }]}>
-          <View style={{ flex: 1, minWidth: 0, paddingRight: 12 }}>
-            <Text style={[styles.headerTitle, { color: colors.text }]}>Fabricantes</Text>
-            <Text style={[styles.headerSubtitle, { color: colors.textSecondary }]}>{manufacturers.length} fabricante{manufacturers.length !== 1 ? 's' : ''} · años en naranja: asignados · en gris: con pedidos, sin asignar</Text>
-          </View>
-          <Pressable
-            style={({ pressed }) => [styles.createBtn, { backgroundColor: colors.primary, opacity: pressed ? 0.8 : 1 }]}
-            onPress={() => { setFormName(''); setFormCode(''); setCreateDialogOpen(true); setTimeout(animateModal, 10); }}
-            testID="create-manufacturer-btn"
-          >
-            <Plus size={15} color="#FFFFFF" />
-            <Text style={styles.createBtnText}>Crear</Text>
-          </Pressable>
+      <View style={[styles.innerContainer, content]}>
+        <Animated.View style={{ opacity: headerFade, transform: [{ translateY: headerSlide }, { scale: headerScale }] }}>
+          <PageHeader
+            title="Fabricantes"
+            subtitle={`${manufacturers.length} fabricante${manufacturers.length !== 1 ? 's' : ''} · años en naranja: asignados · en gris: con pedidos, sin asignar`}
+            actions={
+              <Button
+                label="Crear"
+                icon={Plus}
+                variant="primary"
+                onPress={() => { setFormName(''); setFormCode(''); setCreateDialogOpen(true); setTimeout(animateModal, 10); }}
+                accessibilityLabel="Crear fabricante"
+                testID="create-manufacturer-btn"
+              />
+            }
+          />
         </Animated.View>
 
         {manufacturers.length === 0 ? (
@@ -281,8 +284,11 @@ export default function ManufacturersScreen() {
           </View>
         ) : (
           <FlatList
+            key={`cols-${columns}`}
             data={manufacturers}
-            renderItem={renderItem}
+            renderItem={columns > 1 ? (info) => <View style={{ flex: 1, maxWidth: 'calc(50% - 6px)' as any }}>{renderItem(info)}</View> : renderItem}
+            numColumns={columns}
+            columnWrapperStyle={columns > 1 ? { gap: 12 } : undefined}
             keyExtractor={(item) => item.id}
             contentContainerStyle={styles.listContent}
             showsVerticalScrollIndicator={false}
@@ -397,7 +403,7 @@ const styles = StyleSheet.create({
   },
   createBtn: { flexDirection: 'row', alignItems: 'center', gap: 5, paddingHorizontal: 16, paddingVertical: 9, borderRadius: 999 },
   createBtnText: { color: '#FFFFFF', fontWeight: '600' as const, fontSize: 15, letterSpacing: -0.2 },
-  listContent: { paddingHorizontal: 20, paddingTop: 6, paddingBottom: 40, gap: 12,
+  listContent: { paddingTop: 4, paddingBottom: 40, gap: 12,
   },
   manufacturerCard: {
     borderRadius: 20,

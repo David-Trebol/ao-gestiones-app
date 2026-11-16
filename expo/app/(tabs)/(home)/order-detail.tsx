@@ -1,8 +1,9 @@
 import React, { useCallback, useMemo, useState } from 'react';
-import { Alert, Pressable, ScrollView, StyleSheet, Text, TextInput, View, useWindowDimensions } from 'react-native';
+import { Alert, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import { Check, ChevronDown, ChevronUp, Copy, MoreHorizontal, Pencil, X } from 'lucide-react-native';
 import * as Haptics from 'expo-haptics';
+import { usePageLayout } from '@/components/Page';
 import { useTheme } from '@/contexts/ThemeContext';
 import { useData } from '@/contexts/DataContext';
 import { ThemeColors } from '@/constants/colors';
@@ -20,7 +21,7 @@ export default function OrderDetailScreen() {
   const router = useRouter();
   const { orders, deleteOrder, updateOrderField, duplicateOrder } = useData();
   const { colors, isDark } = useTheme();
-  const { width } = useWindowDimensions();
+  const { width, content } = usePageLayout();
   const desktop = width >= 1024;
   const s = useMemo(() => makeStyles(colors), [colors]);
   const order = useMemo(() => orders.find(o => o.id === orderId), [orders, orderId]);
@@ -366,7 +367,7 @@ export default function OrderDetailScreen() {
   return (
     <View style={s.root}>
       <Stack.Screen options={{ title: order.reference_number }} />
-      <ScrollView contentContainerStyle={[s.content, { maxWidth: desktop ? 1200 : 760 }]}>
+      <ScrollView contentContainerStyle={[s.content, content]}>
         {summary}
         {desktop ? (
           <View style={s.cols}>

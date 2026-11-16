@@ -93,7 +93,7 @@ Las pruebas e2e usan **Playwright con un Supabase simulado** (`tools/e2e/mock.js
 
 ```bash
 cd tools && npm install && npx playwright install chromium
-./serve.sh out/dist 8780                     # servir la compilación
+./serve.sh out/dist 8780                     # servir la compilación (en Mac sin setsid: npx -y serve -s out/dist -l 8780)
 PORT=8780 node e2e/t1.js                     # entrar / contraseña incorrecta
 PORT=8780 node e2e/t2.js                     # crear, editar, decimales, renumerar, duplicar, borrar
 PORT=8780 node e2e/t4.js                     # duplicar año, búsqueda, fabricantes, ajustes, salir

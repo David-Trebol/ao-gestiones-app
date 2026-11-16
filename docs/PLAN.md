@@ -6,8 +6,8 @@ Diagnóstico: la app funciona y los datos son correctos, pero su estructura era 
 
 ## Dónde está cada cosa
 
-- `main` = lo publicado (rediseño estilo Apple, inicio con filtros, seguimiento, lectura de documentos sin IA).
-- Rama **`fase-1-estructura`** = trabajo en curso (sin publicar): compila, `tsc` y `eslint` limpios, 34/34 en `tools/e2e/t9-home.js`. Falta terminar la fase 1 y probar t2/t4 antes de fusionar con `main`.
+- `main` = lo publicado. Desde el 16/11/2026 incluye la fase 1 completa (rama `fase-1-estructura` fusionada).
+- Pruebas al cerrar la fase 1: `tsc` y `eslint` limpios; t1 OK, t2 18/18, t4 14/14, t9 34/34, t7 OK, t5 OK, fórmulas OK; capturas en 6 tamaños (normal y 300 pedidos) sin desbordes.
 
 ## Fase 0 · Que no se caiga ni se pierda nada
 
@@ -28,11 +28,11 @@ Hecho en la rama:
 - [x] Cabeceras de navegación ocultas en Pedidos, Fabricantes y Ajustes (cada pantalla tendrá su propia cabecera).
 - [x] `components/Page.tsx` (`PageHeader`, `usePageLayout`, ancho común `PAGE_MAX = 1280`, márgenes 16/24/32) y `components/Button.tsx` (botón común de 44 px).
 
-Pendiente:
-- [ ] Usar `PageHeader` + `usePageLayout` en Pedidos (`(home)/index.tsx` aún usa su propio título y ancho 1.120), Fabricantes y Ajustes (720 px), y el mismo ancho en ficha y formulario.
-- [ ] En móvil, botón «+ Nuevo» en la cabecera de Pedidos (en ordenador está en la barra lateral). Quitar el botón flotante de la vista «Por año y fabricante».
-- [ ] Vista «Por año y fabricante»: quitar «Atrás» duplicado (dejar migas de pan), usar `OrderCardItem`/`OrderTable` de `components/home/OrdersDashboard.tsx` en vez de la tarjeta antigua con el cliente cortado. Pendiente de decisión si pasa a ser «agrupar por» dentro de la lista.
-- [ ] Probar t2, t4, t5, t7 con la nueva navegación y ajustar selectores (`nav-Pedidos`, `nav-new-order`…).
+Terminado el 16/11/2026:
+- [x] `PageHeader` + `usePageLayout` en Pedidos, Fabricantes y Ajustes; ficha y formulario con el mismo ancho máximo (1.280 px) y márgenes. Ajustes usa una columna de lectura de 820 px alineada a la izquierda; Fabricantes, dos columnas desde 1.024 px.
+- [x] En móvil, botón «+ Nuevo» en la cabecera de Pedidos (`header-new-order`); en tablet y ordenador está en la barra lateral. Botón flotante retirado.
+- [x] Vista «Por año y fabricante»: sin «Atrás» (migas de pan «Años › año › fabricante»), pedidos con `OrderTable` (≥ 1.100 px) u `OrderCardItem` (1 o 2 columnas). Duplicar un pedido sigue disponible desde su ficha. Sigue pendiente de decisión si pasa a ser «agrupar por» dentro de la lista.
+- [x] Pruebas ajustadas: t2 usa `header-new-order`; t4 busca con `home-search` (ya no existe la pestaña Buscar); `ControlOrMeta+a` para que funcionen también en Mac. Nueva `tools/e2e/shots-carpetas.js` (capturas de la vista por año en 3 tamaños).
 
 ## Fase 2 · Pantalla por pantalla
 
