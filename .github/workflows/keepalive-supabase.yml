@@ -1,0 +1,37 @@
+# Evita que el plan gratis de Supabase pause la base de datos (se pausa tras 7 días sin uso).
+# Cada 3 días llama a la función public.keepalive(), que solo devuelve la hora: no lee ni escribe datos.
+# Usa la clave publicable de la web (es pública: ya va dentro de la app), sacada de expo/lib/supabase.ts.
+name: Mantener activa la base de datos
+
+on:
+  schedule:
+    - cron: '17 6 */3 * *' # cada 3 días a las 06:17 UTC
+  workflow_dispatch: {} # también se puede lanzar a mano desde la pestaña Actions
+
+permissions:
+  contents: read
+
+jobs:
+  keepalive:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          sparse-checkout: expo/lib/supabase.ts
+          sparse-checkout-cone-mode: false
+
+      - name: Llamar a keepalive()
+        run: |
+          URL=$(grep -o "https://[a-z0-9]*\.supabase\.co" expo/lib/supabase.ts | head -1)
+          KEY=$(grep -o "sb_publishable_[A-Za-z0-9_-]*" expo/lib/supabase.ts | head -1)
+          if [ -z "$URL" ] || [ -z "$KEY" ]; then echo "No se encontró la URL o la clave en expo/lib/supabase.ts"; exit 1; fi
+          for intento in 1 2 3; do
+            CODE=$(curl -s -o respuesta.txt -w '%{http_code}' -X POST "$URL/rest/v1/rpc/keepalive" \
+              -H "apikey: $KEY" -H "Authorization: Bearer $KEY" -H "Content-Type: application/json" -d '{}')
+            echo "Intento $intento: HTTP $CODE · $(cat respuesta.txt)"
+            if [ "$CODE" = "200" ]; then exit 0; fi
+            sleep 30
+          done
+          echo "::error::La base de datos no respondió. Puede que ya esté pausada: reactívala en el panel de Supabase."
+          exit 1
