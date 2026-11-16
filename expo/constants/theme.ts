@@ -19,9 +19,19 @@ export const DISPLAY_FAMILY = Platform.select({
   default: undefined,
 });
 
-/** Fondo de las pantallas: transparente en web para que se vea el brillo de color del fondo a través del vidrio */
+/** Fondo del contenido de una pantalla: transparente en web, porque el fondo (con su brillo) lo pone la propia escena */
 export function canvas(colors: ThemeColors): string {
   return Platform.OS === 'web' ? 'transparent' : colors.background;
+}
+
+/**
+ * Fondo de cada escena de la navegación: SIEMPRE opaco. Las pantallas que no están activas siguen pintadas
+ * debajo (pestañas y pila), así que un fondo transparente hacía que se vieran unas encima de otras.
+ * En web lleva el brillo de color para que el aspecto sea el mismo.
+ */
+export function sceneBackground(colors: ThemeColors): ViewStyle {
+  if (Platform.OS !== 'web') return { backgroundColor: colors.background };
+  return { backgroundColor: colors.background, backgroundImage: colors.ambient, backgroundRepeat: 'no-repeat' } as unknown as ViewStyle;
 }
 
 export const space = { xs: 4, sm: 8, md: 12, lg: 16, xl: 20, xxl: 24, xxxl: 32, huge: 48 } as const;

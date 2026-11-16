@@ -13,7 +13,6 @@ import ResetPasswordScreen from "@/components/ResetPasswordScreen";
 import WebAlertHost from "@/components/WebAlertHost";
 import WebGlobalStyles from "@/components/WebGlobalStyles";
 import { headerOptions } from "@/constants/navigation";
-import { canvas } from "@/constants/theme";
 import { DarkTheme, DefaultTheme, ThemeProvider as NavThemeProvider } from "@react-navigation/native";
 
 SplashScreen.preventAutoHideAsync();
@@ -61,7 +60,7 @@ function RootLayoutNav() {
     const base = isDark ? DarkTheme : DefaultTheme;
     return {
       ...base,
-      colors: { ...base.colors, background: canvas(colors), card: colors.headerBackground, text: colors.text, border: colors.divider, primary: colors.primary },
+      colors: { ...base.colors, background: colors.background, card: colors.headerBackground, text: colors.text, border: colors.divider, primary: colors.primary },
     };
   }, [colors, isDark]);
 

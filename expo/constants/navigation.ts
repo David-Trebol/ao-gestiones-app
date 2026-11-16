@@ -1,6 +1,6 @@
 import { Platform } from 'react-native';
 import type { ThemeColors } from '@/constants/colors';
-import { FONT_FAMILY, canvas, glass } from '@/constants/theme';
+import { FONT_FAMILY, glass, sceneBackground } from '@/constants/theme';
 
 /** Cabecera estilo Apple: fondo claro/neutro, título oscuro centrado, acento en botones y flecha de volver */
 export function headerOptions(colors: ThemeColors) {
@@ -17,6 +17,6 @@ export function headerOptions(colors: ThemeColors) {
     headerShadowVisible: true,
     headerBackTitle: 'Atrás',
     ...(Platform.OS === 'ios' ? { headerBlurEffect: 'systemChromeMaterial' as const } : {}),
-    contentStyle: { backgroundColor: canvas(colors) },
+    contentStyle: sceneBackground(colors),
   };
 }
