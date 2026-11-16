@@ -1,15 +1,28 @@
 import { Platform, type TextStyle, type ViewStyle } from 'react-native';
 
+import type { ThemeColors } from './colors';
+
 /**
- * Tokens de diseño "estilo Apple": fuente del sistema, escala tipográfica,
- * radios, espaciado (base 4), sombras muy suaves y efecto vidrio para web.
+ * Tokens de diseño con el lenguaje de Apple: fuente del sistema (SF en Mac/iPhone, Inter en el resto),
+ * escala tipográfica de iOS, radios continuos, espaciado base 4, sombras muy suaves y vidrio.
  */
 
-/** Fuente del sistema: SF en Apple, Inter/Segoe/Roboto en el resto */
+/** Fuente del sistema: SF en Apple; Inter (cargada desde Google Fonts) en Windows/Android */
 export const FONT_FAMILY = Platform.select({
   web: '-apple-system, BlinkMacSystemFont, "SF Pro Text", "Inter", system-ui, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif',
   default: undefined,
 });
+
+/** Fuente para títulos grandes (SF Pro Display en Apple) */
+export const DISPLAY_FAMILY = Platform.select({
+  web: '-apple-system, BlinkMacSystemFont, "SF Pro Display", "Inter", system-ui, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif',
+  default: undefined,
+});
+
+/** Fondo de las pantallas: transparente en web para que se vea el brillo de color del fondo a través del vidrio */
+export function canvas(colors: ThemeColors): string {
+  return Platform.OS === 'web' ? 'transparent' : colors.background;
+}
 
 export const space = { xs: 4, sm: 8, md: 12, lg: 16, xl: 20, xxl: 24, xxxl: 32, huge: 48 } as const;
 
@@ -17,7 +30,7 @@ export const radius = { sm: 8, md: 12, lg: 16, xl: 20, xxl: 28, pill: 999 } as c
 
 /** Escala tipográfica (tamaños de iOS) */
 export const type = {
-  largeTitle: { fontSize: 32, fontWeight: '700', letterSpacing: -0.6, lineHeight: 38 },
+  largeTitle: { fontSize: 34, fontWeight: '700', letterSpacing: -0.8, lineHeight: 41, ...(DISPLAY_FAMILY ? { fontFamily: DISPLAY_FAMILY } : {}) },
   title1: { fontSize: 26, fontWeight: '700', letterSpacing: -0.5, lineHeight: 32 },
   title2: { fontSize: 21, fontWeight: '700', letterSpacing: -0.35, lineHeight: 26 },
   title3: { fontSize: 18, fontWeight: '600', letterSpacing: -0.25, lineHeight: 23 },
@@ -51,6 +64,24 @@ export function glass(background: string, blur = 20): ViewStyle {
     backgroundColor: background,
     backdropFilter: `saturate(180%) blur(${blur}px)`,
     WebkitBackdropFilter: `saturate(180%) blur(${blur}px)`,
+  } as unknown as ViewStyle;
+}
+
+/**
+ * Vidrio flotante (estilo Liquid Glass): translúcido, borde claro, brillo interior arriba y sombra amplia.
+ * Solo para controles flotantes (barras, pestañas, botones), nunca para bloques de texto.
+ */
+export function liquidGlass(colors: ThemeColors, isDark: boolean, opts: { strong?: boolean; blur?: number } = {}): ViewStyle {
+  const bg = opts.strong ? colors.glassStrong : colors.glass;
+  if (Platform.OS !== 'web') return { backgroundColor: isDark ? colors.surface : colors.surface };
+  const blur = opts.blur ?? 24;
+  return {
+    backgroundColor: bg,
+    backdropFilter: `blur(${blur}px) saturate(180%)`,
+    WebkitBackdropFilter: `blur(${blur}px) saturate(180%)`,
+    borderWidth: 1,
+    borderColor: colors.glassBorder,
+    boxShadow: `inset 0 1px 0 ${colors.glassHighlight}, 0 10px 30px rgba(0,0,0,${isDark ? 0.45 : 0.12}), 0 1px 3px rgba(0,0,0,${isDark ? 0.3 : 0.06})`,
   } as unknown as ViewStyle;
 }
 

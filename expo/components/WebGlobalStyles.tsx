@@ -23,6 +23,7 @@ export default function WebGlobalStyles() {
     el.textContent = `
       :root { color-scheme: ${isDark ? 'dark' : 'light'}; }
       html, body { background-color: ${colors.background}; }
+      body { background-image: ${colors.ambient}; background-attachment: fixed; background-repeat: no-repeat; min-height: 100vh; }
       body, input, textarea, button, [dir] { font-family: ${FONT_FAMILY}; }
       body { -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale; text-rendering: optimizeLegibility; }
       ::selection { background: ${colors.primarySoftAlt}; }
@@ -39,6 +40,19 @@ export default function WebGlobalStyles() {
         *, *::before, *::after { animation-duration: .01ms !important; animation-iteration-count: 1 !important; transition-duration: .01ms !important; scroll-behavior: auto !important; }
       }
     `;
+    // Inter como alternativa a SF fuera de Apple (en Mac/iPhone se usa la fuente del sistema)
+    if (!document.getElementById('ao-font-inter')) {
+      const pre = document.createElement('link');
+      pre.rel = 'preconnect'; pre.href = 'https://fonts.gstatic.com'; pre.crossOrigin = 'anonymous';
+      document.head.appendChild(pre);
+      const link = document.createElement('link');
+      link.id = 'ao-font-inter';
+      link.rel = 'stylesheet';
+      link.href = 'https://fonts.googleapis.com/css2?family=Inter:opsz,wght@14..32,400..700&display=swap';
+      document.head.appendChild(link);
+    }
+    // Idioma de la página (lectores de pantalla y formato de fechas del navegador)
+    document.documentElement.lang = 'es';
     const meta = document.querySelector('meta[name="theme-color"]') as HTMLMetaElement | null;
     if (meta) meta.content = colors.background;
     else {

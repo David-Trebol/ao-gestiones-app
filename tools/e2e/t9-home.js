@@ -21,19 +21,19 @@ const check = (n, ok, x = '') => results.push((ok ? 'OK  ' : 'FAIL') + ' ' + n +
     await p.getByTestId('login-submit').click(); await w(2500);
     let t = await txt();
     check(`${tag} contadores con nombres completos`, ['Pendiente', 'Procesando', 'Enviado', 'Entregado', 'Cancelado'].every(x => t.includes(x)) && !/Env\.|Pend\./.test(t));
-    check(`${tag} lista con 5 pedidos`, /Todos los pedidos · 5/i.test(t), (t.match(/Todos los pedidos · \d+/i) || [''])[0]);
-    check(`${tag} sección requieren atención`, /Requieren atención · \d/i.test(t));
+    check(`${tag} lista con 5 pedidos`, /Todos los pedidos\W+5/i.test(t), (t.match(/Todos los pedidos\W+\d+/i) || [''])[0]);
+    check(`${tag} sección requieren atención`, /Requieren atención\W+\d/i.test(t));
     await p.getByTestId('counter-shipped').click(); await w(500); t = await txt();
-    check(`${tag} contador abre lista filtrada (Enviado · 1)`, /Enviado · 1/i.test(t) && t.includes('TPG-2026-001'), (t.match(/Enviado · \d+/i) || [''])[0]);
+    check(`${tag} contador abre lista filtrada (Enviado · 1)`, /Enviado\W+1/i.test(t) && t.includes('TPG-2026-001'), (t.match(/Enviado\W+\d+/i) || [''])[0]);
     await p.getByTestId('counter-shipped').click(); await w(400);
     await p.getByTestId('home-search').fill('ruiz'); await w(500); t = await txt();
-    check(`${tag} buscar por cliente`, /Todos los pedidos · 1/i.test(t) && t.includes('ACM-2025-001'));
+    check(`${tag} buscar por cliente`, /Todos los pedidos\W+1/i.test(t) && t.includes('ACM-2025-001'));
     await p.getByTestId('home-search').fill(''); await w(300);
     await p.getByText('Más recientes').click(); await w(400); await p.getByText('Importe: mayor primero', { exact: true }).click(); await w(500);
     const firstRef = await p.evaluate(() => { const el = document.querySelector('[data-testid^="order-row-"],[data-testid^="order-card-"]'); return el ? el.getAttribute('data-testid') : ''; });
     check(`${tag} ordenar por importe`, /o1$/.test(firstRef), firstRef);
     await p.getByText('Fabricante', { exact: true }).first().click(); await w(400); await p.getByText('TechParts Global', { exact: true }).last().click(); await w(500); t = await txt();
-    check(`${tag} filtro fabricante`, /Todos los pedidos · 1/i.test(t) && /Quitar filtros \(1\)/.test(t));
+    check(`${tag} filtro fabricante`, /Todos los pedidos\W+1/i.test(t) && /Quitar filtros \(1\)/.test(t));
     // abrir un pedido y volver: se conservan filtros
     await p.getByText('TPG-2026-001').first().click(); await w(1500); t = await txt();
     check(`${tag} detalle: referencia, estado y total arriba`, /Referencia \| TPG-2026-001/.test(t) && /Total con IVA/.test(t) && /Enviado/.test(t));
@@ -52,7 +52,7 @@ const check = (n, ok, x = '') => results.push((ok ? 'OK  ' : 'FAIL') + ' ' + n +
     await p.goto(base, { waitUntil: 'networkidle' }); await w(1800); t = await txt();
     check(`${tag} aviso de pedidos con retraso`, /requieren? atención/i.test(t) && /1 con retraso/i.test(t));
     await p.getByTestId('filter-overdue').click(); await w(500); t = await txt();
-    check(`${tag} filtro con retraso`, /Con retraso · 1/i.test(t) && t.includes('ACM-2026-002'));
+    check(`${tag} filtro con retraso`, /Con retraso\W+1/i.test(t) && t.includes('ACM-2026-002'));
     await p.goto(base + '/order-detail?orderId=o2', { waitUntil: 'networkidle' }); await w(1500); t = await txt();
     check(`${tag} detalle muestra seguimiento`, /01\/10\/2026 · \d+ días de retraso/.test(t) && t.includes('David') && t.includes('Llamar al fabricante'));
     // editar seguimiento desde el formulario

@@ -17,13 +17,13 @@ import { useLocalSearchParams, useRouter, Stack } from 'expo-router';
 import { Plus, Trash2, FileText, ScanLine, X } from 'lucide-react-native';
 import { LightColors as StaticColors } from '@/constants/colors';
 import { PAGE_MAX, usePageLayout } from '@/components/Page';
+import { canvas , cardShadow, webInputReset } from '@/constants/theme';
 import { useTheme } from '@/contexts/ThemeContext';
 import { useData } from '@/contexts/DataContext';
 import { OrderFormData, OrderFormItem, ShippingFormItem, OrderStatus, Customer } from '@/types';
 import { calculateItemTotals, calculateShippingTotals, formatCurrency } from '@/utils/calculations';
 import * as Haptics from 'expo-haptics';
 import * as DocumentPicker from 'expo-document-picker';
-import { cardShadow, webInputReset } from '@/constants/theme';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import DocumentReview from '@/components/DocumentReview';
 import DateField from '@/components/DateField';
@@ -450,7 +450,7 @@ export default function OrderFormScreen() {
   );
 
   return (
-    <View style={[styles.container, { backgroundColor: colors.background }]}>
+    <View style={[styles.container, { backgroundColor: canvas(colors) }]}>
       <Stack.Screen
         options={{
           title: editingOrder ? 'Editar Pedido' : 'Nuevo Pedido',

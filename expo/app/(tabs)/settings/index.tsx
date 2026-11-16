@@ -30,12 +30,14 @@ import {
   Sun,
   Fingerprint,
 } from 'lucide-react-native';
-import { PageHeader, usePageLayout } from '@/components/Page';
+import { CompactTitleBar, PageHeader, useCollapsingTitle, usePageLayout } from '@/components/Page';
+import { canvas , webInputReset } from '@/constants/theme';
+import { TintChip } from '@/components/AppNav';
+import { SystemTint } from '@/constants/colors';
 import { useTheme } from '@/contexts/ThemeContext';
 import { useData } from '@/contexts/DataContext';
 import { useAuth, AppUser } from '@/contexts/AuthContext';
 import { formatCurrency } from '@/utils/calculations';
-import { webInputReset } from '@/constants/theme';
 import * as Haptics from 'expo-haptics';
 import { useRouter } from 'expo-router';
 
@@ -46,7 +48,8 @@ export default function SettingsScreen() {
   const { colors, isDark, themeMode, setTheme } = useTheme();
   const [deleting, setDeleting] = useState(false);
   const [savingUser, setSavingUser] = useState(false);
-  const { width, content, desktop: isDesktop } = usePageLayout();
+  const { width, content, desktop: isDesktop, bottomSpace } = usePageLayout();
+  const { shown: compactShown, scrollProps } = useCollapsingTitle();
   const isCompact = width < 480;
 
   const [userModalOpen, setUserModalOpen] = useState(false);
@@ -226,8 +229,9 @@ export default function SettingsScreen() {
 
 
   return (
-    <View style={[styles.outerContainer, { backgroundColor: colors.background }]}>
-      <ScrollView style={styles.container} contentContainerStyle={[content, styles.content]} showsVerticalScrollIndicator={false}>
+    <View style={[styles.outerContainer, { backgroundColor: canvas(colors) }]}>
+      <CompactTitleBar title="Ajustes" shown={compactShown} />
+      <ScrollView {...scrollProps} style={styles.container} contentContainerStyle={[content, styles.content, { paddingBottom: bottomSpace }]} showsVerticalScrollIndicator={false}>
         <PageHeader title="Ajustes" />
         {/* Columna de lectura: mismo margen izquierdo que el resto de pantallas, sin estirarse a 1.280 px */}
         <View style={styles.column}>
@@ -261,7 +265,7 @@ export default function SettingsScreen() {
 
         <View style={[styles.section, { backgroundColor: colors.surface, borderColor: colors.borderLight, shadowColor: colors.cardShadow }]}>
           <View style={styles.sectionTitleRow}>
-            {isDark ? <Moon size={17} color={colors.primary} /> : <Sun size={17} color={colors.primary} />}
+            <TintChip Icon={isDark ? Moon : Sun} tint={SystemTint.blue} size={28} />
             <Text style={[styles.sectionTitle, { color: colors.text }]}>Apariencia</Text>
           </View>
 
@@ -320,22 +324,22 @@ export default function SettingsScreen() {
 
               <View style={[styles.statsGrid, isCompact && styles.statsGridCompact]}>
                 <View style={[styles.statCard, isCompact && styles.statCardCompact, { backgroundColor: colors.surfaceAlt }]}>
-                  <View style={[styles.statIconWrap, { backgroundColor: colors.surface }]}>
-                    <FileText size={19} color={colors.primary} />
+                  <View style={[styles.statIconWrap, { backgroundColor: SystemTint.blue }]}>
+                    <FileText size={18} color="#FFFFFF" strokeWidth={2.2} />
                   </View>
                   <Text style={[styles.statValue, { color: colors.text }]}>{totalOrders}</Text>
                   <Text style={[styles.statLabel, { color: colors.textSecondary }]}>Pedidos</Text>
                 </View>
                 <View style={[styles.statCard, isCompact && styles.statCardCompact, { backgroundColor: colors.surfaceAlt }]}>
-                  <View style={[styles.statIconWrap, { backgroundColor: colors.surface }]}>
-                    <Building2 size={19} color={colors.primary} />
+                  <View style={[styles.statIconWrap, { backgroundColor: SystemTint.orange }]}>
+                    <Building2 size={18} color="#FFFFFF" strokeWidth={2.2} />
                   </View>
                   <Text style={[styles.statValue, { color: colors.text }]}>{totalManufacturers}</Text>
                   <Text style={[styles.statLabel, { color: colors.textSecondary }]}>Fabricantes</Text>
                 </View>
                 <View style={[styles.statCard, isCompact && styles.statCardCompact, { backgroundColor: colors.surfaceAlt }]}>
-                  <View style={[styles.statIconWrap, { backgroundColor: colors.surface }]}>
-                    <FolderOpen size={19} color={colors.primary} />
+                  <View style={[styles.statIconWrap, { backgroundColor: SystemTint.indigo }]}>
+                    <FolderOpen size={18} color="#FFFFFF" strokeWidth={2.2} />
                   </View>
                   <Text style={[styles.statValue, { color: colors.text }]}>{totalYears}</Text>
                   <Text style={[styles.statLabel, { color: colors.textSecondary }]}>Años</Text>
@@ -366,7 +370,7 @@ export default function SettingsScreen() {
           <View style={[styles.section, { backgroundColor: colors.surface, borderColor: colors.borderLight, shadowColor: colors.cardShadow }]}>
             <View style={styles.sectionHeaderRow}>
               <View style={styles.sectionTitleRow}>
-                <Users size={17} color={colors.primary} />
+                <TintChip Icon={Users} tint={SystemTint.green} size={28} />
                 <Text style={[styles.sectionTitle, { color: colors.text }]}>Gestión de Usuarios</Text>
               </View>
               <Pressable style={[styles.addUserBtn, { backgroundColor: colors.primary }]} onPress={openCreateUser} testID="add-user-btn">
@@ -418,8 +422,8 @@ export default function SettingsScreen() {
         <View style={[styles.section, { backgroundColor: colors.surface, borderColor: colors.borderLight, shadowColor: colors.cardShadow }]}>
           <Text style={[styles.sectionTitle, { color: colors.text }]}>Cuenta y datos</Text>
           <Pressable style={[styles.menuItem, { borderBottomColor: colors.divider }]} onPress={handleChangePassword} testID="change-password-btn">
-            <View style={[styles.menuIconWrap, { backgroundColor: colors.primarySoft }]}>
-              <KeyRound size={17} color={colors.primary} />
+            <View style={[styles.menuIconWrap, { backgroundColor: SystemTint.gray }]}>
+              <KeyRound size={17} color="#FFFFFF" strokeWidth={2.2} />
             </View>
             <View style={{ flex: 1 }}>
               <Text style={[styles.menuItemTitle, { color: colors.text }]}>Cambiar mi contraseña</Text>
@@ -430,8 +434,8 @@ export default function SettingsScreen() {
           {isAdmin && (
             <>
               <Pressable style={[styles.menuItem, { borderBottomColor: colors.divider }, deleting && { opacity: 0.5 }]} onPress={handleClearAll} disabled={deleting} testID="delete-all-btn">
-                <View style={[styles.menuIconWrap, { backgroundColor: colors.errorBg }]}>
-                  <Trash2 size={17} color={colors.error} />
+                <View style={[styles.menuIconWrap, { backgroundColor: SystemTint.red }]}>
+                  <Trash2 size={17} color="#FFFFFF" strokeWidth={2.2} />
                 </View>
                 <View style={{ flex: 1 }}>
                   <Text style={[styles.menuItemTitle, { color: colors.error }]}>Eliminar todos los datos</Text>
@@ -450,7 +454,7 @@ export default function SettingsScreen() {
 
         <View style={[styles.section, { backgroundColor: colors.surface, borderColor: colors.borderLight, shadowColor: colors.cardShadow }]}>
           <View style={styles.sectionTitleRow}>
-            <Monitor size={17} color={colors.primary} />
+            <TintChip Icon={Monitor} tint={SystemTint.gray} size={28} />
             <Text style={[styles.sectionTitle, { color: colors.text }]}>Plataforma</Text>
           </View>
           <View style={[styles.platformInfo, { backgroundColor: colors.surfaceAlt }]}>
@@ -587,7 +591,7 @@ const styles = StyleSheet.create({
     width: '100%' as any,
     maxWidth: 820,
   },
-  userBanner: { borderRadius: 20, padding: 20, marginBottom: 16, borderWidth: 0,
+  userBanner: { borderRadius: 16, padding: 20, marginBottom: 16, borderWidth: 0,
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
@@ -652,7 +656,7 @@ const styles = StyleSheet.create({
   desktopHalf: {
     flex: 1,
   },
-  section: { borderRadius: 20, padding: 20, marginBottom: 18, borderWidth: 0,
+  section: { borderRadius: 16, padding: 20, marginBottom: 18, borderWidth: 0,
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 1,
     shadowRadius: 8,
@@ -759,7 +763,7 @@ const styles = StyleSheet.create({
   },
   statCard: { flex: 1, alignItems: 'center', paddingVertical: 16, borderRadius: 16, gap: 4, },
   statCardCompact: { minWidth: '30%' as const, },
-  statIconWrap: { width: 36, height: 36, borderRadius: 999,
+  statIconWrap: { width: 34, height: 34, borderRadius: 9,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -799,7 +803,7 @@ const styles = StyleSheet.create({
     fontStyle: 'italic' as const,
   },
   menuItem: { flexDirection: 'row', alignItems: 'center', gap: 14, paddingVertical: 14, borderBottomWidth: StyleSheet.hairlineWidth, },
-  menuIconWrap: { width: 36, height: 36, borderRadius: 999,
+  menuIconWrap: { width: 30, height: 30, borderRadius: 8,
     alignItems: 'center',
     justifyContent: 'center',
   },

@@ -1,32 +1,69 @@
 import React from 'react';
-import { Platform, Pressable, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
+import { Platform, Pressable, StyleSheet, Text, View, ViewStyle, useWindowDimensions } from 'react-native';
 import type { BottomTabBarProps } from '@react-navigation/bottom-tabs';
 import { useRouter, usePathname } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Building2, FolderOpen, Plus, Settings } from 'lucide-react-native';
 import { useTheme } from '@/contexts/ThemeContext';
 import { useAuth } from '@/contexts/AuthContext';
-import { radius } from '@/constants/theme';
+import { SystemTint } from '@/constants/colors';
+import { glass, liquidGlass } from '@/constants/theme';
 
 /** Ancho desde el que la navegación pasa a ser lateral */
 export const NAV_SIDE_MIN = 768;
 /** Ancho desde el que la barra lateral muestra textos */
 export const NAV_FULL_MIN = 1200;
+/** Ancho de la barra lateral (con textos / solo iconos) */
+export const NAV_WIDTH_FULL = 248;
+export const NAV_WIDTH_COMPACT = 84;
+/** Espacio que ocupa la barra flotante de móvil (para que el final de las listas no quede debajo) */
+export const TAB_BAR_SPACE = 96;
 
 const ITEMS = [
-  { name: '(home)', label: 'Pedidos', Icon: FolderOpen },
-  { name: 'manufacturers', label: 'Fabricantes', Icon: Building2 },
-  { name: 'settings', label: 'Ajustes', Icon: Settings },
+  { name: '(home)', label: 'Pedidos', Icon: FolderOpen, tint: SystemTint.blue },
+  { name: 'manufacturers', label: 'Fabricantes', Icon: Building2, tint: SystemTint.orange },
+  { name: 'settings', label: 'Ajustes', Icon: Settings, tint: SystemTint.gray },
 ] as const;
 
+const web = Platform.OS === 'web';
+const pointer = web ? ({ cursor: 'pointer' } as ViewStyle) : null;
+
+/** Icono de la app: degradado de color, como el icono de una app de Apple */
+export function AppIcon({ size = 34 }: { size?: number }) {
+  return (
+    <View
+      style={[
+        styles.appIcon,
+        { width: size, height: size, borderRadius: size * 0.2237 },
+        web
+          ? ({ backgroundImage: 'linear-gradient(145deg, #3D8BFF 0%, #5856D6 55%, #AF52DE 100%)', boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.35), 0 2px 6px rgba(88,86,214,0.35)' } as ViewStyle)
+          : { backgroundColor: SystemTint.indigo },
+      ]}
+      accessibilityElementsHidden
+      importantForAccessibility="no-hide-descendants"
+    >
+      <Text style={[styles.appIconText, { fontSize: size * 0.38 }]}>AO</Text>
+    </View>
+  );
+}
+
+/** Icono en un cuadrado de color (como los de Ajustes de iOS y la barra lateral de macOS) */
+export function TintChip({ Icon, tint, size = 28 }: { Icon: React.ComponentType<{ size?: number; color?: string; strokeWidth?: number }>; tint: string; size?: number }) {
+  return (
+    <View style={[styles.chip, { width: size, height: size, borderRadius: size * 0.27, backgroundColor: tint }]}>
+      <Icon size={size * 0.58} color="#FFFFFF" strokeWidth={2.2} />
+    </View>
+  );
+}
+
 /**
- * Navegación principal:
- * - ordenador (≥ 1200 px): barra lateral con textos y «Nuevo pedido» siempre a mano
- * - tablet (768–1199 px): barra lateral solo con iconos
- * - móvil: barra inferior (se oculta en el formulario, que tiene su propia barra de guardar)
+ * Navegación principal con el lenguaje de Apple:
+ * - ordenador (≥ 1200 px): barra lateral translúcida de macOS, con iconos de colores y «Nuevo pedido»
+ * - tablet (768–1199 px): la misma barra, solo con iconos
+ * - móvil: barra de pestañas flotante de vidrio (se oculta en el formulario, que tiene su barra de guardar)
  */
 export default function AppNav({ state, navigation }: BottomTabBarProps) {
-  const { colors } = useTheme();
+  const { colors, isDark } = useTheme();
   const { width } = useWindowDimensions();
   const insets = useSafeAreaInsets();
   const router = useRouter();
@@ -50,41 +87,50 @@ export default function AppNav({ state, navigation }: BottomTabBarProps) {
   if (!side) {
     if (pathname.startsWith('/order-form')) return null;
     return (
-      <View
-        style={[styles.bottom, { backgroundColor: colors.tabBarBackground, borderTopColor: colors.divider, paddingBottom: Math.max(insets.bottom, 6) }]}
-        accessibilityRole={Platform.OS === 'web' ? ('navigation' as never) : undefined}
-      >
-        {ITEMS.map(({ name, label, Icon }) => {
-          const active = isActive(name);
-          return (
-            <Pressable
-              key={name}
-              onPress={() => go(name)}
-              style={styles.bottomItem}
-              accessibilityRole="tab"
-              accessibilityState={{ selected: active }}
-              accessibilityLabel={label}
-              testID={`nav-${label}`}
-            >
-              <Icon size={22} color={active ? colors.primary : colors.textSecondary} strokeWidth={active ? 2.3 : 1.8} />
-              <Text style={[styles.bottomLabel, { color: active ? colors.primary : colors.textSecondary }]}>{label}</Text>
-            </Pressable>
-          );
-        })}
+      <View pointerEvents="box-none" style={[styles.bottomWrap, { paddingBottom: Math.max(insets.bottom, 12) }]}>
+        <View
+          style={[styles.bottom, liquidGlass(colors, isDark)]}
+          accessibilityRole={web ? ('navigation' as never) : undefined}
+        >
+          {ITEMS.map(({ name, label, Icon }) => {
+            const active = isActive(name);
+            return (
+              <Pressable
+                key={name}
+                onPress={() => go(name)}
+                style={[styles.bottomItem, active && { backgroundColor: colors.primarySoft }, pointer]}
+                accessibilityRole="tab"
+                accessibilityState={{ selected: active }}
+                accessibilityLabel={label}
+                testID={`nav-${label}`}
+              >
+                <Icon size={22} color={active ? colors.primary : colors.text} strokeWidth={active ? 2.3 : 1.8} />
+                <Text style={[styles.bottomLabel, { color: active ? colors.primary : colors.text }, active && { fontWeight: '600' }]}>{label}</Text>
+              </Pressable>
+            );
+          })}
+        </View>
       </View>
     );
   }
 
   return (
     <View
-      style={[styles.side, { width: full ? 232 : 76, backgroundColor: colors.headerBackground, borderRightColor: colors.divider }]}
-      accessibilityRole={Platform.OS === 'web' ? ('navigation' as never) : undefined}
+      style={[
+        styles.side,
+        { width: full ? NAV_WIDTH_FULL : NAV_WIDTH_COMPACT, borderRightColor: colors.divider },
+        glass(colors.headerBackground, 30),
+      ]}
+      accessibilityRole={web ? ('navigation' as never) : undefined}
     >
-      <View style={[styles.brand, !full && { justifyContent: 'center', paddingHorizontal: 0 }]}>
-        <View style={[styles.logo, { backgroundColor: colors.primary }]}>
-          <Text style={styles.logoText}>AO</Text>
-        </View>
-        {full && <Text style={[styles.brandText, { color: colors.text }]}>AO Gestiones</Text>}
+      <View style={[styles.brand, !full && styles.brandCompact]}>
+        <AppIcon />
+        {full && (
+          <View style={{ minWidth: 0 }}>
+            <Text style={[styles.brandText, { color: colors.text }]}>AO Gestiones</Text>
+            <Text style={[styles.brandSub, { color: colors.textSecondary }]}>Libro de pedidos</Text>
+          </View>
+        )}
       </View>
 
       <Pressable
@@ -92,18 +138,19 @@ export default function AppNav({ state, navigation }: BottomTabBarProps) {
         style={({ hovered, pressed }: { pressed: boolean; hovered?: boolean }) => [
           styles.newBtn,
           !full && styles.newBtnCompact,
-          { backgroundColor: hovered ? colors.primaryDark : colors.primary, opacity: pressed ? 0.85 : 1 },
+          { backgroundColor: hovered ? colors.primaryDark : colors.primaryFill, opacity: pressed ? 0.85 : 1 },
+          web && ({ boxShadow: '0 1px 2px rgba(0,0,0,0.12), inset 0 1px 0 rgba(255,255,255,0.18)', cursor: 'pointer' } as ViewStyle),
         ]}
         accessibilityRole="button"
         accessibilityLabel="Nuevo pedido"
         testID="nav-new-order"
       >
-        <Plus size={18} color="#fff" strokeWidth={2.5} />
+        <Plus size={18} color="#fff" strokeWidth={2.6} />
         {full && <Text style={styles.newBtnText}>Nuevo pedido</Text>}
       </Pressable>
 
       <View style={styles.items}>
-        {ITEMS.map(({ name, label, Icon }) => {
+        {ITEMS.map(({ name, label, Icon, tint }) => {
           const active = isActive(name);
           return (
             <Pressable
@@ -112,37 +159,40 @@ export default function AppNav({ state, navigation }: BottomTabBarProps) {
               style={({ hovered }: { pressed: boolean; hovered?: boolean }) => [
                 styles.item,
                 !full && styles.itemCompact,
-                active ? { backgroundColor: colors.primarySoftAlt } : hovered ? { backgroundColor: colors.fill } : null,
+                active ? { backgroundColor: isDark ? 'rgba(255,255,255,0.10)' : 'rgba(0,0,0,0.07)' } : hovered ? { backgroundColor: colors.fill } : null,
+                pointer,
               ]}
               accessibilityRole="tab"
               accessibilityState={{ selected: active }}
               accessibilityLabel={label}
               testID={`nav-${label}`}
             >
-              <Icon size={20} color={active ? colors.primary : colors.textSecondary} strokeWidth={active ? 2.3 : 1.9} />
+              <TintChip Icon={Icon} tint={tint} size={full ? 26 : 30} />
               {full ? (
-                <Text style={[styles.itemText, { color: active ? colors.primary : colors.text }, active && { fontWeight: '600' }]}>{label}</Text>
+                <Text style={[styles.itemText, { color: colors.text }, active && { fontWeight: '600' }]}>{label}</Text>
               ) : (
-                <Text style={[styles.itemTextCompact, { color: active ? colors.primary : colors.textSecondary }]}>{label}</Text>
+                <Text style={[styles.itemTextCompact, { color: active ? colors.text : colors.textSecondary }, active && { fontWeight: '600' }]}>{label}</Text>
               )}
             </Pressable>
           );
         })}
       </View>
 
-      {full && currentUser && (
-        <View style={[styles.user, { borderTopColor: colors.divider }]}>
-          <View style={[styles.avatar, { backgroundColor: colors.fill }]}>
+      {currentUser && (
+        <View style={[styles.user, { borderTopColor: colors.divider }, !full && { justifyContent: 'center', paddingHorizontal: 0 }]}>
+          <View style={[styles.avatar, { backgroundColor: isDark ? '#3A3A3C' : '#D1D1D6' }]} accessibilityLabel={currentUser.displayName || currentUser.email || 'Usuario'}>
             <Text style={[styles.avatarText, { color: colors.text }]}>{(currentUser.displayName || currentUser.email || '?').slice(0, 1).toUpperCase()}</Text>
           </View>
-          <View style={{ flex: 1, minWidth: 0 }}>
-            <Text style={[styles.userName, { color: colors.text }]} numberOfLines={1}>
-              {currentUser.displayName || currentUser.email}
-            </Text>
-            <Text style={[styles.userMail, { color: colors.textSecondary }]} numberOfLines={1}>
-              {currentUser.role === 'admin' ? 'Administrador' : 'Usuario'}
-            </Text>
-          </View>
+          {full && (
+            <View style={{ flex: 1, minWidth: 0 }}>
+              <Text style={[styles.userName, { color: colors.text }]} numberOfLines={1}>
+                {currentUser.displayName || currentUser.email}
+              </Text>
+              <Text style={[styles.userMail, { color: colors.textSecondary }]} numberOfLines={1}>
+                {currentUser.role === 'admin' ? 'Administrador' : 'Usuario'}
+              </Text>
+            </View>
+          )}
         </View>
       )}
     </View>
@@ -150,22 +200,26 @@ export default function AppNav({ state, navigation }: BottomTabBarProps) {
 }
 
 const styles = StyleSheet.create({
-  bottom: { flexDirection: 'row', borderTopWidth: StyleSheet.hairlineWidth, paddingTop: 6 },
-  bottomItem: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 2, minHeight: 48 },
-  bottomLabel: { fontSize: 11, fontWeight: '500' },
-  side: { height: '100%', borderRightWidth: StyleSheet.hairlineWidth, paddingVertical: 16, paddingHorizontal: 12, gap: 8 },
-  brand: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 6, marginBottom: 12, minHeight: 36 },
-  logo: { width: 34, height: 34, borderRadius: 9, alignItems: 'center', justifyContent: 'center' },
-  logoText: { color: '#fff', fontWeight: '800', fontSize: 13, letterSpacing: 0.3 },
-  brandText: { fontSize: 16, fontWeight: '700', letterSpacing: -0.3 },
-  newBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, minHeight: 44, borderRadius: radius.pill, marginBottom: 12 },
+  appIcon: { alignItems: 'center', justifyContent: 'center' },
+  appIconText: { color: '#fff', fontWeight: '800', letterSpacing: -0.3 },
+  chip: { alignItems: 'center', justifyContent: 'center' },
+  bottomWrap: { position: 'absolute', left: 0, right: 0, bottom: 0, alignItems: 'center', paddingHorizontal: 16 },
+  bottom: { flexDirection: 'row', alignItems: 'center', gap: 4, padding: 6, borderRadius: 32, width: '100%', maxWidth: 420 },
+  bottomItem: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 2, minHeight: 52, borderRadius: 26 },
+  bottomLabel: { fontSize: 11, fontWeight: '500', letterSpacing: 0.1 },
+  side: { height: '100%', borderRightWidth: StyleSheet.hairlineWidth, paddingTop: 18, paddingBottom: 14, paddingHorizontal: 12, gap: 8 },
+  brand: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 6, marginBottom: 10, minHeight: 40 },
+  brandCompact: { justifyContent: 'center', paddingHorizontal: 0 },
+  brandText: { fontSize: 15, fontWeight: '700', letterSpacing: -0.3 },
+  brandSub: { fontSize: 12, marginTop: 1 },
+  newBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, minHeight: 44, borderRadius: 999, marginBottom: 14 },
   newBtnCompact: { width: 48, alignSelf: 'center' },
-  newBtnText: { color: '#fff', fontSize: 15, fontWeight: '600' },
+  newBtnText: { color: '#fff', fontSize: 15, fontWeight: '600', letterSpacing: -0.2 },
   items: { gap: 2, flex: 1 },
-  item: { flexDirection: 'row', alignItems: 'center', gap: 12, minHeight: 44, paddingHorizontal: 12, borderRadius: radius.md },
-  itemCompact: { flexDirection: 'column', gap: 2, paddingHorizontal: 0, paddingVertical: 8, minHeight: 56, justifyContent: 'center' },
-  itemText: { fontSize: 15 },
-  itemTextCompact: { fontSize: 10.5, fontWeight: '500' },
+  item: { flexDirection: 'row', alignItems: 'center', gap: 10, minHeight: 44, paddingHorizontal: 8, borderRadius: 10 },
+  itemCompact: { flexDirection: 'column', gap: 4, paddingHorizontal: 0, paddingVertical: 8, minHeight: 64, justifyContent: 'center' },
+  itemText: { fontSize: 15, letterSpacing: -0.2 },
+  itemTextCompact: { fontSize: 11, fontWeight: '500' },
   user: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingTop: 12, paddingHorizontal: 6, borderTopWidth: StyleSheet.hairlineWidth },
   avatar: { width: 32, height: 32, borderRadius: 16, alignItems: 'center', justifyContent: 'center' },
   avatarText: { fontSize: 14, fontWeight: '600' },
