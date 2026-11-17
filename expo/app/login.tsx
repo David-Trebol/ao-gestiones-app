@@ -12,13 +12,14 @@ import {
   ActivityIndicator,
   ScrollView,
   ViewStyle,
+  useWindowDimensions,
 } from 'react-native';
 import { Stack } from 'expo-router';
-import { Eye, EyeOff, Mail, Fingerprint } from 'lucide-react-native';
+import { Eye, EyeOff, Mail, Fingerprint, Package, Search, ScanLine } from 'lucide-react-native';
 import { useAuth } from '@/contexts/AuthContext';
 import { useTheme } from '@/contexts/ThemeContext';
 import { supabase } from '@/lib/supabase';
-import { canvas, liquidGlass, type, webInputReset } from '@/constants/theme';
+import { canvas, cardShadow, type, webInputReset } from '@/constants/theme';
 import type { ThemeColors } from '@/constants/colors';
 import { AppIcon } from '@/components/AppNav';
 import * as Haptics from 'expo-haptics';
@@ -31,6 +32,9 @@ export default function LoginScreen() {
   const { login, loginWithBiometric, requestPasswordReset, biometricEnabled, biometricAvailable, locked } = useAuth();
   const { colors, isDark } = useTheme();
   const st = useMemo(() => makeStyles(colors, isDark), [colors, isDark]);
+  const { width } = useWindowDimensions();
+  // Ordenador: panel de marca a la izquierda y formulario a la derecha; móvil: franja de marca arriba
+  const split = width >= 960;
 
   const [username, setUsername] = useState<string>('');
   const [password, setPassword] = useState<string>('');
@@ -237,21 +241,63 @@ export default function LoginScreen() {
   const showBiometricButton = biometricEnabled && biometricAvailable && Platform.OS !== 'web';
   const field = (name: string) => [st.inputWrap, focusedField === name && st.inputWrapFocused];
 
+  // Lo que hace la app (solo funciones que existen)
+  const features: { Icon: typeof Package; title: string; text: string }[] = [
+    { Icon: Package, title: 'Pedidos y clientes', text: 'Cada pedido con su cliente, productos, importes y seguimiento.' },
+    { Icon: Search, title: 'Encuentra cualquier pedido', text: 'Por referencia, cliente, email, NIF o producto, por año y por fabricante.' },
+    { Icon: ScanLine, title: 'Lee tus documentos', text: 'Rellena un pedido desde un PDF o una foto, sin enviarlo a ningún servicio.' },
+  ];
+
+  const brandPanel = (
+    <View style={[st.panel, { backgroundColor: colors.nav }, !split && st.panelTop]}>
+      <View style={st.wordmarkRow}>
+        <AppIcon size={split ? 44 : 38} />
+        <View>
+          <Text style={[st.wordmark, { color: colors.brand }]}>ALPHAΩMEGA</Text>
+          <Text style={[st.wordmarkSub, { color: colors.navMuted }]}>ELECTRONICS</Text>
+        </View>
+      </View>
+      {split ? (
+        <View style={st.panelBody}>
+          <Text style={[st.panelTitle, { color: colors.navText }]}>Libro de pedidos</Text>
+          <Text style={[st.panelLead, { color: colors.navMuted }]}>La herramienta interna para llevar los pedidos de la empresa: lo que antes vivía en la hoja de Excel, ahora ordenado y a mano.</Text>
+          <View style={st.featureList}>
+            {features.map(({ Icon, title, text }) => (
+              <View key={title} style={st.feature}>
+                <View style={[st.featureIcon, { backgroundColor: colors.brand }]}>
+                  <Icon size={18} color={colors.onPrimary} strokeWidth={2.3} />
+                </View>
+                <View style={{ flex: 1, minWidth: 0 }}>
+                  <Text style={[st.featureTitle, { color: colors.navText }]}>{title}</Text>
+                  <Text style={[st.featureText, { color: colors.navMuted }]}>{text}</Text>
+                </View>
+              </View>
+            ))}
+          </View>
+        </View>
+      ) : (
+        <Text style={[st.panelLeadMobile, { color: colors.navMuted }]}>Libro de pedidos · uso interno</Text>
+      )}
+      {split && <Text style={[st.panelFoot, { color: colors.navMuted }]}>Alpha Omega Electronics · uso interno</Text>}
+    </View>
+  );
+
   return (
-    <View style={[st.container, { backgroundColor: canvas(colors) }]}>
+    <View style={[st.container, { backgroundColor: canvas(colors) }, split && { flexDirection: 'row' }]}>
       <Stack.Screen options={{ headerShown: false }} />
+      {split && brandPanel}
       <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={{ flex: 1 }}>
-        <ScrollView contentContainerStyle={st.scroll} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
-          <Animated.View style={[st.column, { transform: [{ translateX: shakeAnim }] }]}>
+        <ScrollView contentContainerStyle={[st.scroll, !split && st.scrollMobile]} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
+          {!split && brandPanel}
+          <Animated.View style={[st.column, !split && st.columnMobile, { transform: [{ translateX: shakeAnim }] }]}>
             <Animated.View style={[st.brand, { opacity: fadeAnim, transform: [{ translateY: slideAnim }, { scale: logoScale }] }]}>
-              <AppIcon size={72} />
-              <Text style={st.appName} accessibilityRole="header">AO Gestiones</Text>
+              <Text style={st.appName} accessibilityRole="header">{setupMode ? 'Crea tu cuenta' : 'Inicia sesión'}</Text>
               <Animated.Text style={[st.tagline, { opacity: taglineAnim }]}>
-                {setupMode ? 'Crea la primera cuenta de administrador' : 'Inicia sesión para ver tus pedidos'}
+                {setupMode ? 'Crea la primera cuenta de administrador' : 'Entra con tu email y tu contraseña'}
               </Animated.Text>
             </Animated.View>
 
-            <Animated.View style={[st.card, liquidGlass(colors, isDark, { strong: true }), { opacity: formFade, transform: [{ translateY: formSlide }] }]}>
+            <Animated.View style={[st.card, { backgroundColor: colors.surface }, cardShadow(isDark), { opacity: formFade, transform: [{ translateY: formSlide }] }]}>
               {displayError !== '' && (
                 <View style={st.errorBanner} accessibilityLiveRegion="assertive">
                   <Text style={st.errorText}>{displayError}</Text>
@@ -391,7 +437,7 @@ export default function LoginScreen() {
                 accessibilityRole="button"
                 testID="login-submit"
               >
-                {loading ? <ActivityIndicator color="#fff" size="small" /> : <Text style={st.primaryBtnText}>{setupMode ? 'Crear cuenta y entrar' : 'Entrar'}</Text>}
+                {loading ? <ActivityIndicator color={colors.onPrimary} size="small" /> : <Text style={[st.primaryBtnText, { color: colors.onPrimary }]}>{setupMode ? 'Crear cuenta y entrar' : 'Entrar'}</Text>}
               </Pressable>
 
               {info !== '' && (
@@ -423,11 +469,29 @@ function makeStyles(c: ThemeColors, isDark: boolean) {
   return StyleSheet.create({
     container: { flex: 1 },
     scroll: { flexGrow: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 20, paddingVertical: 48 },
-    column: { width: '100%', maxWidth: 400 },
-    brand: { alignItems: 'center', marginBottom: 28 },
-    appName: { ...type.largeTitle, color: c.text, marginTop: 18, textAlign: 'center' },
-    tagline: { fontSize: 17, lineHeight: 22, color: c.textSecondary, marginTop: 4, textAlign: 'center', letterSpacing: -0.2 },
-    card: { borderRadius: 24, padding: 24, gap: 16, ...(web ? {} : { backgroundColor: c.surface }) },
+    scrollMobile: { justifyContent: 'flex-start', paddingHorizontal: 0, paddingTop: 0 },
+    column: { width: '100%', maxWidth: 420 },
+    columnMobile: { paddingHorizontal: 20, marginTop: 24 },
+    brand: { alignItems: 'flex-start', marginBottom: 20, paddingHorizontal: 4 },
+    appName: { ...type.largeTitle, color: c.text },
+    tagline: { fontSize: 17, lineHeight: 22, color: c.textSecondary, marginTop: 4, letterSpacing: -0.2 },
+    card: { borderRadius: 24, padding: 24, gap: 16, borderTopWidth: 4, borderTopColor: c.brand },
+    // panel de marca
+    panel: { width: '42%', maxWidth: 620, minWidth: 380, paddingHorizontal: 56, paddingVertical: 48, justifyContent: 'space-between' },
+    panelTop: { width: '100%', maxWidth: undefined, minWidth: 0, paddingHorizontal: 24, paddingTop: 36, paddingBottom: 28, borderBottomLeftRadius: 28, borderBottomRightRadius: 28, gap: 14 },
+    wordmarkRow: { flexDirection: 'row', alignItems: 'center', gap: 12 },
+    wordmark: { fontSize: 24, fontWeight: '800', letterSpacing: 1.2 },
+    wordmarkSub: { fontSize: 12, fontWeight: '600', letterSpacing: 5, marginTop: -2 },
+    panelBody: { gap: 18, marginVertical: 40 },
+    panelTitle: { fontSize: 48, lineHeight: 52, fontWeight: '800', letterSpacing: -1.4 },
+    panelLead: { fontSize: 18, lineHeight: 27, maxWidth: 460 },
+    panelLeadMobile: { fontSize: 15, letterSpacing: 0.2 },
+    featureList: { gap: 20, marginTop: 12 },
+    feature: { flexDirection: 'row', gap: 14, alignItems: 'flex-start', maxWidth: 480 },
+    featureIcon: { width: 40, height: 40, borderRadius: 11, alignItems: 'center', justifyContent: 'center' },
+    featureTitle: { fontSize: 17, fontWeight: '700' },
+    featureText: { fontSize: 15, lineHeight: 21, marginTop: 2 },
+    panelFoot: { fontSize: 13 },
     field: { gap: 6 },
     label: { fontSize: 13, fontWeight: '600', color: c.textSecondary, paddingHorizontal: 4 },
     inputWrap: { minHeight: 48, borderRadius: 12, backgroundColor: c.fill, borderWidth: 2, borderColor: 'transparent', justifyContent: 'center' },
