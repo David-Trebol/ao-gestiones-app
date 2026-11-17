@@ -94,6 +94,8 @@ export default function OrderFormScreen() {
   const { width, height, pad } = usePageLayout();
   // Móvil en horizontal: una sola barra arriba (Cancelar · título y total · Guardar) para dejar sitio al formulario
   const compact = height < 500;
+  // Móviles muy estrechos (320 px): total más pequeño y botón corto para que el importe quepa entero
+  const tiny = width < 360;
   // Ordenador ancho: dos columnas (cliente y productos | pedido, total y guardar) y productos en tabla
   const wideForm = width >= 1200;
   // La tabla editable de productos necesita ~950 px de columna: solo en pantallas muy anchas; si no, tarjetas
@@ -494,7 +496,7 @@ export default function OrderFormScreen() {
       accessibilityState={{ disabled: saving, busy: saving }}
     >
       {saving && <ActivityIndicator size="small" color="#fff" />}
-      <Text style={[styles.submitBtnText, compact && { fontSize: 15 }]}>{saving ? 'Guardando…' : compact ? (editingOrder ? 'Guardar' : 'Crear') : editingOrder ? 'Guardar cambios' : 'Crear pedido'}</Text>
+      <Text style={[styles.submitBtnText, (compact || tiny) && { fontSize: 15 }]}>{saving ? 'Guardando…' : compact || tiny ? (editingOrder ? 'Guardar' : 'Crear') : editingOrder ? 'Guardar cambios' : 'Crear pedido'}</Text>
     </Pressable>
   );
 
@@ -680,7 +682,7 @@ export default function OrderFormScreen() {
                     autoComplete="organization"
                   />
                   {empresaFocused && customerSuggestions.length > 0 && (
-                    <View style={[styles.suggestions, { backgroundColor: colors.surface, borderColor: colors.border }]} accessibilityRole="menu">
+                    <View style={[styles.suggestions, width < 768 && styles.suggestionsInline, { backgroundColor: colors.surface, borderColor: colors.border }]} accessibilityRole="menu">
                       <Text style={[styles.suggestTitle, { color: colors.textSecondary }]}>Clientes de pedidos anteriores</Text>
                       {customerSuggestions.map(o => (
                         <Pressable
@@ -1054,7 +1056,7 @@ export default function OrderFormScreen() {
               ) : (
                 <>
                   {height >= 500 && <Text style={[styles.saveBarLabel, { color: colors.textSecondary }]}>Total con IVA</Text>}
-                  <Text style={[styles.saveBarTotal, { color: colors.text }]}>{formatCurrency(totals.grandTotal)}</Text>
+                  <Text style={[styles.saveBarTotal, { color: colors.text }, tiny && { fontSize: 16 }]} numberOfLines={1} adjustsFontSizeToFit>{formatCurrency(totals.grandTotal)}</Text>
                 </>
               )}
             </View>
@@ -1324,6 +1326,8 @@ const styles = StyleSheet.create({
   chipSmallText: { fontSize: 13, fontWeight: '500' as const },
   help: { fontSize: 12, lineHeight: 16 },
   errorText: { fontSize: 12, marginTop: -8, marginBottom: 12 },
+  // En móvil la lista va en el flujo (empuja el formulario): flotando quedaba tapada por la barra de guardar
+  suggestionsInline: { position: 'relative', top: 0, marginTop: -4, marginBottom: 12 },
   suggestions: { position: 'absolute', top: 72, left: 0, right: 0, borderRadius: 12, borderWidth: StyleSheet.hairlineWidth, overflow: 'hidden', zIndex: 20, ...(Platform.OS === 'web' ? ({ boxShadow: '0 8px 28px rgba(0,0,0,0.14)' } as object) : { elevation: 6 }) },
   suggestTitle: { fontSize: 12, fontWeight: '600' as const, textTransform: 'uppercase', letterSpacing: 0.3, paddingHorizontal: 12, paddingVertical: 8 },
   suggestion: { paddingHorizontal: 12, paddingVertical: 10, borderTopWidth: StyleSheet.hairlineWidth, minHeight: 48 },
