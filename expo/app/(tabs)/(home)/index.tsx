@@ -17,14 +17,13 @@ import {
   Easing,
 } from 'react-native';
 import { useRouter } from 'expo-router';
-import { FolderOpen, Building2, ChevronRight, Home, Plus } from 'lucide-react-native';
+import { ChevronRight, Home, Plus } from 'lucide-react-native';
 import { useTheme } from '@/contexts/ThemeContext';
 import { useData } from '@/contexts/DataContext';
-import FolderCard from '@/components/FolderCard';
+import FolderTile from '@/components/home/FolderTile';
 import EmptyState from '@/components/EmptyState';
 import SectionHeader from '@/components/SectionHeader';
 import { NavigationView, Manufacturer, Order } from '@/types';
-import { formatCurrency } from '@/utils/calculations';
 import * as Haptics from 'expo-haptics';
 import OrdersDashboard, { OrderCardItem, OrderTable } from '@/components/home/OrdersDashboard';
 import { CompactTitleBar, PageHeader, PAGE_MAX, useCollapsingTitle, usePageLayout } from '@/components/Page';
@@ -45,7 +44,7 @@ export default function HomeScreen() {
   const navWidth = width >= NAV_FULL_MIN ? NAV_WIDTH_FULL : width >= NAV_SIDE_MIN ? NAV_WIDTH_COMPACT : 0;
   const innerWidth = Math.min(width - navWidth, PAGE_MAX) - pad * 2;
   // Tantas columnas como quepan con un mínimo de 240 px por tarjeta (máx. 6)
-  const gridColumns = Math.max(1, Math.min(6, Math.floor((innerWidth + 12) / 252)));
+  const gridColumns = Math.max(1, Math.min(5, Math.floor((innerWidth + 14) / 294)));
   const useTable = width >= 1100; // igual que la lista del inicio
   const twoCols = width >= 700 && !useTable;
 
@@ -325,19 +324,15 @@ export default function HomeScreen() {
           {allYears.map((year, index) => {
             const yearOrders = getOrdersByYear(year);
             const manufacturersForYear = getManufacturersForYear(year);
-            const totalAmount = yearOrders.reduce((sum, o) => sum + o.total_with_vat, 0);
 
             return (
               <AnimatedGridItem key={year} index={index} width={gridItemWidth}>
-                <FolderCard
-                  icon={<FolderOpen size={20} color={colors.primary} strokeWidth={2} />}
+                <FolderTile
+                  kind="year"
                   title={String(year)}
-                  badges={[
-                    { label: `${yearOrders.length} pedido${yearOrders.length !== 1 ? 's' : ''}`, color: colors.accent },
-                    { label: `${manufacturersForYear.length} fabricante${manufacturersForYear.length !== 1 ? 's' : ''}`, color: colors.primary },
-                  ]}
-                  totalLabel="Total"
-                  totalValue={formatCurrency(totalAmount)}
+                  orders={yearOrders}
+                  extraLabel="Fabricantes"
+                  extraValue={String(manufacturersForYear.length)}
                   onPress={() => navigateToYear(year)}
                   onDuplicate={() => handleDuplicateYear(year)}
                   testID={`year-folder-${year}`}
@@ -382,19 +377,14 @@ export default function HomeScreen() {
         <View style={styles.grid}>
           {manufacturersForYear.map((manufacturer, index) => {
             const mfOrders = yearOrders.filter(o => o.manufacturer_id === manufacturer.id);
-            const totalAmount = mfOrders.reduce((sum, o) => sum + o.total_with_vat, 0);
 
             return (
               <AnimatedGridItem key={manufacturer.id} index={index} width={gridItemWidth}>
-                <FolderCard
-                  icon={<Building2 size={20} color={colors.primary} strokeWidth={2} />}
+                <FolderTile
+                  kind="manufacturer"
                   title={manufacturer.name}
-                  subtitle={manufacturer.code}
-                  badges={[
-                    { label: `${mfOrders.length} pedido${mfOrders.length !== 1 ? 's' : ''}`, color: colors.accent },
-                  ]}
-                  totalLabel="Total"
-                  totalValue={formatCurrency(totalAmount)}
+                  code={manufacturer.code}
+                  orders={mfOrders}
                   onPress={() => navigateToManufacturer(manufacturer)}
                   testID={`manufacturer-folder-${manufacturer.code}`}
                 />
