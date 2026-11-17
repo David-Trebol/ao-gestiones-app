@@ -43,15 +43,15 @@ export default function WebGlobalStyles() {
         *, *::before, *::after { animation-duration: .01ms !important; animation-iteration-count: 1 !important; transition-duration: .01ms !important; scroll-behavior: auto !important; }
       }
     `;
-    // Inter como alternativa a SF fuera de Apple (en Mac/iPhone se usa la fuente del sistema)
-    if (!document.getElementById('ao-font-inter')) {
+    // Figtree, la tipografía de alphaomega-electronics.com
+    if (!document.getElementById('ao-font-figtree')) {
       const pre = document.createElement('link');
       pre.rel = 'preconnect'; pre.href = 'https://fonts.gstatic.com'; pre.crossOrigin = 'anonymous';
       document.head.appendChild(pre);
       const link = document.createElement('link');
-      link.id = 'ao-font-inter';
+      link.id = 'ao-font-figtree';
       link.rel = 'stylesheet';
-      link.href = 'https://fonts.googleapis.com/css2?family=Inter:opsz,wght@14..32,400..700&display=swap';
+      link.href = 'https://fonts.googleapis.com/css2?family=Figtree:wght@400..800&display=swap';
       document.head.appendChild(link);
     }
     // Idioma de la página (lectores de pantalla y formato de fechas del navegador)

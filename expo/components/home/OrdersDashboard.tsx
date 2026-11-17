@@ -1,7 +1,7 @@
 import React, { useMemo, useState } from 'react';
 import { Alert, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { useRouter } from 'expo-router';
-import { AlertTriangle, ChevronDown, Download, Search, SlidersHorizontal, X } from 'lucide-react-native';
+import { AlertTriangle, ChevronDown, Download, Mail, MapPin, Phone, Search, SlidersHorizontal, X } from 'lucide-react-native';
 import { useTheme } from '@/contexts/ThemeContext';
 import { useData } from '@/contexts/DataContext';
 import { ThemeColors , SystemTint } from '@/constants/colors';
@@ -261,7 +261,7 @@ export default function OrdersDashboard() {
               </Pressable>
             )}
             <Pressable onPress={() => setFilters({ status: filters.status === 'attention' ? 'all' : 'attention' })} style={s.textBtn} accessibilityRole="button" testID="filter-attention">
-              <Text style={s.link}>{filters.status === 'attention' ? 'Ver todos' : 'Ver'}</Text>
+              <Text style={s.link}>{filters.status === 'attention' ? 'Ver todos' : 'Ver cuáles'}</Text>
             </Pressable>
           </View>
         </View>
@@ -292,16 +292,22 @@ export default function OrdersDashboard() {
             Reglas: fecha prevista vencida; pendiente más de {ATTENTION_RULES.pendingDays} días sin cambios; procesando o enviado más de {ATTENTION_RULES.activeDays} días sin cambios; sin cliente o con importe 0 €.
           </Text>
         )}
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={[s.chips, { paddingHorizontal: pad }]} style={{ marginHorizontal: -pad }}>
-          <View style={s.filterIcon}>
-            <SlidersHorizontal size={16} color={colors.textSecondary} />
-          </View>
-          {chip('manufacturer', mfName ?? 'Fabricante', !!filters.manufacturerId)}
-          {(owners.length > 0 || !!filters.owner) && chip('owner', filters.owner === '__none' ? 'Sin responsable' : filters.owner || 'Responsable', !!filters.owner)}
-          {chip('year', filters.year || 'Año', !!filters.year)}
-          {chip('period', filters.period === 'all' ? 'Fecha' : PERIOD_LABELS[filters.period], filters.period !== 'all')}
-          {chip('sort', SORT_LABELS[filters.sort], false)}
-        </ScrollView>
+        {(() => {
+          const chipList = (
+            <>
+              <View style={s.filterIcon}>
+                <SlidersHorizontal size={16} color={colors.textSecondary} />
+              </View>
+              {chip('year', filters.year || 'Año', !!filters.year)}
+              {chip('manufacturer', mfName ?? 'Fabricante', !!filters.manufacturerId)}
+              {(owners.length > 0 || !!filters.owner) && chip('owner', filters.owner === '__none' ? 'Sin responsable' : filters.owner || 'Responsable', !!filters.owner)}
+              {chip('period', filters.period === 'all' ? 'Fecha' : PERIOD_LABELS[filters.period], filters.period !== 'all')}
+              {chip('sort', SORT_LABELS[filters.sort], false)}
+            </>
+          );
+          // En móvil, en varias filas (en una sola fila con desplazamiento lateral no se veía que había más)
+          return width < 700 ? <View style={[s.chips, s.chipsWrap]}>{chipList}</View> : <View style={s.chips}>{chipList}</View>;
+        })()}
 
         {orders.length === 0 ? (
           <View style={[s.card, s.empty, cardShadow(isDark)]}>
@@ -356,7 +362,28 @@ export function ExpectedText({ o, prefix = '' }: { o: Order; prefix?: string }) 
   );
 }
 
-export function OrderTable({ orders, onOpen, showReasons, showUpdated }: { orders: Order[]; onOpen: (o: Order) => void; showReasons?: boolean; showUpdated?: boolean }) {
+/** Una sola línea corta bajo el estado: «47 d de retraso», «Previsto hoy» o «Previsto 15/01» (la fila no crece) */
+function LateLine({ o }: { o: Order }) {
+  const { colors } = useTheme();
+  const s = useMemo(() => makeStyles(colors), [colors]);
+  if (!o.expected_date) return o.owner ? <Text style={s.tdSub} numberOfLines={1}>{o.owner}</Text> : null;
+  const late = overdueDays(o);
+  if (late !== null && late > 0) return <Text style={[s.tdSub, { color: colors.error, fontWeight: '700' }]} numberOfLines={1}>{late} d de retraso</Text>;
+  return <Text style={s.tdSub} numberOfLines={1}>{late === 0 ? 'Previsto hoy' : `Previsto ${formatISODate(o.expected_date).slice(0, 5)}`}</Text>;
+}
+
+/** Población del cliente para la lista: «CP Provincia», o el país si no hay más */
+function placeOf(c: Order['customer'] | undefined): string {
+  if (!c) return '';
+  const local = [c.codigo_postal, c.provincia].filter(x => x?.trim()).join(' ');
+  return local || c.pais || '';
+}
+
+/**
+ * Tabla de pedidos (ordenador). Como el Excel del propietario: la referencia destaca en naranja y se ven
+ * de un vistazo el cliente, cómo contactarlo y dónde está, además del fabricante, el estado y el total.
+ */
+export function OrderTable({ orders, onOpen, showReasons }: { orders: Order[]; onOpen: (o: Order) => void; showReasons?: boolean; showUpdated?: boolean }) {
   const { colors, isDark } = useTheme();
   const s = useMemo(() => makeStyles(colors), [colors]);
   return (
@@ -364,63 +391,70 @@ export function OrderTable({ orders, onOpen, showReasons, showUpdated }: { order
       <View style={[s.tr, s.th]}>
         <Text style={[s.thText, s.cRef]}>Referencia</Text>
         <Text style={[s.thText, s.cClient]}>Cliente</Text>
+        <Text style={[s.thText, s.cContact]}>Contacto</Text>
+        <Text style={[s.thText, s.cPlace]}>Población</Text>
         <Text style={[s.thText, s.cMf]}>Fabricante</Text>
         <Text style={[s.thText, s.cStatus]}>Estado</Text>
-        <Text style={[s.thText, s.cDate]}>Creado</Text>
-        {showUpdated && <Text style={[s.thText, s.cDate]}>Actualizado</Text>}
-        <Text style={[s.thText, s.cDate]}>Previsto</Text>
         <Text style={[s.thText, s.cTotal]}>Total</Text>
       </View>
       {orders.map((o, i) => {
         const reasons = showReasons ? attentionReasons(o) : [];
+        const c = o.customer;
+        const person = [c?.contacto, c?.departamento].filter(x => x?.trim()).join(' · ');
         return (
           <Pressable
             key={o.id}
             onPress={() => onOpen(o)}
-            style={({ hovered, pressed }: { pressed: boolean; hovered?: boolean }) => [s.tr, i > 0 && s.rowBorder, (hovered || pressed) && { backgroundColor: colors.surfaceAlt }, Platform.OS === 'web' && ({ cursor: 'pointer' } as object)]}
+            style={({ hovered, pressed }: { pressed: boolean; hovered?: boolean }) => [s.tr, s.trBody, i > 0 && s.rowBorder, (hovered || pressed) && { backgroundColor: colors.primarySoft }, Platform.OS === 'web' && ({ cursor: 'pointer' } as object)]}
             accessibilityRole="link"
-            accessibilityLabel={`Pedido ${o.reference_number}, ${o.customer?.nombre_empresa || 'sin cliente'}, ${statusConfig[o.status].label}, ${formatCurrency(o.total_with_vat)}`}
+            accessibilityLabel={`Pedido ${o.reference_number}, ${c?.nombre_empresa || 'sin cliente'}, ${statusConfig[o.status].label}, ${formatCurrency(o.total_with_vat)}`}
             testID={`order-row-${o.id}`}
           >
             <View style={s.cRef}>
-              <Text style={s.tdStrong}>{o.reference_number}</Text>
-              {!!o.custom_reference && (
-                <Text style={s.tdSub} numberOfLines={1}>
-                  Ref. {o.custom_reference}
-                </Text>
-              )}
+              <Text style={s.refText} numberOfLines={1}>{o.reference_number}</Text>
+              <Text style={s.tdSub} numberOfLines={1}>
+                {formatDate(o.created_at)}
+                {o.custom_reference ? ` · ${o.custom_reference}` : ''}
+              </Text>
             </View>
             <View style={s.cClient}>
-              <Text style={s.td} numberOfLines={2}>
-                {o.customer?.nombre_empresa || '—'}
-              </Text>
+              <Text style={s.clientText} numberOfLines={1}>{c?.nombre_empresa || '—'}</Text>
               {reasons.length > 0 ? (
-                <Text style={[s.tdSub, { color: colors.warning }]} numberOfLines={2}>
-                  {reasons.join(' · ')}
-                </Text>
-              ) : o.customer?.numero_referencia_pedido ? (
-                <Text style={s.tdSub} numberOfLines={1}>
-                  Su pedido {o.customer.numero_referencia_pedido}
-                </Text>
+                <Text style={[s.tdSub, { color: colors.warning }]} numberOfLines={1}>{reasons.join(' · ')}</Text>
+              ) : person ? (
+                <Text style={s.tdSub} numberOfLines={1}>{person}</Text>
+              ) : c?.numero_referencia_pedido ? (
+                <Text style={s.tdSub} numberOfLines={1}>Su pedido {c.numero_referencia_pedido}</Text>
               ) : null}
             </View>
-            <Text style={[s.td, s.cMf]} numberOfLines={2}>
-              {o.manufacturer_name}
-            </Text>
-            <View style={s.cStatus}>
+            <View style={s.cContact}>
+              {c?.telefono_1 ? (
+                <View style={s.iconLine}>
+                  <Phone size={13} color={colors.accent} />
+                  <Text style={s.td} numberOfLines={1}>{c.telefono_1}</Text>
+                </View>
+              ) : null}
+              {c?.email ? (
+                <View style={s.iconLine}>
+                  <Mail size={13} color={colors.accent} />
+                  <Text style={s.tdSub} numberOfLines={1}>{c.email}</Text>
+                </View>
+              ) : null}
+              {!c?.telefono_1 && !c?.email && <Text style={s.tdSub}>—</Text>}
+            </View>
+            <View style={s.cPlace}>
+              <Text style={s.td} numberOfLines={1}>{placeOf(c) || '—'}</Text>
+              {!!c?.direccion_1 && <Text style={s.tdSub} numberOfLines={1}>{c.direccion_1}</Text>}
+            </View>
+            <View style={s.cMf}>
+              <Text style={s.td} numberOfLines={1}>{o.manufacturer_name}</Text>
+              <Text style={s.tdSub}>{o.year}</Text>
+            </View>
+            <View style={[s.cStatus, { gap: 3 }]}>
               <StatusBadge status={o.status} size="sm" />
+              <LateLine o={o} />
             </View>
-            <Text style={[s.tdSub, s.cDate]}>{formatDate(o.created_at)}</Text>
-            {showUpdated && <Text style={[s.tdSub, s.cDate]}>{formatDate(o.updated_at)}</Text>}
-            <View style={s.cDate}>
-              <ExpectedText o={o} />
-              {!!o.owner && (
-                <Text style={s.tdSub} numberOfLines={1}>
-                  {o.owner}
-                </Text>
-              )}
-            </View>
-            <Text style={[s.tdStrong, s.cTotal]}>{formatCurrency(o.total_with_vat)}</Text>
+            <Text style={[s.totalText, s.cTotal]}>{formatCurrency(o.total_with_vat)}</Text>
           </Pressable>
         );
       })}
@@ -454,7 +488,35 @@ export function OrderCardItem({ order: o, onOpen, twoCols, showReasons, grouped,
         <Text style={s.oRef}>{o.reference_number}</Text>
         <StatusBadge status={o.status} size="sm" />
       </View>
-      <Text style={s.oClient}>{o.customer?.nombre_empresa || 'Sin cliente'}</Text>
+      <Text style={s.oClient} numberOfLines={2}>{o.customer?.nombre_empresa || 'Sin cliente'}</Text>
+      {(() => {
+        const c = o.customer;
+        const person = [c?.contacto, c?.departamento].filter(x => x?.trim()).join(' · ');
+        const place = placeOf(c);
+        return (
+          <View style={s.oInfo}>
+            {!!person && <Text style={s.tdSub} numberOfLines={1}>{person}</Text>}
+            {!!c?.telefono_1 && (
+              <View style={s.iconLine}>
+                <Phone size={13} color={colors.accent} />
+                <Text style={s.tdSub} numberOfLines={1}>{c.telefono_1}</Text>
+              </View>
+            )}
+            {!!c?.email && (
+              <View style={s.iconLine}>
+                <Mail size={13} color={colors.accent} />
+                <Text style={s.tdSub} numberOfLines={1}>{c.email}</Text>
+              </View>
+            )}
+            {!!place && (
+              <View style={s.iconLine}>
+                <MapPin size={13} color={colors.accent} />
+                <Text style={s.tdSub} numberOfLines={1}>{place}</Text>
+              </View>
+            )}
+          </View>
+        );
+      })()}
       {!!o.custom_reference && <Text style={s.tdSub}>Ref. {o.custom_reference}</Text>}
       {reasons.length > 0 && <Text style={[s.tdSub, { color: colors.warning }]}>{reasons.join(' · ')}</Text>}
       {(!!o.expected_date || !!o.owner || !!o.next_action) && (
@@ -469,9 +531,10 @@ export function OrderCardItem({ order: o, onOpen, twoCols, showReasons, grouped,
         </View>
       )}
       <View style={s.oBottom}>
-        <Text style={s.oMeta} numberOfLines={2}>
-          {o.manufacturer_name} · {formatDate(o.created_at)} · {o.items.length} {o.items.length === 1 ? 'producto' : 'productos'}
-        </Text>
+        <View style={s.oMetaWrap}>
+          <Text style={s.oMf} numberOfLines={1}>{o.manufacturer_name} · {o.year}</Text>
+          <Text style={s.oMeta} numberOfLines={1}>{formatDate(o.created_at)}</Text>
+        </View>
         <Text style={s.oTotal}>{formatCurrency(o.total_with_vat)}</Text>
       </View>
     </Pressable>
@@ -519,10 +582,18 @@ function makeStyles(c: ThemeColors) {
     td: { fontSize: 14, color: c.text },
     tdStrong: { fontSize: 14, color: c.text, fontWeight: '600', fontVariant: ['tabular-nums'] },
     tdSub: { fontSize: 13, color: c.textSecondary, fontVariant: ['tabular-nums'] },
-    cRef: { flex: 1.3, minWidth: 0 },
+    cRef: { flex: 1.25, minWidth: 0 },
     cClient: { flex: 2, minWidth: 0 },
-    cMf: { flex: 1.2, minWidth: 0 },
-    cStatus: { flex: 1.1, minWidth: 0 },
+    cContact: { flex: 2, minWidth: 0, gap: 2 },
+    cPlace: { flex: 1.5, minWidth: 0 },
+    cMf: { flex: 1.1, minWidth: 0 },
+    cStatus: { width: 130, alignItems: 'flex-start' },
+    trBody: { alignItems: 'flex-start', paddingVertical: 14 },
+    refText: { fontSize: 15, fontWeight: '800', color: c.reference, letterSpacing: 0.1, fontVariant: ['tabular-nums'] },
+    clientText: { fontSize: 15, fontWeight: '700', color: c.text, letterSpacing: -0.1 },
+    totalText: { fontSize: 15, fontWeight: '800', color: c.text, fontVariant: ['tabular-nums'] },
+    iconLine: { flexDirection: 'row', alignItems: 'center', gap: 6, minWidth: 0 },
+    oInfo: { gap: 3, marginTop: 4 },
     cDate: { flex: 1, minWidth: 0 },
     cTotal: { flex: 1.1, minWidth: 120, textAlign: 'right' },
     cardsWrap: { gap: 10 },
@@ -533,12 +604,15 @@ function makeStyles(c: ThemeColors) {
     oRow: { borderRadius: 0, backgroundColor: 'transparent', paddingTop: 14, paddingBottom: 14 },
     oSep: { position: 'absolute', top: 0, left: 16, right: 0, height: StyleSheet.hairlineWidth, backgroundColor: c.divider },
     oTop: { flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between', gap: 10 },
-    oRef: { flex: 1, fontSize: 16, fontWeight: '600', color: c.text, fontVariant: ['tabular-nums'] },
-    oClient: { fontSize: 15, color: c.text },
+    oRef: { flex: 1, fontSize: 16, fontWeight: '800', color: c.reference, fontVariant: ['tabular-nums'] },
+    oClient: { fontSize: 17, fontWeight: '700', color: c.text, letterSpacing: -0.2 },
     follow: { flexDirection: 'row', flexWrap: 'wrap', columnGap: 12, rowGap: 2, marginTop: 4 },
     oBottom: { flexDirection: 'row', alignItems: 'flex-end', justifyContent: 'space-between', gap: 12, marginTop: 6 },
-    oMeta: { flex: 1, fontSize: 13, color: c.textSecondary },
-    oTotal: { fontSize: 18, fontWeight: '700', color: c.text, fontVariant: ['tabular-nums'], letterSpacing: -0.3 },
+    oMetaWrap: { flex: 1, minWidth: 0 },
+    oMf: { fontSize: 13.5, fontWeight: '600', color: c.accent },
+    oMeta: { fontSize: 13, color: c.textSecondary },
+    chipsWrap: { flexWrap: 'wrap' },
+    oTotal: { flexShrink: 0, fontSize: 18, fontWeight: '800', color: c.text, fontVariant: ['tabular-nums'], letterSpacing: -0.3 },
     moreBtn: { alignSelf: 'center', marginTop: 12, minHeight: 44, paddingHorizontal: 18, justifyContent: 'center' },
   });
 }

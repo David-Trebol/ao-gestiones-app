@@ -13,6 +13,7 @@ PORT=8780 node e2e/t5-scan.js samples/01-factura-proveedor.pdf 390 prueba   # le
 PORT=8780 node e2e/t7-errors.js              # errores de lectura y cancelar
 PORT=8780 node e2e/t10-fase2.js              # selector de fabricante con buscador, menú de fabricantes, copia completa, borrado protegido
 PORT=8780 node e2e/t11-solapes.js            # que al cambiar de pantalla no se vea la anterior por debajo (BASE=https://… para probar la web publicada)
+PORT=8780 node e2e/t12-buscadores.js         # buscadores de todos los años, de un año y de un fabricante
 node e2e/shots-dark.js 8780                  # capturas en modo oscuro; también shots-login.js y shots-carpetas.js
 node e2e/shots.js <prefijo> 8780 [normal|big] home,detail,form,manufacturers,settings   # capturas en 6 tamaños + comprobación de desbordes
 cd unit && bun run calc.test.ts              # fórmulas

@@ -29,6 +29,8 @@ import * as Haptics from 'expo-haptics';
 import OrdersDashboard, { OrderCardItem, OrderTable } from '@/components/home/OrdersDashboard';
 import { CompactTitleBar, PageHeader, PAGE_MAX, useCollapsingTitle, usePageLayout } from '@/components/Page';
 import Button from '@/components/Button';
+import SearchField from '@/components/SearchField';
+import { matchesQuery } from '@/utils/orderFilters';
 import { NAV_FULL_MIN, NAV_SIDE_MIN, NAV_WIDTH_COMPACT, NAV_WIDTH_FULL } from '@/components/AppNav';
 
 // Vista elegida (se conserva al volver de un pedido)
@@ -42,7 +44,8 @@ export default function HomeScreen() {
   // Ancho útil real: ventana menos la barra lateral, con el máximo común y sin márgenes
   const navWidth = width >= NAV_FULL_MIN ? NAV_WIDTH_FULL : width >= NAV_SIDE_MIN ? NAV_WIDTH_COMPACT : 0;
   const innerWidth = Math.min(width - navWidth, PAGE_MAX) - pad * 2;
-  const gridColumns = innerWidth >= 1000 ? 4 : innerWidth >= 640 ? 3 : innerWidth >= 320 ? 2 : 1;
+  // Tantas columnas como quepan con un mínimo de 240 px por tarjeta (máx. 6)
+  const gridColumns = Math.max(1, Math.min(6, Math.floor((innerWidth + 12) / 252)));
   const useTable = width >= 1100; // igual que la lista del inicio
   const twoCols = width >= 700 && !useTable;
 
@@ -67,6 +70,11 @@ export default function HomeScreen() {
   const [currentView, setCurrentView] = useState<NavigationView>('years');
   const [selectedYear, setSelectedYear] = useState<number | null>(null);
   const [selectedManufacturer, setSelectedManufacturer] = useState<Manufacturer | null>(null);
+  // Buscador de la vista por año y fabricante: uno por nivel (todos los años, un año, un fabricante)
+  const [scopeQuery, setScopeQuery] = useState('');
+  useEffect(() => {
+    setScopeQuery('');
+  }, [currentView, selectedYear, selectedManufacturer]);
   const [refreshing, setRefreshing] = useState(false);
   const [yearModalOpen, setYearModalOpen] = useState(false);
   const [yearInput, setYearInput] = useState(String(new Date().getFullYear()));
@@ -257,6 +265,38 @@ export default function HomeScreen() {
     );
   };
 
+  /** Resultados de búsqueda dentro de un ámbito (todos los años, un año o un fabricante) */
+  const renderResults = (list: Order[]) => {
+    const q = scopeQuery.trim();
+    const found = list.filter(o => matchesQuery(o, q));
+    return (
+      <View style={styles.results}>
+        <View style={styles.resultsHead}>
+          <Text style={[styles.resultsTitle, { color: colors.text }]} accessibilityRole="header">
+            {found.length} {found.length === 1 ? 'resultado' : 'resultados'}
+          </Text>
+          <Pressable onPress={() => setScopeQuery('')} style={({ hovered }: { pressed: boolean; hovered?: boolean }) => [styles.clearBtn, hovered && { backgroundColor: colors.fill }]} accessibilityRole="button" testID="clear-scope-search">
+            <Text style={[styles.clearBtnText, { color: colors.primary }]}>Borrar búsqueda</Text>
+          </Pressable>
+        </View>
+        {found.length === 0 ? (
+          <View style={[styles.noResults, { backgroundColor: colors.surface }]}>
+            <Text style={[styles.noResultsTitle, { color: colors.text }]}>Ningún pedido coincide con «{q}»</Text>
+            <Text style={[styles.noResultsText, { color: colors.textSecondary }]}>Prueba con la referencia, el cliente, el email, el NIF o un producto.</Text>
+          </View>
+        ) : useTable ? (
+          <OrderTable orders={found} onOpen={navigateToOrder} />
+        ) : (
+          <View style={twoCols ? [styles.grid, { justifyContent: 'space-between' }] : styles.list}>
+            {found.map(order => (
+              <OrderCardItem key={order.id} order={order} onOpen={navigateToOrder} twoCols={twoCols} />
+            ))}
+          </View>
+        )}
+      </View>
+    );
+  };
+
   const renderYearsView = () => {
     if (allYears.length === 0) {
       return (
@@ -279,6 +319,8 @@ export default function HomeScreen() {
             onAction={handleAddYear}
           />
         </Animated.View>
+        <SearchField value={scopeQuery} onChangeText={setScopeQuery} placeholder="Buscar en todos los años" testID="search-years" style={styles.scopeSearch} />
+        {scopeQuery.trim() ? renderResults(orders) : (
         <View style={styles.grid}>
           {allYears.map((year, index) => {
             const yearOrders = getOrdersByYear(year);
@@ -304,6 +346,7 @@ export default function HomeScreen() {
             );
           })}
         </View>
+        )}
       </>
     );
   };
@@ -312,13 +355,19 @@ export default function HomeScreen() {
     if (selectedYear === null) return null;
     const manufacturersForYear = getManufacturersForYear(selectedYear);
     const yearOrders = getOrdersByYear(selectedYear);
+    const search = <SearchField value={scopeQuery} onChangeText={setScopeQuery} placeholder={`Buscar en ${selectedYear}`} testID="search-year" style={styles.scopeSearch} />;
 
     if (manufacturersForYear.length === 0) {
       return (
-        <EmptyState
-          title={`No hay fabricantes en ${selectedYear}`}
-          description="Añade un fabricante a este año desde la Gestión de Fabricantes"
-        />
+        <>
+          {yearOrders.length > 0 && search}
+          {scopeQuery.trim() ? renderResults(yearOrders) : (
+            <EmptyState
+              title={`No hay fabricantes en ${selectedYear}`}
+              description="Añade un fabricante a este año desde la Gestión de Fabricantes"
+            />
+          )}
+        </>
       );
     }
 
@@ -328,6 +377,8 @@ export default function HomeScreen() {
           title={String(selectedYear)}
           subtitle="Elige un fabricante para ver sus pedidos"
         />
+        {search}
+        {scopeQuery.trim() ? renderResults(yearOrders) : (
         <View style={styles.grid}>
           {manufacturersForYear.map((manufacturer, index) => {
             const mfOrders = yearOrders.filter(o => o.manufacturer_id === manufacturer.id);
@@ -351,6 +402,7 @@ export default function HomeScreen() {
             );
           })}
         </View>
+        )}
       </>
     );
   };
@@ -378,7 +430,8 @@ export default function HomeScreen() {
           actionLabel="Nuevo"
           onAction={() => router.push(`/order-form?manufacturerId=${selectedManufacturer.id}&year=${selectedYear}` as any)}
         />
-        {useTable ? (
+        <SearchField value={scopeQuery} onChangeText={setScopeQuery} placeholder={`Buscar en ${selectedManufacturer.name} · ${selectedYear}`} testID="search-manufacturer" style={styles.scopeSearch} />
+        {scopeQuery.trim() ? renderResults(filteredOrders) : useTable ? (
           <OrderTable orders={filteredOrders} onOpen={navigateToOrder} />
         ) : (
           <View style={twoCols ? [styles.grid, { justifyContent: 'space-between' }] : styles.list}>
@@ -563,6 +616,49 @@ const styles = StyleSheet.create({
   gridItem: {},
   list: {
     gap: 12,
+  },
+  scopeSearch: {
+    marginBottom: 16,
+  },
+  results: {
+    gap: 12,
+  },
+  resultsHead: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 8,
+  },
+  resultsTitle: {
+    fontSize: 20,
+    fontWeight: '700' as const,
+    letterSpacing: -0.4,
+    paddingHorizontal: 2,
+  },
+  clearBtn: {
+    minHeight: 44,
+    paddingHorizontal: 10,
+    justifyContent: 'center',
+    borderRadius: 10,
+  },
+  clearBtnText: {
+    fontSize: 15,
+    fontWeight: '600' as const,
+  },
+  noResults: {
+    borderRadius: 14,
+    padding: 24,
+    alignItems: 'center',
+    gap: 6,
+  },
+  noResultsTitle: {
+    fontSize: 17,
+    fontWeight: '600' as const,
+    textAlign: 'center',
+  },
+  noResultsText: {
+    fontSize: 14,
+    textAlign: 'center',
   },
   modalOverlay: {
     flex: 1,

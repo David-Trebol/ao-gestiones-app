@@ -24,13 +24,13 @@ export default React.memo(function SectionHeader({ title, subtitle, actionLabel,
         <Pressable
           style={({ pressed, hovered }: any) => [
             styles.actionButton,
-            { backgroundColor: colors.primary, opacity: pressed ? 0.75 : hovered ? 0.9 : 1 },
+            { backgroundColor: colors.primaryFill, opacity: pressed ? 0.75 : hovered ? 0.9 : 1 },
           ]}
           onPress={onAction}
           accessibilityRole="button"
         >
-          <Plus size={15} color="#FFFFFF" strokeWidth={2.5} />
-          <Text style={styles.actionText}>{actionLabel}</Text>
+          <Plus size={15} color={colors.onPrimary} strokeWidth={2.5} />
+          <Text style={[styles.actionText, { color: colors.onPrimary }]}>{actionLabel}</Text>
         </Pressable>
       ) : null}
     </View>

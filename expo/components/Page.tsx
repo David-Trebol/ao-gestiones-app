@@ -6,7 +6,7 @@ import { glass, type } from '@/constants/theme';
 import { TAB_BAR_SPACE } from '@/components/AppNav';
 
 /** Ancho máximo común de todas las pantallas */
-export const PAGE_MAX = 1280;
+export const PAGE_MAX = 1600;
 
 /** Márgenes según el ancho: móvil 16, tablet 24, ordenador 32 */
 export function usePageLayout() {
