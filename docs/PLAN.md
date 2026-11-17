@@ -60,6 +60,8 @@ Pedido del propietario: más color y aprovechar el ancho; que la referencia y lo
 - [x] Ficha estilo Excel: cabecera con referencia y total, tarjeta Cliente destacada (teléfono y email con enlace), Pedido y documentos, productos en tabla (≥ 1.200 px), dos columnas sin huecos.
 - [x] Buscadores en «Por año y fabricante»: todos los años, un año y un fabricante (`components/SearchField.tsx`, `matchesQuery`). Prueba: `t12-buscadores.js`.
 - [x] Formulario con la marca: secciones con icono naranja; Cliente en el orden del Excel (rejilla de 3), Documentos debajo; en ordenador, Pedido y Resumen con «Guardar» fijos a la derecha; productos en tabla editable desde 1.680 px (tarjetas por debajo).
+- [x] Fabricantes: resumen (fabricantes, con pedidos, pedidos, importe sin cancelados), buscador, tarjetas en rejilla en ordenador (pedidos, importe, último pedido, años) y lista en móvil; modales de marca.
+- [x] Ajustes: perfil en azul petróleo con «Cerrar sesión», dos columnas en ordenador, resumen en tarjetas de color, modales de marca.
 
 ## Fase 2 · Pantalla por pantalla
 
