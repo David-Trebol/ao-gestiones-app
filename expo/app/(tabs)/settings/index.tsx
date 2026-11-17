@@ -27,6 +27,7 @@ import {
   ChevronRight,
   Download,
   Euro,
+  LogOut,
 } from 'lucide-react-native';
 import { CompactTitleBar, PageHeader, useCollapsingTitle, usePageLayout } from '@/components/Page';
 import { canvas, cardShadow, webInputReset } from '@/constants/theme';
@@ -45,7 +46,9 @@ export default function SettingsScreen() {
   const { colors, isDark, themeMode, setTheme } = useTheme();
   const [deleting, setDeleting] = useState(false);
   const [savingUser, setSavingUser] = useState(false);
-  const { content, bottomSpace } = usePageLayout();
+  const { content, bottomSpace, width } = usePageLayout();
+  // Ordenador: dos columnas (Apariencia, Cuenta y Datos | Resumen y Usuarios)
+  const twoCols = width >= 1024;
   const { shown: compactShown, scrollProps } = useCollapsingTitle();
 
   const [userModalOpen, setUserModalOpen] = useState(false);
@@ -275,142 +278,189 @@ export default function SettingsScreen() {
     </View>
   );
 
+  const stat = (label: string, value: string, Icon: React.ComponentType<{ size?: number; color?: string; strokeWidth?: number }>, tint: string, big?: boolean) => (
+    <View style={[styles.statTile, big && styles.statTileBig, { backgroundColor: colors.surface }, cardShadow(isDark)]}>
+      <View style={[styles.statStripe, { backgroundColor: tint }]} />
+      <View style={[styles.statTop, !twoCols && !big && styles.statTopStacked]}>
+        <View style={[styles.statIcon, { backgroundColor: tint }]}>
+          <Icon size={17} color="#FFFFFF" strokeWidth={2.3} />
+        </View>
+        {/* Etiqueta y luego la cifra, en textos separados */}
+        <Text style={[styles.statLabel, { color: colors.textSecondary }]}>{label}</Text>
+      </View>
+      <Text style={[styles.statValue, big && styles.statValueBig, { color: colors.text }]} numberOfLines={1} adjustsFontSizeToFit>{value}</Text>
+    </View>
+  );
+
+  const profileCard = (
+    <View style={[styles.profileCard, { backgroundColor: colors.nav }, !twoCols && styles.profileCardStacked]}>
+      <View style={styles.profileLeft}>
+        <View style={[styles.profileAvatarBrand, { backgroundColor: colors.brand }]}>
+          <Text style={[styles.profileInitialBrand, { color: colors.onPrimary }]}>{(currentUser?.displayName || currentUser?.email || '?').slice(0, 1).toUpperCase()}</Text>
+        </View>
+        <View style={{ flex: 1, minWidth: 0 }}>
+          <Text style={[styles.profileNameBrand, { color: colors.navText }]} numberOfLines={1}>{currentUser?.displayName}</Text>
+          {!!currentUser?.email && <Text style={[styles.profileMeta, { color: colors.navMuted }]} numberOfLines={1}>{currentUser.email}</Text>}
+          <View style={[styles.rolePill, { backgroundColor: colors.navActiveBg }]}>
+            {isAdmin ? <Shield size={13} color={colors.navActiveText} /> : <User size={13} color={colors.navActiveText} />}
+            <Text style={[styles.rolePillText, { color: colors.navActiveText }]}>{isAdmin ? 'Administrador' : 'Usuario'}</Text>
+          </View>
+        </View>
+      </View>
+      <Pressable
+        onPress={handleLogout}
+        style={({ pressed, hovered }: { pressed: boolean; hovered?: boolean }) => [styles.logoutBrand, !twoCols && { alignSelf: 'stretch' }, { backgroundColor: hovered || pressed ? 'rgba(255,255,255,0.18)' : 'rgba(255,255,255,0.10)' }]}
+        accessibilityRole="button"
+        testID="logout-btn"
+      >
+        <LogOut size={17} color={colors.navText} />
+        <Text style={[styles.logoutBrandText, { color: colors.navText }]}>Cerrar sesión</Text>
+      </Pressable>
+    </View>
+  );
+
+  const resumen = (
+    <View style={styles.group}>
+      <Text style={[styles.groupTitle, { color: colors.text }]} accessibilityRole="header">Resumen</Text>
+      <View style={styles.statGrid}>
+        {stat('Pedidos', String(totalOrders), FileText, '#FF8718')}
+        {stat('Fabricantes', String(totalManufacturers), Building2, '#3F6E92')}
+        {stat('Años', String(totalYears), FolderOpen, '#5B6B73')}
+        {stat('Facturación total', formatCurrency(totalAmount), Euro, SystemTint.green, true)}
+      </View>
+      <Text style={[styles.groupFooter, { color: colors.textSecondary }]}>
+        {`Suma del total con IVA de los pedidos que no están cancelados${cancelledCount ? ` (no cuenta ${cancelledCount} cancelado${cancelledCount === 1 ? '' : 's'})` : ''}.`}
+      </Text>
+    </View>
+  );
+
+  const apariencia = group(
+    'Apariencia',
+    <>
+      <View style={styles.row}>
+        <TintChip Icon={isDark ? Moon : Sun} tint="#FF8718" size={30} />
+        <Text style={[styles.rowTitle, styles.rowText, { color: colors.text }]}>Tema</Text>
+        <View style={[styles.segment, { backgroundColor: colors.fill }]} accessibilityRole="tablist">
+          {(['light', 'dark'] as const).map(m => (
+            <Pressable
+              key={m}
+              onPress={() => handleSetTheme(m)}
+              style={[styles.segBtn, themeMode === m && [styles.segOn, { backgroundColor: colors.primaryFill }]]}
+              accessibilityRole="tab"
+              accessibilityState={{ selected: themeMode === m }}
+              testID={`theme-${m}`}
+            >
+              <Text style={[styles.segText, { color: themeMode === m ? colors.onPrimary : colors.text }]}>{m === 'light' ? 'Claro' : 'Oscuro'}</Text>
+            </Pressable>
+          ))}
+        </View>
+      </View>
+      {Platform.OS !== 'web' && biometricAvailable && row({
+        icon: Fingerprint, tint: SystemTint.green, title: 'Acceso con huella', detail: 'Desbloquea la app con tu huella digital',
+        trailing: <Switch value={biometricEnabled} onValueChange={handleToggleBiometric} trackColor={{ false: colors.border, true: SystemTint.green }} />,
+      })}
+    </>,
+  );
+
+  const usuarios = isAdmin
+    ? group(
+        'Usuarios',
+        <>
+          {users.map((user, i) => (
+            <Pressable
+              key={user.id}
+              onPress={() => openEditUser(user)}
+              style={({ pressed, hovered }: { pressed: boolean; hovered?: boolean }) => [styles.row, i > 0 && { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.divider }, (pressed || hovered) && { backgroundColor: colors.fill }]}
+              accessibilityRole="button"
+              accessibilityLabel={`Editar ${user.displayName}`}
+              testID={`user-row-${user.id}`}
+            >
+              <View style={[styles.userAvatarSmall, { backgroundColor: user.role === 'admin' ? colors.brand : '#3F6E92' }]}>
+                <Text style={[styles.userInitial, { color: user.role === 'admin' ? colors.onPrimary : '#FFFFFF' }]}>{(user.displayName || user.email || '?').slice(0, 1).toUpperCase()}</Text>
+              </View>
+              <View style={styles.rowText}>
+                <Text style={[styles.rowTitle, { color: colors.text, fontWeight: '600' }]} numberOfLines={1}>{user.displayName}</Text>
+                <Text style={[styles.rowDetail, { color: colors.textSecondary }]} numberOfLines={1}>
+                  {user.email} · {user.role === 'admin' ? 'Administrador' : 'Usuario'}{user.active ? '' : ' · Inactivo'}
+                </Text>
+              </View>
+              {user.id !== currentUser?.id && (
+                <Pressable onPress={() => handleDeleteUser(user)} style={({ hovered }: { pressed: boolean; hovered?: boolean }) => [styles.iconBtn, hovered && { backgroundColor: colors.errorBg }]} accessibilityRole="button" accessibilityLabel={`Eliminar ${user.displayName}`}>
+                  <Trash2 size={17} color={colors.error} />
+                </Pressable>
+              )}
+              {chevron}
+            </Pressable>
+          ))}
+          <Pressable
+            onPress={openCreateUser}
+            style={({ pressed, hovered }: { pressed: boolean; hovered?: boolean }) => [styles.row, users.length > 0 && { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.divider }, (pressed || hovered) && { backgroundColor: colors.primarySoft }]}
+            accessibilityRole="button"
+            testID="add-user-btn"
+          >
+            <View style={[styles.userAvatarSmall, { backgroundColor: colors.primarySoftAlt }]}>
+              <UserPlus size={16} color={colors.primary} />
+            </View>
+            <Text style={[styles.rowTitle, styles.rowText, { color: colors.primary, fontWeight: '600' }]}>Añadir usuario</Text>
+          </Pressable>
+        </>,
+      )
+    : null;
+
+  const cuenta = group(
+    'Cuenta',
+    row({ icon: KeyRound, tint: '#5B6B73', title: 'Cambiar mi contraseña', detail: 'Te enviamos un enlace seguro por email', onPress: handleChangePassword, testID: 'change-password-btn', first: true }),
+  );
+
+  const datos = group(
+    'Datos',
+    <>
+      {Platform.OS === 'web' && row({ icon: Download, tint: SystemTint.green, title: 'Descargar copia completa', detail: 'Excel con pedidos, líneas, envíos y fabricantes', onPress: () => void handleExportAll(), testID: 'export-all-btn', first: true, disabled: exporting || orders.length === 0 })}
+      {isAdmin && row({ icon: Trash2, tint: SystemTint.red, title: 'Eliminar todos los datos', detail: 'Borra pedidos, fabricantes y años para todos los usuarios', onPress: openDeleteAll, destructive: true, testID: 'delete-all-btn', first: Platform.OS !== 'web', disabled: deleting })}
+      {!isAdmin && Platform.OS !== 'web' && <Text style={[styles.rowDetail, { color: colors.textSecondary, padding: 16 }]}>Solo los administradores pueden borrar datos.</Text>}
+    </>,
+    isAdmin ? undefined : 'Solo los administradores pueden borrar datos o gestionar usuarios.',
+  );
+
   return (
     <View style={[styles.outerContainer, { backgroundColor: canvas(colors) }]}>
       <CompactTitleBar title="Ajustes" shown={compactShown} />
       <ScrollView {...scrollProps} style={styles.container} contentContainerStyle={[content, styles.content, { paddingBottom: bottomSpace }]} showsVerticalScrollIndicator={false}>
         <PageHeader title="Ajustes" />
-        {/* Columna de lectura (como Ajustes de iOS/macOS): mismo margen izquierdo que el resto de pantallas */}
-        <View style={styles.column}>
-          {/* Perfil */}
-          <View style={[styles.groupCard, styles.profile, { backgroundColor: colors.surface }, cardShadow(isDark)]}>
-            <View style={[styles.profileAvatar, { backgroundColor: isDark ? '#3A3A3C' : '#D1D1D6' }]}>
-              <Text style={[styles.profileInitial, { color: colors.text }]}>{(currentUser?.displayName || currentUser?.email || '?').slice(0, 1).toUpperCase()}</Text>
+        {profileCard}
+        {twoCols ? (
+          <View style={styles.cols}>
+            <View style={styles.colLeft}>
+              {apariencia}
+              {cuenta}
+              {datos}
             </View>
-            <View style={{ flex: 1, minWidth: 0 }}>
-              <Text style={[styles.profileName, { color: colors.text }]} numberOfLines={1}>{currentUser?.displayName}</Text>
-              {!!currentUser?.email && <Text style={[styles.rowDetail, { color: colors.textSecondary }]} numberOfLines={1}>{currentUser.email}</Text>}
-              <Text style={[styles.rowDetail, { color: colors.textSecondary }]}>{isAdmin ? 'Administrador' : 'Usuario'}</Text>
+            <View style={styles.colRight}>
+              {resumen}
+              {usuarios}
             </View>
           </View>
-
-          {group(
-            'Apariencia',
-            <>
-              <View style={styles.row}>
-                <TintChip Icon={isDark ? Moon : Sun} tint={SystemTint.blue} size={30} />
-                <Text style={[styles.rowTitle, styles.rowText, { color: colors.text }]}>Tema</Text>
-                <View style={[styles.segment, { backgroundColor: colors.fill }]} accessibilityRole="tablist">
-                  {(['light', 'dark'] as const).map(m => (
-                    <Pressable
-                      key={m}
-                      onPress={() => handleSetTheme(m)}
-                      style={[styles.segBtn, themeMode === m && [styles.segOn, { backgroundColor: isDark ? '#636366' : '#FFFFFF' }]]}
-                      accessibilityRole="tab"
-                      accessibilityState={{ selected: themeMode === m }}
-                      testID={`theme-${m}`}
-                    >
-                      <Text style={[styles.segText, { color: colors.text }]}>{m === 'light' ? 'Claro' : 'Oscuro'}</Text>
-                    </Pressable>
-                  ))}
-                </View>
-              </View>
-              {Platform.OS !== 'web' && biometricAvailable && row({
-                icon: Fingerprint, tint: SystemTint.green, title: 'Acceso con huella', detail: 'Desbloquea la app con tu huella digital',
-                trailing: <Switch value={biometricEnabled} onValueChange={handleToggleBiometric} trackColor={{ false: colors.border, true: SystemTint.green }} />,
-              })}
-            </>,
-          )}
-
-          {group(
-            'Resumen',
-            <>
-              {row({ icon: FileText, tint: SystemTint.blue, title: 'Pedidos', value: String(totalOrders), first: true })}
-              {row({ icon: Building2, tint: SystemTint.orange, title: 'Fabricantes', value: String(totalManufacturers) })}
-              {row({ icon: FolderOpen, tint: SystemTint.indigo, title: 'Años', value: String(totalYears) })}
-              <View style={[styles.row, { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.divider }]}>
-                <TintChip Icon={Euro} tint={SystemTint.green} size={30} />
-                <Text style={[styles.rowTitle, styles.rowText, { color: colors.text }]}>Facturación total</Text>
-                <Text style={[styles.totalValue, { color: colors.text }]}>{formatCurrency(totalAmount)}</Text>
-              </View>
-            </>,
-            `Suma del total con IVA de los pedidos que no están cancelados${cancelledCount ? ` (no cuenta ${cancelledCount} cancelado${cancelledCount === 1 ? '' : 's'})` : ''}.`,
-          )}
-
-          {isAdmin &&
-            group(
-              'Usuarios',
-              <>
-                {users.map((user, i) => (
-                  <Pressable
-                    key={user.id}
-                    onPress={() => openEditUser(user)}
-                    style={({ pressed, hovered }: { pressed: boolean; hovered?: boolean }) => [styles.row, i > 0 && { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.divider }, (pressed || hovered) && { backgroundColor: colors.fill }]}
-                    accessibilityRole="button"
-                    accessibilityLabel={`Editar ${user.displayName}`}
-                    testID={`user-row-${user.id}`}
-                  >
-                    <View style={[styles.userAvatarSmall, { backgroundColor: user.role === 'admin' ? SystemTint.blue : SystemTint.gray }]}>
-                      {user.role === 'admin' ? <Shield size={15} color="#FFFFFF" /> : <User size={15} color="#FFFFFF" />}
-                    </View>
-                    <View style={styles.rowText}>
-                      <Text style={[styles.rowTitle, { color: colors.text }]} numberOfLines={1}>{user.displayName}</Text>
-                      <Text style={[styles.rowDetail, { color: colors.textSecondary }]} numberOfLines={1}>
-                        {user.email} · {user.role === 'admin' ? 'Administrador' : 'Usuario'}{user.active ? '' : ' · Inactivo'}
-                      </Text>
-                    </View>
-                    {user.id !== currentUser?.id && (
-                      <Pressable onPress={() => handleDeleteUser(user)} style={({ hovered }: { pressed: boolean; hovered?: boolean }) => [styles.iconBtn, hovered && { backgroundColor: colors.errorBg }]} accessibilityRole="button" accessibilityLabel={`Eliminar ${user.displayName}`}>
-                        <Trash2 size={17} color={colors.error} />
-                      </Pressable>
-                    )}
-                    {chevron}
-                  </Pressable>
-                ))}
-                <Pressable
-                  onPress={openCreateUser}
-                  style={({ pressed, hovered }: { pressed: boolean; hovered?: boolean }) => [styles.row, users.length > 0 && { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.divider }, (pressed || hovered) && { backgroundColor: colors.fill }]}
-                  accessibilityRole="button"
-                  testID="add-user-btn"
-                >
-                  <UserPlus size={20} color={colors.primary} style={{ marginHorizontal: 5 }} />
-                  <Text style={[styles.rowTitle, styles.rowText, { color: colors.primary }]}>Añadir usuario</Text>
-                </Pressable>
-              </>,
-            )}
-
-          {group(
-            'Cuenta',
-            row({ icon: KeyRound, tint: SystemTint.gray, title: 'Cambiar mi contraseña', detail: 'Te enviamos un enlace seguro por email', onPress: handleChangePassword, testID: 'change-password-btn', first: true }),
-          )}
-
-          {group(
-            'Datos',
-            <>
-              {Platform.OS === 'web' && row({ icon: Download, tint: SystemTint.green, title: 'Descargar copia completa', detail: 'Excel con pedidos, líneas, envíos y fabricantes', onPress: () => void handleExportAll(), testID: 'export-all-btn', first: true, disabled: exporting || orders.length === 0 })}
-              {isAdmin && row({ icon: Trash2, tint: SystemTint.red, title: 'Eliminar todos los datos', detail: 'Borra pedidos, fabricantes y años para todos los usuarios', onPress: openDeleteAll, destructive: true, testID: 'delete-all-btn', first: Platform.OS !== 'web', disabled: deleting })}
-              {!isAdmin && Platform.OS !== 'web' && <Text style={[styles.rowDetail, { color: colors.textSecondary, padding: 16 }]}>Solo los administradores pueden borrar datos.</Text>}
-            </>,
-            isAdmin ? undefined : 'Solo los administradores pueden borrar datos o gestionar usuarios.',
-          )}
-
-          <View style={styles.group}>
-            <Pressable
-              onPress={handleLogout}
-              style={({ pressed, hovered }: { pressed: boolean; hovered?: boolean }) => [styles.groupCard, styles.logoutRow, { backgroundColor: (pressed || hovered) ? colors.surfaceAlt : colors.surface }, cardShadow(isDark)]}
-              accessibilityRole="button"
-              testID="logout-btn"
-            >
-              <Text style={[styles.rowTitle, { color: colors.error }]}>Cerrar sesión</Text>
-            </Pressable>
-          </View>
-        </View>
+        ) : (
+          <>
+            {resumen}
+            {apariencia}
+            {usuarios}
+            {cuenta}
+            {datos}
+          </>
+        )}
       </ScrollView>
 
       <Modal visible={deleteOpen} transparent animationType="fade" onRequestClose={() => setDeleteOpen(false)}>
         <View style={[styles.modalOverlay, { backgroundColor: colors.overlay }]}>
           <View style={[styles.modalContent, { backgroundColor: colors.surface }]} accessibilityViewIsModal>
-            <Text style={[styles.modalTitle, { color: colors.text }]}>Eliminar todos los datos</Text>
+            <View style={[styles.modalStripe, { backgroundColor: SystemTint.red }]} />
+            <View style={styles.modalTitleRow}>
+              <View style={[styles.statIcon, { backgroundColor: SystemTint.red }]}>
+                <Trash2 size={17} color="#FFFFFF" strokeWidth={2.3} />
+              </View>
+              <Text style={[styles.modalTitle, { color: colors.text, marginBottom: 0 }]}>Eliminar todos los datos</Text>
+            </View>
             <Text style={[styles.deleteText, { color: colors.text }]}>
               Se borrarán {orders.length} pedidos, {manufacturers.length} fabricantes y {years.length} años para todos los usuarios. No se puede deshacer.
             </Text>
@@ -433,7 +483,7 @@ export default function SettingsScreen() {
               testID="delete-confirm-input"
             />
             <View style={styles.deleteActions}>
-              <Pressable onPress={() => setDeleteOpen(false)} style={[styles.deleteBtn, { backgroundColor: colors.fill }]} accessibilityRole="button" testID="delete-cancel-btn">
+              <Pressable onPress={() => setDeleteOpen(false)} style={({ hovered }: { pressed: boolean; hovered?: boolean }) => [styles.deleteBtn, { backgroundColor: hovered ? colors.surfaceAlt : colors.fill }]} accessibilityRole="button" testID="delete-cancel-btn">
                 <Text style={[styles.deleteBtnText, { color: colors.text }]}>Cancelar</Text>
               </Pressable>
               <Pressable
@@ -454,9 +504,15 @@ export default function SettingsScreen() {
       <Modal visible={userModalOpen} transparent animationType="fade" onRequestClose={() => setUserModalOpen(false)}>
         <View style={[styles.modalOverlay, { backgroundColor: colors.overlay }]}>
           <View style={[styles.modalContent, { backgroundColor: colors.surface }]}>
+            <View style={[styles.modalStripe, { backgroundColor: colors.brand }]} />
             <View style={styles.modalHeader}>
-              <Text style={[styles.modalTitle, { color: colors.text }]}>{editingUser ? 'Editar Usuario' : 'Crear Usuario'}</Text>
-              <Pressable onPress={() => setUserModalOpen(false)} hitSlop={10}>
+              <View style={styles.modalTitleRow}>
+                <View style={[styles.statIcon, { backgroundColor: colors.brand }]}>
+                  {editingUser ? <User size={17} color={colors.onPrimary} strokeWidth={2.3} /> : <UserPlus size={17} color={colors.onPrimary} strokeWidth={2.3} />}
+                </View>
+                <Text style={[styles.modalTitle, { color: colors.text, marginBottom: 0 }]}>{editingUser ? 'Editar usuario' : 'Nuevo usuario'}</Text>
+              </View>
+              <Pressable onPress={() => setUserModalOpen(false)} style={({ hovered }: { pressed: boolean; hovered?: boolean }) => [styles.iconBtn, hovered && { backgroundColor: colors.fill }]} accessibilityRole="button" accessibilityLabel="Cerrar">
                 <X size={20} color={colors.textSecondary} />
               </Pressable>
             </View>
@@ -464,7 +520,7 @@ export default function SettingsScreen() {
             <View style={styles.modalField}>
               <Text style={[styles.modalLabel, { color: colors.textSecondary }]}>Email *</Text>
               <TextInput
-                style={[styles.modalInput, { backgroundColor: colors.background, borderColor: colors.border, color: colors.text }]}
+                style={[styles.modalInput, { backgroundColor: colors.fill, borderColor: 'transparent', color: colors.text }]}
                 value={formUsername}
                 onChangeText={setFormUsername}
                 placeholder="persona@empresa.com"
@@ -479,7 +535,7 @@ export default function SettingsScreen() {
             <View style={styles.modalField}>
               <Text style={[styles.modalLabel, { color: colors.textSecondary }]}>{editingUser ? 'Nueva contraseña (vacío = no cambiar)' : 'Contraseña * (mínimo 8 caracteres)'}</Text>
               <TextInput
-                style={[styles.modalInput, { backgroundColor: colors.background, borderColor: colors.border, color: colors.text }]}
+                style={[styles.modalInput, { backgroundColor: colors.fill, borderColor: 'transparent', color: colors.text }]}
                 value={formPassword}
                 onChangeText={setFormPassword}
                 placeholder={editingUser ? '••••••' : 'Contraseña'}
@@ -493,7 +549,7 @@ export default function SettingsScreen() {
             <View style={styles.modalField}>
               <Text style={[styles.modalLabel, { color: colors.textSecondary }]}>Nombre visible *</Text>
               <TextInput
-                style={[styles.modalInput, { backgroundColor: colors.background, borderColor: colors.border, color: colors.text }]}
+                style={[styles.modalInput, { backgroundColor: colors.fill, borderColor: 'transparent', color: colors.text }]}
                 value={formDisplayName}
                 onChangeText={setFormDisplayName}
                 placeholder="Nombre completo"
@@ -506,18 +562,22 @@ export default function SettingsScreen() {
               <Text style={[styles.modalLabel, { color: colors.textSecondary }]}>Rol</Text>
               <View style={styles.roleSelector}>
                 <Pressable
-                  style={[styles.roleOption, { borderColor: formRole === 'admin' ? colors.primary : colors.border, backgroundColor: formRole === 'admin' ? colors.primary : colors.surface }]}
+                  style={[styles.roleOption, { borderColor: formRole === 'admin' ? colors.primaryFill : colors.border, backgroundColor: formRole === 'admin' ? colors.primaryFill : colors.surface }]}
                   onPress={() => setFormRole('admin')}
+                  accessibilityRole="radio"
+                  accessibilityState={{ selected: formRole === 'admin' }}
                 >
-                  <Shield size={14} color={formRole === 'admin' ? '#FFFFFF' : colors.textSecondary} />
-                  <Text style={[styles.roleOptionText, { color: formRole === 'admin' ? '#FFFFFF' : colors.textSecondary }]}>Admin</Text>
+                  <Shield size={14} color={formRole === 'admin' ? colors.onPrimary : colors.textSecondary} />
+                  <Text style={[styles.roleOptionText, { color: formRole === 'admin' ? colors.onPrimary : colors.textSecondary }]}>Administrador</Text>
                 </Pressable>
                 <Pressable
-                  style={[styles.roleOption, { borderColor: formRole === 'user' ? colors.primary : colors.border, backgroundColor: formRole === 'user' ? colors.primary : colors.surface }]}
+                  style={[styles.roleOption, { borderColor: formRole === 'user' ? colors.primaryFill : colors.border, backgroundColor: formRole === 'user' ? colors.primaryFill : colors.surface }]}
                   onPress={() => setFormRole('user')}
+                  accessibilityRole="radio"
+                  accessibilityState={{ selected: formRole === 'user' }}
                 >
-                  <User size={14} color={formRole === 'user' ? '#FFFFFF' : colors.textSecondary} />
-                  <Text style={[styles.roleOptionText, { color: formRole === 'user' ? '#FFFFFF' : colors.textSecondary }]}>Usuario</Text>
+                  <User size={14} color={formRole === 'user' ? colors.onPrimary : colors.textSecondary} />
+                  <Text style={[styles.roleOptionText, { color: formRole === 'user' ? colors.onPrimary : colors.textSecondary }]}>Usuario</Text>
                 </Pressable>
               </View>
             </View>
@@ -528,18 +588,18 @@ export default function SettingsScreen() {
                 <Switch
                   value={formActive}
                   onValueChange={setFormActive}
-                  trackColor={{ false: colors.border, true: colors.primaryLight }}
-                  thumbColor={formActive ? colors.primary : colors.textTertiary}
+                  trackColor={{ false: colors.border, true: colors.primaryFill }}
+                  thumbColor={formActive ? '#FFFFFF' : colors.textTertiary}
                 />
               </View>
             )}
 
             <View style={[styles.modalActions, { borderTopColor: colors.divider }]}>
-              <Pressable style={[styles.modalCancelBtn, { borderColor: colors.border }]} onPress={() => setUserModalOpen(false)}>
-                <Text style={[styles.modalCancelText, { color: colors.textSecondary }]}>Cancelar</Text>
+              <Pressable style={({ hovered }: { pressed: boolean; hovered?: boolean }) => [styles.modalCancelBtn, { borderColor: 'transparent', backgroundColor: hovered ? colors.surfaceAlt : colors.fill }]} onPress={() => setUserModalOpen(false)} accessibilityRole="button">
+                <Text style={[styles.modalCancelText, { color: colors.text }]}>Cancelar</Text>
               </Pressable>
-              <Pressable style={[styles.modalConfirmBtn, { backgroundColor: colors.primary, opacity: savingUser ? 0.6 : 1 }]} onPress={handleSaveUser} disabled={savingUser} testID="user-form-save">
-                <Text style={styles.modalConfirmText}>{savingUser ? 'Guardando…' : editingUser ? 'Actualizar' : 'Crear'}</Text>
+              <Pressable style={({ hovered }: { pressed: boolean; hovered?: boolean }) => [styles.modalConfirmBtn, { backgroundColor: hovered ? colors.primaryDark : colors.primaryFill, opacity: savingUser ? 0.6 : 1 }]} onPress={handleSaveUser} disabled={savingUser} accessibilityRole="button" testID="user-form-save">
+                <Text style={[styles.modalConfirmText, { color: colors.onPrimary }]}>{savingUser ? 'Guardando…' : editingUser ? 'Guardar cambios' : 'Crear usuario'}</Text>
               </Pressable>
             </View>
           </View>
@@ -559,10 +619,35 @@ const styles = StyleSheet.create({
   content: {
     paddingBottom: 40,
   },
-  column: {
-    width: '100%' as any,
-    maxWidth: 820,
-  },
+  cols: { flexDirection: 'row', gap: 24, alignItems: 'flex-start' },
+  colLeft: { flex: 1, minWidth: 0 },
+  colRight: { flex: 1.15, minWidth: 0 },
+  profileCard: { borderRadius: 18, padding: 20, marginBottom: 28, flexDirection: 'row', alignItems: 'center', gap: 16, overflow: 'hidden' },
+  profileCardStacked: { flexDirection: 'column', alignItems: 'stretch' },
+  profileLeft: { flexDirection: 'row', alignItems: 'center', gap: 16, flex: 1, minWidth: 0 },
+  profileAvatarBrand: { width: 60, height: 60, borderRadius: 30, alignItems: 'center', justifyContent: 'center' },
+  profileInitialBrand: { fontSize: 26, fontWeight: '800' as const },
+  profileNameBrand: { fontSize: 22, fontWeight: '800' as const, letterSpacing: -0.4 },
+  profileMeta: { fontSize: 14, marginTop: 2 },
+  rolePill: { flexDirection: 'row', alignItems: 'center', gap: 5, alignSelf: 'flex-start', paddingHorizontal: 10, paddingVertical: 4, borderRadius: 999, marginTop: 8 },
+  rolePillText: { fontSize: 13, fontWeight: '700' as const },
+  logoutBrand: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, minHeight: 44, paddingHorizontal: 18, borderRadius: 999 },
+  logoutBrandText: { fontSize: 15, fontWeight: '700' as const },
+  statGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 12 },
+  // Pedidos, Fabricantes y Años en una fila de tres; la facturación ocupa la fila entera
+  statTile: { flexGrow: 1, flexBasis: '30%' as unknown as number, minWidth: 96, borderRadius: 14, padding: 14, paddingTop: 16, gap: 10, overflow: 'hidden' },
+  statTileBig: { flexBasis: '100%' as unknown as number },
+  statStripe: { position: 'absolute', top: 0, left: 0, right: 0, height: 4 },
+  statTop: { flexDirection: 'row', alignItems: 'center', gap: 10 },
+  // En móvil, icono encima de la etiqueta para que «Fabricantes» quepa en una tarjeta de un tercio
+  statTopStacked: { flexDirection: 'column', alignItems: 'flex-start', gap: 6 },
+  statIcon: { width: 32, height: 32, borderRadius: 9, alignItems: 'center', justifyContent: 'center' },
+  statLabel: { fontSize: 14, fontWeight: '600' as const, flexShrink: 1 },
+  statValue: { fontSize: 30, fontWeight: '800' as const, letterSpacing: -0.8, fontVariant: ['tabular-nums'] },
+  statValueBig: { fontSize: 34 },
+  userInitial: { fontSize: 14, fontWeight: '800' as const },
+  modalStripe: { position: 'absolute', top: 0, left: 0, right: 0, height: 4 },
+  modalTitleRow: { flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 14, flexShrink: 1 },
   userBanner: { borderRadius: 16, padding: 20, marginBottom: 16, borderWidth: 0,
     flexDirection: 'row',
     justifyContent: 'space-between',
@@ -697,10 +782,6 @@ const styles = StyleSheet.create({
     marginTop: 5,
   },
   userRolePill: { paddingHorizontal: 9, paddingVertical: 2, borderRadius: 999, },
-  rolePillText: {
-    fontSize: 11,
-    fontWeight: '600' as const,
-  },
   inactivePill: { paddingHorizontal: 9, paddingVertical: 2, borderRadius: 999, },
   inactivePillText: {
     fontSize: 11,
@@ -739,8 +820,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  statValue: { fontSize: 28, fontWeight: '700' as const, letterSpacing: -0.8, fontVariant: ['tabular-nums'], },
-  statLabel: { fontSize: 13, fontWeight: '400' as const, },
   totalAmountCard: { borderRadius: 20, paddingVertical: 24, paddingHorizontal: 20, alignItems: 'center', },
   totalAmountLabel: { fontSize: 15, color: 'rgba(245,245,247,0.65)', marginBottom: 4, fontWeight: '500' as const, },
   totalAmountValue: { fontSize: 40, fontWeight: '700' as const, color: '#F5F5F7', letterSpacing: -1.2, fontVariant: ['tabular-nums'], },
