@@ -62,6 +62,7 @@ Pedido del propietario: más color y aprovechar el ancho; que la referencia y lo
 - [x] Formulario con la marca: secciones con icono naranja; Cliente en el orden del Excel (rejilla de 3), Documentos debajo; en ordenador, Pedido y Resumen con «Guardar» fijos a la derecha; productos en tabla editable desde 1.680 px (tarjetas por debajo).
 - [x] Fabricantes: resumen (fabricantes, con pedidos, pedidos, importe sin cancelados), buscador, tarjetas en rejilla en ordenador (pedidos, importe, último pedido, años) y lista en móvil; modales de marca.
 - [x] Ajustes: perfil en azul petróleo con «Cerrar sesión», dos columnas en ordenador, resumen en tarjetas de color, modales de marca.
+- [x] Vista «Por año y fabricante»: tarjetas nuevas (`components/home/FolderTile.tsx`) con el año en grande o el código del fabricante, barra de colores con el reparto por estado, pedidos, fabricantes o último pedido e importe sin cancelados.
 
 ## Fase 2 · Pantalla por pantalla
 
