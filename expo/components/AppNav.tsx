@@ -71,6 +71,9 @@ export default function AppNav({ state, navigation }: BottomTabBarProps) {
   const { currentUser } = useAuth();
   const side = width >= NAV_SIDE_MIN;
   const full = width >= NAV_FULL_MIN;
+  const { height } = useWindowDimensions();
+  // Pantallas bajas (móvil en horizontal): elementos de la barra lateral más compactos
+  const low = height < 460;
 
   const go = (name: string) => {
     const route = state.routes.find(r => r.name === name);
@@ -158,6 +161,7 @@ export default function AppNav({ state, navigation }: BottomTabBarProps) {
               style={({ hovered }: { pressed: boolean; hovered?: boolean }) => [
                 styles.item,
                 !full && styles.itemCompact,
+                !full && low && { minHeight: 52, paddingVertical: 4 },
                 active ? { backgroundColor: colors.navActiveBg } : hovered ? { backgroundColor: 'rgba(255,255,255,0.06)' } : null,
                 pointer,
               ]}

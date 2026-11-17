@@ -316,9 +316,11 @@ export default function ManufacturersScreen() {
         {codeIcon(item, 40)}
         <View style={{ flex: 1, minWidth: 0, gap: 3 }}>
           <Text style={[styles.mfName, { color: colors.text }]} numberOfLines={1}>{item.name}</Text>
+          {/* El importe en su propia línea: en móvil se cortaba a medias */}
           <Text style={[styles.mfCode, { color: colors.textSecondary }]} numberOfLines={1}>
-            {item.code} · {count} pedido{count !== 1 ? 's' : ''} · <Text style={{ color: colors.text, fontWeight: '700' }}>{formatCurrency(st?.amount ?? 0)}</Text>
+            {item.code} · {count} pedido{count !== 1 ? 's' : ''}
           </Text>
+          <Text style={[styles.mfCode, { color: colors.text, fontWeight: '700' }]} numberOfLines={1}>{formatCurrency(st?.amount ?? 0)}</Text>
           <View style={[styles.yearBadges, { marginTop: 4 }]}>{yearChips(item)}</View>
         </View>
         {menuButton(item)}
@@ -338,9 +340,9 @@ export default function ManufacturersScreen() {
         <t.Icon size={17} color={colors.onPrimary} strokeWidth={2.3} />
       </View>
       <Text style={[styles.tileValue, { color: colors.text }]} numberOfLines={1}>{t.value}</Text>
-      <Text style={[styles.tileLabel, { color: colors.textSecondary }]} numberOfLines={1}>
+      <Text style={[styles.tileLabel, { color: colors.textSecondary }]} numberOfLines={2}>
         {t.label}
-        {t.hint ? <Text style={{ fontSize: 12 }}> · {t.hint}</Text> : null}
+        {t.hint ? <Text style={{ fontSize: 12 }}>{'\n'}{t.hint}</Text> : null}
       </Text>
     </View>
   ));

@@ -64,6 +64,8 @@ Pedido del propietario: más color y aprovechar el ancho; que la referencia y lo
 - [x] Ajustes: perfil en azul petróleo con «Cerrar sesión», dos columnas en ordenador, resumen en tarjetas de color, modales de marca.
 - [x] Vista «Por año y fabricante»: tarjetas nuevas (`components/home/FolderTile.tsx`) con el año en grande o el código del fabricante, barra de colores con el reparto por estado, pedidos, fabricantes o último pedido e importe sin cancelados.
 - [x] Entrada: panel de marca azul petróleo (ALPHAΩMEGA, «Libro de pedidos» y tres funciones que existen) a la izquierda en ordenador; franja de marca arriba en móvil; formulario con borde naranja.
+- [x] Auditoría (17/11/2026): QA completa, revisión visual y detector automático de solapes (`t13`). Arreglado: guardar la ref. manual con el ratón en la ficha, cabecera de la ficha en 320 px, importes cortados (fabricantes en móvil, total de la lista, barra de guardar en 320 px), sugerencias de cliente tapadas en móvil, tabla de productos solo desde 1.600 px, estado con su flecha en la misma píldora, barra lateral compacta en horizontal.
+- [ ] Lector de documentos con imágenes (`tools/docread/check.ts`): este equipo no tiene tesseract; sin comprobar 02–07.
 
 ## Fase 2 · Pantalla por pantalla
 

@@ -25,7 +25,7 @@ export default function OrderDetailScreen() {
   const { shown: compactShown, scrollProps } = useCollapsingTitle(90);
   const desktop = width >= 1024;
   // Tabla de productos solo si la columna tiene sitio para todas las cifras (en 1024 se cortaba «Con IVA»)
-  const tableWide = width >= 1200;
+  const tableWide = width >= 1600;
   const s = useMemo(() => makeStyles(colors), [colors]);
   const order = useMemo(() => orders.find(o => o.id === orderId), [orders, orderId]);
 
@@ -281,18 +281,10 @@ export default function OrderDetailScreen() {
       <InfoRow s={s} label="Nº recibo / albarán" value={c.numero_recibo} />
       <InfoRow s={s} label="Condiciones de entrega" value={c.condiciones_entrega} stacked />
       <InfoRow s={s} label="Condiciones de pago" value={c.condiciones_pago} stacked />
-      <Pressable
-        onPress={() => {
-          setRefValue(order.custom_reference || '');
-          setEditingRef(true);
-        }}
-        style={({ hovered }: { pressed: boolean; hovered?: boolean }) => [s.row, s.rowSep, hovered && !editingRef && { backgroundColor: colors.fill }]}
-        disabled={editingRef}
-        accessibilityRole="button"
-        accessibilityLabel="Editar referencia manual"
-      >
-        <Text style={s.rowLabel}>Ref. manual</Text>
-        {editingRef ? (
+      {/* Editando: una fila normal (no un botón), porque en web un botón desactivado bloqueaba el clic en ✓ y ✗ */}
+      {editingRef ? (
+        <View style={[s.row, s.rowSep]}>
+          <Text style={s.rowLabel}>Ref. manual</Text>
           <View style={s.refEditRow}>
             <TextInput
               value={refValue}
@@ -304,21 +296,34 @@ export default function OrderDetailScreen() {
               onSubmitEditing={saveRef}
               returnKeyType="done"
               accessibilityLabel="Referencia manual"
+              testID="ref-input"
             />
-            <Pressable onPress={saveRef} disabled={busy} style={[s.iconBtn, { backgroundColor: colors.primaryFill }]} accessibilityLabel="Guardar referencia manual">
+            <Pressable onPress={saveRef} disabled={busy} style={[s.iconBtn, { backgroundColor: colors.primaryFill }]} accessibilityRole="button" accessibilityLabel="Guardar referencia manual" testID="ref-save">
               <Check size={18} color={colors.onPrimary} />
             </Pressable>
-            <Pressable onPress={() => setEditingRef(false)} style={[s.iconBtn, { backgroundColor: colors.fill }]} accessibilityLabel="Cancelar">
+            <Pressable onPress={() => setEditingRef(false)} style={[s.iconBtn, { backgroundColor: colors.fill }]} accessibilityRole="button" accessibilityLabel="Cancelar" testID="ref-cancel">
               <X size={18} color={colors.text} />
             </Pressable>
           </View>
-        ) : (
+        </View>
+      ) : (
+        <Pressable
+          onPress={() => {
+            setRefValue(order.custom_reference || '');
+            setEditingRef(true);
+          }}
+          style={({ hovered }: { pressed: boolean; hovered?: boolean }) => [s.row, s.rowSep, hovered && { backgroundColor: colors.fill }]}
+          accessibilityRole="button"
+          accessibilityLabel="Editar referencia manual"
+          testID="ref-edit"
+        >
+          <Text style={s.rowLabel}>Ref. manual</Text>
           <View style={s.rowRight}>
             <Text style={s.rowValue}>{order.custom_reference || '—'}</Text>
             <Pencil size={14} color={colors.textSecondary} />
           </View>
-        )}
-      </Pressable>
+        </Pressable>
+      )}
       <InfoRow s={s} label="Creado" value={formatDate(order.created_at)} />
       <InfoRow s={s} label="Última actualización" value={formatDate(order.updated_at)} />
     </>,
@@ -583,12 +588,14 @@ function makeStyles(c: ThemeColors) {
     roundBtn: { width: 44, height: 44, borderRadius: 22, alignItems: 'center', justifyContent: 'center', backgroundColor: c.primarySoft },
     heroCard: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'flex-end', gap: 16, backgroundColor: c.surface, borderRadius: 18, padding: 20, paddingLeft: 26, overflow: 'hidden' },
     heroAccent: { position: 'absolute', left: 0, top: 0, bottom: 0, width: 6 },
-    heroMain: { flexGrow: 1, flexBasis: 320, minWidth: 0 },
+    // base 240 (no 320): en móviles de 320 px la cabecera se salía de la tarjeta
+    heroMain: { flexGrow: 1, flexBasis: 240, minWidth: 0, maxWidth: '100%' },
     heroSide: { gap: 6, alignItems: 'flex-start' },
     caption: { fontSize: 13, fontWeight: '600', color: c.textSecondary },
     ref: { ...type.largeTitle, fontWeight: '800', color: c.reference, fontVariant: ['tabular-nums'] },
     heroMeta: { flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 10, flexWrap: 'wrap' },
-    statusBtn: { flexDirection: 'row', alignItems: 'center', gap: 4, minHeight: 44 },
+    // la flecha va dentro de la misma píldora que el estado (antes flotaba suelta)
+    statusBtn: { flexDirection: 'row', alignItems: 'center', gap: 2, minHeight: 44, paddingRight: 10, paddingLeft: 2, borderRadius: 999, backgroundColor: c.fill },
     metaChip: { flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: c.fill, borderRadius: 999, paddingHorizontal: 12, minHeight: 32, flexShrink: 1, maxWidth: '100%', minWidth: 0 },
     metaChipText: { fontSize: 14, color: c.text, fontWeight: '500', flexShrink: 1, minWidth: 0 },
     heroCompany: { fontSize: 17, fontWeight: '700', color: c.text, marginTop: 4, letterSpacing: -0.2 },
@@ -620,7 +627,7 @@ function makeStyles(c: ThemeColors) {
     row: { flexDirection: 'row', alignItems: 'center', gap: 12, minHeight: 44, paddingHorizontal: 16, paddingVertical: 9 },
     rowStacked: { flexDirection: 'column', alignItems: 'flex-start', gap: 2 },
     rowSep: { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: c.divider },
-    rowLabel: { fontSize: 14.5, color: c.textSecondary },
+    rowLabel: { fontSize: 14.5, color: c.textSecondary, flexShrink: 0, maxWidth: '45%' },
     rowValue: { flex: 1, minWidth: 0, fontSize: 15.5, color: c.text, textAlign: 'right', lineHeight: 21 },
     rowRight: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'flex-end', gap: 8, minWidth: 0 },
     totalRow: { minHeight: 54, backgroundColor: c.primarySoft },
@@ -639,7 +646,7 @@ function makeStyles(c: ThemeColors) {
     cQty: { width: 44, textAlign: 'center' },
     cName: { flex: 1, minWidth: 170 },
     // Importes: ancho fijo y sin partir («912,00 €» no debe quedar en dos líneas); el concepto se estrecha
-    cNum: { width: 80, flexShrink: 0, textAlign: 'right' },
+    cNum: { width: 108, flexShrink: 0, textAlign: 'right', paddingLeft: 8 },
     noWrap: (Platform.OS === 'web' ? { whiteSpace: 'nowrap' } : {}) as object,
     cDto: { width: 56, textAlign: 'right' },
     // móvil
