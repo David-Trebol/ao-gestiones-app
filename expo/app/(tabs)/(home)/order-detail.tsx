@@ -174,13 +174,14 @@ export default function OrderDetailScreen() {
             <Pressable
               onPress={() => setSheet('status')}
               disabled={busy}
-              style={({ hovered }: { pressed: boolean; hovered?: boolean }) => [s.statusBtn, hovered && { opacity: 0.85 }]}
+              style={({ hovered }: { pressed: boolean; hovered?: boolean }) => [s.statusBtn, { backgroundColor: colors[statusConfig[order.status].bgKey] }, hovered && { opacity: 0.85 }]}
+              hitSlop={6}
               accessibilityRole="button"
               accessibilityLabel={`Estado: ${statusConfig[order.status].label}. Cambiar estado`}
               testID="change-status"
             >
               <StatusBadge status={order.status} />
-              <ChevronDown size={15} color={colors.textSecondary} />
+              <ChevronDown size={15} color={colors[statusConfig[order.status].textKey]} strokeWidth={2.5} />
             </Pressable>
             <View style={s.metaChip}>
               <Factory size={14} color={colors.accent} />
@@ -228,8 +229,8 @@ export default function OrderDetailScreen() {
   );
 
   // ---------------------------------------------------------------- bloques
-  const card = (title: string, icon: React.ReactNode, body: React.ReactNode, opts: { trailing?: React.ReactNode; footer?: string; flush?: boolean } = {}) => (
-    <View style={[s.card, cardShadow(isDark)]}>
+  const card = (title: string, icon: React.ReactNode, body: React.ReactNode, opts: { trailing?: React.ReactNode; footer?: string; flush?: boolean; grow?: boolean } = {}) => (
+    <View style={[s.card, cardShadow(isDark), opts.grow && { flexGrow: 1 }]}>
       <View style={s.cardHead}>
         <View style={s.cardIcon}>{icon}</View>
         <Text style={s.cardTitle} accessibilityRole="header">{title}</Text>
@@ -267,6 +268,7 @@ export default function OrderDetailScreen() {
         <Cell s={s} cols={clientCols} icon={<MapPin size={14} color={colors.accent} />} label="Dirección" value={addressLines.length ? addressLines.join('\n') : ''} />
       </View>
     </>,
+    { grow: true },
   );
 
   const orderInfo = card(
@@ -328,6 +330,71 @@ export default function OrderDetailScreen() {
       <InfoRow s={s} label="Última actualización" value={formatDate(order.updated_at)} />
     </>,
     { flush: true },
+  );
+
+  /** Pedido y documentos en rejilla de dos columnas (ordenador): los mismos datos que la lista, en la mitad de alto */
+  // lado a lado con el cliente desde 1280 px (2 columnas); por debajo, a todo el ancho (3 columnas)
+  const sideBySide = width >= 1280;
+  const docCols = sideBySide ? 2 : 3;
+  const orderInfoGrid = card(
+    'Pedido y documentos',
+    <FileText size={16} color={colors.onPrimary} />,
+    <>
+      <View style={[s.grid, s.cardBody]}>
+        <Cell s={s} cols={docCols} icon={<Factory size={14} color={colors.accent} />} label="Fabricante" value={`${order.manufacturer_name} (${order.manufacturer_code}) · ${order.year}`} />
+        <Cell s={s} cols={docCols} icon={<Receipt size={14} color={colors.accent} />} label="Nº pedido del cliente" value={c.numero_referencia_pedido} />
+        <Cell s={s} cols={docCols} icon={<FileText size={14} color={colors.accent} />} label="Oferta / proforma" value={c.oferta_proforma} />
+        <Cell s={s} cols={docCols} icon={<Receipt size={14} color={colors.accent} />} label="Nº factura" value={c.numero_factura} />
+        <Cell s={s} cols={docCols} icon={<FileText size={14} color={colors.accent} />} label="Nº recibo / albarán" value={c.numero_recibo} />
+        <Cell s={s} cols={docCols} icon={<CalendarDays size={14} color={colors.accent} />} label="Creado · actualizado" value={`${formatDate(order.created_at)} · ${formatDate(order.updated_at)}`} />
+        <Cell s={s} cols={docCols} icon={<Truck size={14} color={colors.accent} />} label="Condiciones de entrega" value={c.condiciones_entrega} />
+        <Cell s={s} cols={docCols} icon={<Euro size={14} color={colors.accent} />} label="Condiciones de pago" value={c.condiciones_pago} />
+      </View>
+      {/* Editando: una fila normal (no un botón), porque en web un botón desactivado bloqueaba el clic en ✓ y ✗ */}
+      {editingRef ? (
+        <View style={[s.row, s.rowSep]}>
+          <Text style={s.rowLabel}>Ref. manual</Text>
+          <View style={s.refEditRow}>
+            <TextInput
+              value={refValue}
+              onChangeText={setRefValue}
+              placeholder="Referencia manual"
+              placeholderTextColor={colors.textTertiary}
+              style={s.refInput}
+              autoFocus
+              onSubmitEditing={saveRef}
+              returnKeyType="done"
+              accessibilityLabel="Referencia manual"
+              testID="ref-input"
+            />
+            <Pressable onPress={saveRef} disabled={busy} style={[s.iconBtn, { backgroundColor: colors.primaryFill }]} accessibilityRole="button" accessibilityLabel="Guardar referencia manual" testID="ref-save">
+              <Check size={18} color={colors.onPrimary} />
+            </Pressable>
+            <Pressable onPress={() => setEditingRef(false)} style={[s.iconBtn, { backgroundColor: colors.fill }]} accessibilityRole="button" accessibilityLabel="Cancelar" testID="ref-cancel">
+              <X size={18} color={colors.text} />
+            </Pressable>
+          </View>
+        </View>
+      ) : (
+        <Pressable
+          onPress={() => {
+            setRefValue(order.custom_reference || '');
+            setEditingRef(true);
+          }}
+          style={({ hovered }: { pressed: boolean; hovered?: boolean }) => [s.row, s.rowSep, hovered && { backgroundColor: colors.fill }]}
+          accessibilityRole="button"
+          accessibilityLabel="Editar referencia manual"
+          testID="ref-edit"
+        >
+          <Text style={s.rowLabel}>Ref. manual</Text>
+          <View style={s.rowRight}>
+            <Text style={s.rowValue}>{order.custom_reference || '—'}</Text>
+            <Pencil size={14} color={colors.textSecondary} />
+          </View>
+        </Pressable>
+      )}
+    </>,
+    { flush: true, grow: true },
   );
 
   const followUp = card(
@@ -465,6 +532,87 @@ export default function OrderDetailScreen() {
     { flush: true, trailing: <Text style={s.cardCount}>{shipLines.length}</Text> },
   );
 
+  const hasUnitPrice = order.items.some(i => i.tpv_unitario > 0);
+  const hasDiscount = order.items.some(i => !!i.descuento_porcentaje);
+  /** Ordenador: productos a todo el ancho, como una factura (líneas, gastos de envío y totales alineados a la derecha) */
+  const invoice = card(
+    'Productos',
+    <Package size={16} color={colors.onPrimary} />,
+    <View>
+      <View style={[s.tr, s.th]}>
+        <Text style={[s.thText, s.cQty]}>Cant.</Text>
+        <Text style={[s.thText, s.cName]}>Equipo y referencia</Text>
+        {hasUnitPrice && <Text style={[s.thText, s.cNum]}>Precio ud.</Text>}
+        {hasDiscount && <Text style={[s.thText, s.cDto]}>Dto.</Text>}
+        <Text style={[s.thText, s.cNum]}>Neto sin IVA</Text>
+        <Text style={[s.thText, s.cDto]}>IVA</Text>
+        {hasCost && <Text style={[s.thText, s.cNum]}>Coste ud.</Text>}
+        {hasCost && <Text style={[s.thText, s.cNum]}>Beneficio</Text>}
+        <Text style={[s.thText, s.cNum]}>Con IVA</Text>
+      </View>
+      {order.items.map((it, i) => (
+        <View key={i} style={[s.tr, s.rowSep, i % 2 === 1 && { backgroundColor: colors.surfaceAlt }]}>
+          <Text style={[s.td, s.cQty, s.tdStrong]}>{it.quantity}</Text>
+          <View style={s.cName}>
+            <Text style={[s.td, s.tdStrong]} selectable>{it.product_name || 'Sin nombre'}</Text>
+            {it.total_sin_iva > 0 && <Text style={s.tdSub}>Importe de la línea antes de dto.: {formatCurrency(it.total_sin_iva)}</Text>}
+          </View>
+          {hasUnitPrice && <Text style={[s.td, s.cNum, s.noWrap, !(it.tpv_unitario > 0) && s.dim]}>{it.tpv_unitario > 0 ? formatCurrency(it.tpv_unitario) : '—'}</Text>}
+          {hasDiscount && <Text style={[s.td, s.cDto, s.noWrap, !it.descuento_porcentaje && s.dim]}>{it.descuento_porcentaje ? `${it.descuento_porcentaje} %` : '—'}</Text>}
+          <Text style={[s.td, s.cNum, s.noWrap, s.tdStrong]}>{formatCurrency(it.valor_sin_iva)}</Text>
+          <Text style={[s.td, s.cDto, s.noWrap]}>{it.vat_percentage} %</Text>
+          {hasCost && <Text style={[s.td, s.cNum, s.noWrap, !(it.costo_unitario > 0) && s.dim]}>{it.costo_unitario > 0 ? formatCurrency(it.costo_unitario) : '—'}</Text>}
+          {hasCost && (
+            <Text style={[s.td, s.cNum, s.noWrap, it.costo_unitario > 0 ? { color: it.beneficio_bruto >= 0 ? colors.success : colors.error, fontWeight: '600' } : s.dim]}>
+              {it.costo_unitario > 0 ? formatCurrency(it.beneficio_bruto) : '—'}
+            </Text>
+          )}
+          <Text style={[s.td, s.cNum, s.noWrap]}>{formatCurrency(it.valor_con_iva)}</Text>
+        </View>
+      ))}
+
+      {/* Pie de factura: gastos de envío a la izquierda, totales a la derecha */}
+      <View style={[s.invoiceFoot, s.rowSep]}>
+        <View style={s.invoiceShip}>
+          <Text style={s.subHead}>Gastos de envío</Text>
+          {shipLines.length === 0 && order.shipping_cost <= 0 ? (
+            <Text style={s.muted}>Sin gastos de envío.</Text>
+          ) : (
+            <>
+              {shipLines.map((x, i) => (
+                <View key={i} style={s.shipLine}>
+                  <Text style={[s.td, { flex: 1, minWidth: 0 }]} numberOfLines={2}>
+                    {x.quantity > 1 ? `${x.quantity} × ` : ''}{x.description || 'Envío'}
+                  </Text>
+                  <Text style={[s.tdSub, s.noWrap]}>{formatCurrency(x.valor_sin_iva)} + IVA {x.vat_percentage} %</Text>
+                  <Text style={[s.td, s.tdStrong, s.noWrap, { width: 100, textAlign: 'right' }]}>{formatCurrency(x.valor_con_iva)}</Text>
+                </View>
+              ))}
+              {order.shipping_cost > 0 && (
+                <View style={s.shipLine}>
+                  <Text style={[s.td, { flex: 1 }]}>Envío extra (importe fijo, sin IVA)</Text>
+                  <Text style={[s.td, s.tdStrong, s.noWrap, { width: 100, textAlign: 'right' }]}>{formatCurrency(order.shipping_cost)}</Text>
+                </View>
+              )}
+            </>
+          )}
+          {hasCost && <Text style={[s.muted, { marginTop: 10 }]}>Beneficio bruto de los productos: <Text style={{ color: profit >= 0 ? colors.success : colors.error, fontWeight: '700' }}>{formatCurrency(profit)}</Text> (venta sin IVA − coste).</Text>}
+        </View>
+        <View style={s.totals}>
+          <View style={s.totLine}><Text style={s.totLabel}>Productos (sin IVA)</Text><Text style={s.totValue}>{formatCurrency(order.total_ex_vat)}</Text></View>
+          <View style={s.totLine}><Text style={s.totLabel}>IVA de los productos</Text><Text style={s.totValue}>{formatCurrency(order.total_vat)}</Text></View>
+          {shipTotal > 0 && <View style={s.totLine}><Text style={s.totLabel}>Gastos de envío (con IVA)</Text><Text style={s.totValue}>{formatCurrency(shipTotal)}</Text></View>}
+          {order.shipping_cost > 0 && <View style={s.totLine}><Text style={s.totLabel}>Envío extra</Text><Text style={s.totValue}>{formatCurrency(order.shipping_cost)}</Text></View>}
+          <View style={[s.totLine, s.totGrand]}>
+            <Text style={s.totalRowLabel}>Total</Text>
+            <Text style={s.totalRowValue}>{formatCurrency(order.total_with_vat)}</Text>
+          </View>
+        </View>
+      </View>
+    </View>,
+    { flush: true, trailing: <Text style={s.cardCount}>{order.items.length}</Text> },
+  );
+
   return (
     <View style={s.root}>
       <Stack.Screen options={{ title: order.reference_number, headerShown: false }} />
@@ -472,19 +620,22 @@ export default function OrderDetailScreen() {
       <ScrollView {...scrollProps} contentContainerStyle={[s.content, content, { paddingBottom: bottomSpace }]}>
         {header}
         {desktop ? (
-          // Dos columnas independientes: lo que cuelga de cada una sube sin dejar huecos
-          <View style={s.cols}>
-            <View style={s.colMain}>
-              {client}
-              {products}
-              {shipping}
-            </View>
-            <View style={s.colSide}>
-              {finance}
-              {orderInfo}
-              {followUp}
-            </View>
-          </View>
+          // Como una factura: datos (cliente | pedido y documentos), productos con sus totales a todo el ancho, seguimiento
+          <>
+            {sideBySide ? (
+              <View style={[s.cols, { alignItems: 'stretch' }]}>
+                <View style={s.colMain}>{client}</View>
+                <View style={s.colSide}>{orderInfoGrid}</View>
+              </View>
+            ) : (
+              <>
+                {client}
+                {orderInfoGrid}
+              </>
+            )}
+            {invoice}
+            {followUp}
+          </>
         ) : (
           <>
             {client}
@@ -595,7 +746,7 @@ function makeStyles(c: ThemeColors) {
     ref: { ...type.largeTitle, fontWeight: '800', color: c.reference, fontVariant: ['tabular-nums'] },
     heroMeta: { flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 10, flexWrap: 'wrap' },
     // la flecha va dentro de la misma píldora que el estado (antes flotaba suelta)
-    statusBtn: { flexDirection: 'row', alignItems: 'center', gap: 2, minHeight: 44, paddingRight: 10, paddingLeft: 2, borderRadius: 999, backgroundColor: c.fill },
+    statusBtn: { flexDirection: 'row', alignItems: 'center', gap: 0, minHeight: 36, paddingRight: 10, borderRadius: 999 },
     metaChip: { flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: c.fill, borderRadius: 999, paddingHorizontal: 12, minHeight: 32, flexShrink: 1, maxWidth: '100%', minWidth: 0 },
     metaChipText: { fontSize: 14, color: c.text, fontWeight: '500', flexShrink: 1, minWidth: 0 },
     heroCompany: { fontSize: 17, fontWeight: '700', color: c.text, marginTop: 4, letterSpacing: -0.2 },
@@ -646,9 +797,19 @@ function makeStyles(c: ThemeColors) {
     cQty: { width: 44, textAlign: 'center' },
     cName: { flex: 1, minWidth: 170 },
     // Importes: ancho fijo y sin partir («912,00 €» no debe quedar en dos líneas); el concepto se estrecha
-    cNum: { width: 108, flexShrink: 0, textAlign: 'right', paddingLeft: 8 },
+    cNum: { width: 100, flexShrink: 0, textAlign: 'right', paddingLeft: 6 },
     noWrap: (Platform.OS === 'web' ? { whiteSpace: 'nowrap' } : {}) as object,
     cDto: { width: 56, textAlign: 'right' },
+    dim: { color: c.textTertiary },
+    invoiceFoot: { flexDirection: 'row', gap: 32, padding: 16, paddingTop: 18, alignItems: 'flex-start' },
+    invoiceShip: { flex: 1, minWidth: 0, gap: 6 },
+    subHead: { fontSize: 13, fontWeight: '700', color: c.textSecondary, marginBottom: 2 },
+    shipLine: { flexDirection: 'row', alignItems: 'center', gap: 12, minHeight: 32 },
+    totals: { width: 360, maxWidth: '45%', gap: 2 },
+    totLine: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', gap: 12, minHeight: 34 },
+    totLabel: { fontSize: 15, color: c.textSecondary },
+    totValue: { fontSize: 15.5, color: c.text, fontVariant: ['tabular-nums'], fontWeight: '600' },
+    totGrand: { marginTop: 6, paddingHorizontal: 14, paddingVertical: 10, borderRadius: 12, backgroundColor: c.primarySoft },
     // móvil
     item: { paddingHorizontal: 16, paddingVertical: 12, gap: 4 },
     itemTop: { flexDirection: 'row', gap: 10, alignItems: 'flex-start' },
