@@ -63,6 +63,7 @@ Pedido del propietario: más color y aprovechar el ancho; que la referencia y lo
 - [x] Fabricantes: resumen (fabricantes, con pedidos, pedidos, importe sin cancelados), buscador, tarjetas en rejilla en ordenador (pedidos, importe, último pedido, años) y lista en móvil; modales de marca.
 - [x] Ajustes: perfil en azul petróleo con «Cerrar sesión», dos columnas en ordenador, resumen en tarjetas de color, modales de marca.
 - [x] Vista «Por año y fabricante»: tarjetas nuevas (`components/home/FolderTile.tsx`) con el año en grande o el código del fabricante, barra de colores con el reparto por estado, pedidos, fabricantes o último pedido e importe sin cancelados.
+- [x] Entrada: panel de marca azul petróleo (ALPHAΩMEGA, «Libro de pedidos» y tres funciones que existen) a la izquierda en ordenador; franja de marca arriba en móvil; formulario con borde naranja.
 
 ## Fase 2 · Pantalla por pantalla
 
