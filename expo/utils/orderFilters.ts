@@ -120,6 +120,14 @@ export function attentionReasons(o: Order, now = Date.now()): string[] {
   return out;
 }
 
+/** ¿El pedido contiene todas las palabras de la búsqueda? (sin acentos ni mayúsculas; mismos campos que el buscador del inicio) */
+export function matchesQuery(order: Order, query: string): boolean {
+  const q = fold(query.trim());
+  if (!q) return true;
+  const h = haystack(order);
+  return q.split(/\s+/).every(t => h.includes(t));
+}
+
 export function filterOrders(orders: Order[], f: OrderFilters, now = Date.now()): Order[] {
   const q = fold(f.query.trim());
   const terms = q ? q.split(/\s+/) : [];

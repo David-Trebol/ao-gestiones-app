@@ -52,6 +52,14 @@ Pedido del propietario el 16/11/2026: estética de Apple (tipografía, colores, 
 - [ ] Probar en un iPhone real (Safari) y con el teclado abierto.
 - Nota: en `t5-scan.js`, «muestra progreso» falla por tiempos (el PDF de muestra se lee en menos de 0,4 s); el resto pasa.
 
+## Rediseño con la marca Alpha Omega (17/11/2026)
+
+Pedido del propietario: más color y aprovechar el ancho; que la referencia y los datos del cliente se vean de un golpe, como su Excel; buscador en cada año y fabricante. Base: alphaomega-electronics.com (azul petróleo #002A39, naranja #FF8718, azul acero #7FA4B7, Figtree).
+- [x] Paleta de marca (`constants/colors.ts`: `brand`, `reference`, `onPrimary`, `nav*`), Figtree, botón principal naranja con texto azul petróleo (6,3:1), barra lateral azul petróleo.
+- [x] Ancho máximo 1.600 px. Lista: referencia en naranja, cliente, contacto (teléfono y email), población y calle, fabricante y año, estado con retraso en una línea, total.
+- [x] Ficha estilo Excel: cabecera con referencia y total, tarjeta Cliente destacada (teléfono y email con enlace), Pedido y documentos, productos en tabla (≥ 1.200 px), dos columnas sin huecos.
+- [x] Buscadores en «Por año y fabricante»: todos los años, un año y un fabricante (`components/SearchField.tsx`, `matchesQuery`). Prueba: `t12-buscadores.js`.
+
 ## Fase 2 · Pantalla por pantalla
 
 - [x] Pedidos: contadores compactos que filtran, aviso de atención en una línea que filtra la lista (con «Ver retrasados»), la lista visible desde la primera pantalla, tabla desde 1.100 px y tarjetas en 1 o 2 columnas.

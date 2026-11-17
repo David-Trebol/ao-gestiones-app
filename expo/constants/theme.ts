@@ -7,15 +7,15 @@ import type { ThemeColors } from './colors';
  * escala tipográfica de iOS, radios continuos, espaciado base 4, sombras muy suaves y vidrio.
  */
 
-/** Fuente del sistema: SF en Apple; Inter (cargada desde Google Fonts) en Windows/Android */
+/** Figtree (la tipografía de la web de Alpha Omega, desde Google Fonts); si no carga, la del sistema */
 export const FONT_FAMILY = Platform.select({
-  web: '-apple-system, BlinkMacSystemFont, "SF Pro Text", "Inter", system-ui, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif',
+  web: '"Figtree", -apple-system, BlinkMacSystemFont, "SF Pro Text", system-ui, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif',
   default: undefined,
 });
 
-/** Fuente para títulos grandes (SF Pro Display en Apple) */
+/** Fuente para títulos grandes: la misma Figtree de alphaomega-electronics.com */
 export const DISPLAY_FAMILY = Platform.select({
-  web: '-apple-system, BlinkMacSystemFont, "SF Pro Display", "Inter", system-ui, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif',
+  web: '"Figtree", -apple-system, BlinkMacSystemFont, "SF Pro Display", system-ui, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif',
   default: undefined,
 });
 
@@ -40,7 +40,7 @@ export const radius = { sm: 8, md: 12, lg: 16, xl: 20, xxl: 28, pill: 999 } as c
 
 /** Escala tipográfica (tamaños de iOS) */
 export const type = {
-  largeTitle: { fontSize: 34, fontWeight: '700', letterSpacing: -0.8, lineHeight: 41, ...(DISPLAY_FAMILY ? { fontFamily: DISPLAY_FAMILY } : {}) },
+  largeTitle: { fontSize: 34, fontWeight: '800', letterSpacing: -0.9, lineHeight: 41, ...(DISPLAY_FAMILY ? { fontFamily: DISPLAY_FAMILY } : {}) },
   title1: { fontSize: 26, fontWeight: '700', letterSpacing: -0.5, lineHeight: 32 },
   title2: { fontSize: 21, fontWeight: '700', letterSpacing: -0.35, lineHeight: 26 },
   title3: { fontSize: 18, fontWeight: '600', letterSpacing: -0.25, lineHeight: 23 },

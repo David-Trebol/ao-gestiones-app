@@ -469,7 +469,7 @@ const styles = StyleSheet.create({
   },
   yearBadge: { paddingHorizontal: 9, paddingVertical: 2, borderRadius: 999, borderWidth: 0,
   },
-  yearBadgeText: { fontSize: 12,
+  yearBadgeText: { fontSize: 13,
     fontWeight: '600' as const,
   },
   noYears: {

@@ -20,7 +20,7 @@ interface Props {
 /** Botón común: 44 px de alto, estados de hover, pulsado, foco, cargando y deshabilitado. */
 export default function Button({ label, icon: Icon, onPress, variant = 'secondary', disabled, busy, accessibilityLabel, testID, style }: Props) {
   const { colors } = useTheme();
-  const fg = variant === 'primary' ? '#FFFFFF' : variant === 'danger' ? colors.error : variant === 'ghost' ? colors.primary : colors.text;
+  const fg = variant === 'primary' ? colors.onPrimary : variant === 'danger' ? colors.error : variant === 'ghost' ? colors.primary : colors.text;
   const bg = (hovered?: boolean) =>
     variant === 'primary'
       ? hovered ? colors.primaryDark : colors.primaryFill

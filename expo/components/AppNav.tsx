@@ -6,8 +6,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Building2, FolderOpen, Plus, Settings } from 'lucide-react-native';
 import { useTheme } from '@/contexts/ThemeContext';
 import { useAuth } from '@/contexts/AuthContext';
-import { SystemTint } from '@/constants/colors';
-import { glass, liquidGlass } from '@/constants/theme';
+import { liquidGlass } from '@/constants/theme';
 
 /** Ancho desde el que la navegación pasa a ser lateral */
 export const NAV_SIDE_MIN = 768;
@@ -20,9 +19,10 @@ export const NAV_WIDTH_COMPACT = 84;
 export const TAB_BAR_SPACE = 96;
 
 const ITEMS = [
-  { name: '(home)', label: 'Pedidos', Icon: FolderOpen, tint: SystemTint.blue },
-  { name: 'manufacturers', label: 'Fabricantes', Icon: Building2, tint: SystemTint.orange },
-  { name: 'settings', label: 'Ajustes', Icon: Settings, tint: SystemTint.gray },
+  // Colores de la marca Alpha Omega: naranja, azul acero y gris pizarra
+  { name: '(home)', label: 'Pedidos', Icon: FolderOpen, tint: '#FF8718' },
+  { name: 'manufacturers', label: 'Fabricantes', Icon: Building2, tint: '#3F6E92' },
+  { name: 'settings', label: 'Ajustes', Icon: Settings, tint: '#5B6B73' },
 ] as const;
 
 const web = Platform.OS === 'web';
@@ -36,13 +36,13 @@ export function AppIcon({ size = 34 }: { size?: number }) {
         styles.appIcon,
         { width: size, height: size, borderRadius: size * 0.2237 },
         web
-          ? ({ backgroundImage: 'linear-gradient(145deg, #3D8BFF 0%, #5856D6 55%, #AF52DE 100%)', boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.35), 0 2px 6px rgba(88,86,214,0.35)' } as ViewStyle)
-          : { backgroundColor: SystemTint.indigo },
+          ? ({ backgroundImage: 'linear-gradient(145deg, #FFA24A 0%, #FF8718 45%, #E5600A 100%)', boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.35), 0 2px 8px rgba(255,135,24,0.35)' } as ViewStyle)
+          : { backgroundColor: '#FF8718' },
       ]}
       accessibilityElementsHidden
       importantForAccessibility="no-hide-descendants"
     >
-      <Text style={[styles.appIconText, { fontSize: size * 0.38 }]}>AO</Text>
+      <Text style={[styles.appIconText, { fontSize: size * 0.5 }]}>Ω</Text>
     </View>
   );
 }
@@ -118,8 +118,7 @@ export default function AppNav({ state, navigation }: BottomTabBarProps) {
     <View
       style={[
         styles.side,
-        { width: full ? NAV_WIDTH_FULL : NAV_WIDTH_COMPACT, borderRightColor: colors.divider },
-        glass(colors.headerBackground, 30),
+        { width: full ? NAV_WIDTH_FULL : NAV_WIDTH_COMPACT, backgroundColor: colors.nav, borderRightColor: colors.nav },
       ]}
       accessibilityRole={web ? ('navigation' as never) : undefined}
     >
@@ -127,8 +126,8 @@ export default function AppNav({ state, navigation }: BottomTabBarProps) {
         <AppIcon />
         {full && (
           <View style={{ minWidth: 0 }}>
-            <Text style={[styles.brandText, { color: colors.text }]}>AO Gestiones</Text>
-            <Text style={[styles.brandSub, { color: colors.textSecondary }]}>Libro de pedidos</Text>
+            <Text style={[styles.brandText, { color: colors.brand }]}>ALPHAΩMEGA</Text>
+            <Text style={[styles.brandSub, { color: colors.navMuted }]}>Libro de pedidos</Text>
           </View>
         )}
       </View>
@@ -145,8 +144,8 @@ export default function AppNav({ state, navigation }: BottomTabBarProps) {
         accessibilityLabel="Nuevo pedido"
         testID="nav-new-order"
       >
-        <Plus size={18} color="#fff" strokeWidth={2.6} />
-        {full && <Text style={styles.newBtnText}>Nuevo pedido</Text>}
+        <Plus size={18} color={colors.onPrimary} strokeWidth={2.6} />
+        {full && <Text style={[styles.newBtnText, { color: colors.onPrimary }]}>Nuevo pedido</Text>}
       </Pressable>
 
       <View style={styles.items}>
@@ -159,7 +158,7 @@ export default function AppNav({ state, navigation }: BottomTabBarProps) {
               style={({ hovered }: { pressed: boolean; hovered?: boolean }) => [
                 styles.item,
                 !full && styles.itemCompact,
-                active ? { backgroundColor: isDark ? 'rgba(255,255,255,0.10)' : 'rgba(0,0,0,0.07)' } : hovered ? { backgroundColor: colors.fill } : null,
+                active ? { backgroundColor: colors.navActiveBg } : hovered ? { backgroundColor: 'rgba(255,255,255,0.06)' } : null,
                 pointer,
               ]}
               accessibilityRole="tab"
@@ -169,26 +168,27 @@ export default function AppNav({ state, navigation }: BottomTabBarProps) {
             >
               <TintChip Icon={Icon} tint={tint} size={full ? 26 : 30} />
               {full ? (
-                <Text style={[styles.itemText, { color: colors.text }, active && { fontWeight: '600' }]}>{label}</Text>
+                <Text style={[styles.itemText, { color: active ? colors.navActiveText : colors.navText }, active && { fontWeight: '700' }]}>{label}</Text>
               ) : (
-                <Text style={[styles.itemTextCompact, { color: active ? colors.text : colors.textSecondary }, active && { fontWeight: '600' }]}>{label}</Text>
+                <Text style={[styles.itemTextCompact, { color: active ? colors.navActiveText : colors.navMuted }, active && { fontWeight: '700' }]}>{label}</Text>
               )}
+              {full && active && <View style={[styles.activeBar, { backgroundColor: colors.brand }]} />}
             </Pressable>
           );
         })}
       </View>
 
       {currentUser && (
-        <View style={[styles.user, { borderTopColor: colors.divider }, !full && { justifyContent: 'center', paddingHorizontal: 0 }]}>
-          <View style={[styles.avatar, { backgroundColor: isDark ? '#3A3A3C' : '#D1D1D6' }]} accessibilityLabel={currentUser.displayName || currentUser.email || 'Usuario'}>
-            <Text style={[styles.avatarText, { color: colors.text }]}>{(currentUser.displayName || currentUser.email || '?').slice(0, 1).toUpperCase()}</Text>
+        <View style={[styles.user, { borderTopColor: colors.navDivider }, !full && { justifyContent: 'center', paddingHorizontal: 0 }]}>
+          <View style={[styles.avatar, { backgroundColor: 'rgba(255,255,255,0.12)' }]} accessibilityLabel={currentUser.displayName || currentUser.email || 'Usuario'}>
+            <Text style={[styles.avatarText, { color: colors.navText }]}>{(currentUser.displayName || currentUser.email || '?').slice(0, 1).toUpperCase()}</Text>
           </View>
           {full && (
             <View style={{ flex: 1, minWidth: 0 }}>
-              <Text style={[styles.userName, { color: colors.text }]} numberOfLines={1}>
+              <Text style={[styles.userName, { color: colors.navText }]} numberOfLines={1}>
                 {currentUser.displayName || currentUser.email}
               </Text>
-              <Text style={[styles.userMail, { color: colors.textSecondary }]} numberOfLines={1}>
+              <Text style={[styles.userMail, { color: colors.navMuted }]} numberOfLines={1}>
                 {currentUser.role === 'admin' ? 'Administrador' : 'Usuario'}
               </Text>
             </View>
@@ -201,7 +201,7 @@ export default function AppNav({ state, navigation }: BottomTabBarProps) {
 
 const styles = StyleSheet.create({
   appIcon: { alignItems: 'center', justifyContent: 'center' },
-  appIconText: { color: '#fff', fontWeight: '800', letterSpacing: -0.3 },
+  appIconText: { color: '#002A39', fontWeight: '800', letterSpacing: -0.3, marginTop: -2 },
   chip: { alignItems: 'center', justifyContent: 'center' },
   bottomWrap: { position: 'absolute', left: 0, right: 0, bottom: 0, alignItems: 'center', paddingHorizontal: 16 },
   bottom: { flexDirection: 'row', alignItems: 'center', gap: 4, padding: 6, borderRadius: 32, width: '100%', maxWidth: 420 },
@@ -210,13 +210,14 @@ const styles = StyleSheet.create({
   side: { height: '100%', borderRightWidth: StyleSheet.hairlineWidth, paddingTop: 18, paddingBottom: 14, paddingHorizontal: 12, gap: 8 },
   brand: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 6, marginBottom: 10, minHeight: 40 },
   brandCompact: { justifyContent: 'center', paddingHorizontal: 0 },
-  brandText: { fontSize: 15, fontWeight: '700', letterSpacing: -0.3 },
+  brandText: { fontSize: 17, fontWeight: '800', letterSpacing: 0.6 },
   brandSub: { fontSize: 12, marginTop: 1 },
   newBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, minHeight: 44, borderRadius: 999, marginBottom: 14 },
   newBtnCompact: { width: 48, alignSelf: 'center' },
-  newBtnText: { color: '#fff', fontSize: 15, fontWeight: '600', letterSpacing: -0.2 },
+  newBtnText: { fontSize: 15, fontWeight: '700', letterSpacing: -0.1 },
   items: { gap: 2, flex: 1 },
-  item: { flexDirection: 'row', alignItems: 'center', gap: 10, minHeight: 44, paddingHorizontal: 8, borderRadius: 10 },
+  item: { flexDirection: 'row', alignItems: 'center', gap: 10, minHeight: 46, paddingHorizontal: 10, borderRadius: 12, overflow: 'hidden' },
+  activeBar: { position: 'absolute', left: 0, top: 10, bottom: 10, width: 3, borderRadius: 2 },
   itemCompact: { flexDirection: 'column', gap: 4, paddingHorizontal: 0, paddingVertical: 8, minHeight: 64, justifyContent: 'center' },
   itemText: { fontSize: 15, letterSpacing: -0.2 },
   itemTextCompact: { fontSize: 11, fontWeight: '500' },
