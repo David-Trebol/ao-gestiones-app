@@ -15,7 +15,7 @@ import {
   useWindowDimensions,
 } from 'react-native';
 import { useLocalSearchParams, useRouter, Stack } from 'expo-router';
-import { ChevronDown, ChevronUp, Plus, Trash2, ScanLine, X } from 'lucide-react-native';
+import { Building2, CalendarClock, ChevronDown, ChevronUp, ClipboardList, Euro, FileText, Package, Plus, Trash2, ScanLine, Truck, X } from 'lucide-react-native';
 import SelectSheet from '@/components/SelectSheet';
 import { LightColors as StaticColors } from '@/constants/colors';
 import { PAGE_MAX, usePageLayout } from '@/components/Page';
@@ -94,7 +94,10 @@ export default function OrderFormScreen() {
   const { width, height, pad } = usePageLayout();
   // Móvil en horizontal: una sola barra arriba (Cancelar · título y total · Guardar) para dejar sitio al formulario
   const compact = height < 500;
-  const isDesktop = width >= 1024;
+  // Ordenador ancho: dos columnas (cliente y productos | pedido, total y guardar) y productos en tabla
+  const wideForm = width >= 1200;
+  // La tabla editable de productos necesita ~950 px de columna: solo en pantallas muy anchas; si no, tarjetas
+  const productTable = width >= 1680;
   // Mismo ancho máximo que el resto de pantallas
   const insets = useSafeAreaInsets();
 
@@ -466,14 +469,12 @@ export default function OrderFormScreen() {
     <FormSection
       title="Documentos y condiciones"
       subtitle="Opcional"
+      icon={FileText}
       collapsible
       startOpen={docsHaveData}
       summary={docsSummary}
     >
-      <View style={styles.fieldRow}>
-        <FormField label="Nº pedido del cliente" value={formData.customer.numero_referencia_pedido} onChangeText={(v) => updateCustomer('numero_referencia_pedido', v)} half />
-        <FormField label="Oferta / proforma" value={formData.customer.oferta_proforma} onChangeText={(v) => updateCustomer('oferta_proforma', v)} half />
-      </View>
+      <FormField label="Oferta / proforma" value={formData.customer.oferta_proforma} onChangeText={(v) => updateCustomer('oferta_proforma', v)} />
       <View style={styles.fieldRow}>
         <FormField label="Nº factura" value={formData.customer.numero_factura} onChangeText={(v) => updateCustomer('numero_factura', v)} half />
         <FormField label="Nº recibo / albarán" value={formData.customer.numero_recibo} onChangeText={(v) => updateCustomer('numero_recibo', v)} half />
@@ -598,9 +599,10 @@ export default function OrderFormScreen() {
             {DOC_READ_SUPPORTED ? ' Con «Leer documento» puedes rellenarlo desde un PDF o una foto; se lee en tu dispositivo.' : ''}
           </Text>
 
-          <View style={isDesktop ? styles.desktopFormRow : undefined}>
-            <View style={isDesktop ? styles.desktopFormCol : undefined}>
-              <FormSection title="Pedido" subtitle="Fabricante, año y estado">
+          {(() => {
+            // ---------- Pedido: fabricante, año, ref. manual y estado
+            const pedidoSection = (
+              <FormSection title="Pedido" subtitle="Fabricante, año y estado" icon={ClipboardList}>
                 <Text style={[styles.fieldLabel, { color: colors.textSecondary }]}>
                   Fabricante <Text style={{ color: colors.error }}>*</Text>
                 </Text>
@@ -653,54 +655,16 @@ export default function OrderFormScreen() {
                       accessibilityRole="radio"
                       accessibilityState={{ selected: selectedStatusIndex === i }}
                     >
-                      <Text style={[styles.chipText, { color: colors.text }, selectedStatusIndex === i && { color: '#FFFFFF' }]}>{st.label}</Text>
+                      <Text style={[styles.chipText, { color: colors.text }, selectedStatusIndex === i && { color: isDark ? colors.onPrimary : '#FFFFFF' }]}>{st.label}</Text>
                     </Pressable>
                   ))}
                 </View>
               </FormSection>
+            );
 
-              <FormSection
-                title="Seguimiento"
-                subtitle="Opcional · sirve para avisar de pedidos retrasados en el inicio"
-                collapsible
-                startOpen={followList.length > 0}
-                summary={followList.length ? followList.join(' · ') : undefined}
-              >
-                <View style={[styles.fieldRow, { flexWrap: 'wrap' }]}>
-                  <DateField
-                    label="Fecha prevista"
-                    value={formData.expected_date}
-                    onChange={d => setFormData(prev => ({ ...prev, expected_date: d }))}
-                    tone={expectedLate ? 'danger' : 'normal'}
-                    hint={expectedLate ? `Ya ha pasado (${formatISODate(formData.expected_date)}): aparecerá como retrasado.` : undefined}
-                  />
-                  <View style={{ flex: 1, minWidth: 150 }}>
-                    <FormField label="Responsable" value={formData.owner} onChangeText={v => setFormData(prev => ({ ...prev, owner: v }))} placeholder="Quién lo lleva" autoCapitalize="words" />
-                  </View>
-                </View>
-                {ownerOptions.length > 0 && (
-                  <View style={[styles.chipWrap, { marginTop: -4 }]}>
-                    {ownerOptions.slice(0, 6).map(n => (
-                      <Pressable
-                        key={n}
-                        onPress={() => setFormData(prev => ({ ...prev, owner: prev.owner === n ? '' : n }))}
-                        style={[styles.chipSmall, { backgroundColor: formData.owner === n ? colors.primarySoftAlt : colors.fill }]}
-                        accessibilityRole="button"
-                        accessibilityState={{ selected: formData.owner === n }}
-                        accessibilityLabel={`Responsable: ${n}`}
-                      >
-                        <Text style={[styles.chipSmallText, { color: formData.owner === n ? colors.primary : colors.textSecondary }]}>{n}</Text>
-                      </Pressable>
-                    ))}
-                  </View>
-                )}
-                <FormField label="Siguiente acción" value={formData.next_action} onChangeText={v => setFormData(prev => ({ ...prev, next_action: v }))} placeholder="Ej.: confirmar fecha de envío con el fabricante" multiline={formData.next_action.length > 50} />
-              </FormSection>
-              {isDesktop && documentsSection}
-            </View>
-
-            <View style={isDesktop ? styles.desktopFormCol : undefined}>
-              <FormSection title="Cliente" subtitle="Escribe el nombre para reutilizar un cliente de pedidos anteriores">
+            // ---------- Cliente, en el mismo orden que la hoja de Excel del propietario
+            const clienteSection = (
+              <FormSection title="Cliente" subtitle="Escribe el nombre para reutilizar un cliente de pedidos anteriores" icon={Building2}>
                 <View style={{ zIndex: 10 }}>
                   <FormField
                     label="Empresa"
@@ -735,141 +699,351 @@ export default function OrderFormScreen() {
                   )}
                 </View>
                 {!!autofillNote && <Text style={[styles.note, { color: colors.success, backgroundColor: colors.successBg }]}>{autofillNote}</Text>}
-                <View style={styles.fieldRow}>
-                  <FormField label="NIF / CIF" value={formData.customer.nif} onChangeText={(v) => updateCustomer('nif', v.toUpperCase())} half autoCapitalize="characters" />
-                  <FormField label="Contacto" value={formData.customer.contacto} onChangeText={(v) => updateCustomer('contacto', v)} half autoComplete="name" />
+                <View style={styles.fieldGrid}>
+                  <FormField label="Contacto" value={formData.customer.contacto} onChangeText={(v) => updateCustomer('contacto', v)} grid autoComplete="name" />
+                  <FormField label="Departamento" value={formData.customer.departamento} onChangeText={(v) => updateCustomer('departamento', v)} grid />
+                  <FormField label="Nº pedido del cliente" value={formData.customer.numero_referencia_pedido} onChangeText={(v) => updateCustomer('numero_referencia_pedido', v)} grid />
+                  <FormField label="Dirección" value={formData.customer.direccion_1} onChangeText={(v) => updateCustomer('direccion_1', v)} placeholder="Calle y número" autoComplete="street-address" grid />
+                  <FormField label="Dirección (2)" value={formData.customer.direccion_2} onChangeText={(v) => updateCustomer('direccion_2', v)} placeholder="Piso, nave, población…" grid />
+                  <FormField label="Código postal" value={formData.customer.codigo_postal} onChangeText={(v) => updateCustomer('codigo_postal', v)} keyboardType="number-pad" autoComplete="postal-code" grid />
+                  <FormField label="Provincia" value={formData.customer.provincia} onChangeText={(v) => updateCustomer('provincia', v)} grid />
+                  <FormField label="País" value={formData.customer.pais} onChangeText={(v) => updateCustomer('pais', v)} autoComplete="country" grid />
+                  <FormField label="NIF / CIF" value={formData.customer.nif} onChangeText={(v) => updateCustomer('nif', v.toUpperCase())} autoCapitalize="characters" grid />
+                  <FormField label="Teléfono" value={formData.customer.telefono_1} onChangeText={(v) => updateCustomer('telefono_1', v)} keyboardType="phone-pad" autoComplete="tel" grid />
+                  <FormField label="Teléfono 2" value={formData.customer.telefono_2} onChangeText={(v) => updateCustomer('telefono_2', v)} keyboardType="phone-pad" grid />
+                  <FormField label="Email" value={formData.customer.email} onChangeText={(v) => updateCustomer('email', v.trim())} keyboardType="email-address" autoCapitalize="none" autoComplete="email" hint={warnings.email} grid />
                 </View>
-                <FormField label="Departamento" value={formData.customer.departamento} onChangeText={(v) => updateCustomer('departamento', v)} />
-                <FormField label="Dirección" value={formData.customer.direccion_1} onChangeText={(v) => updateCustomer('direccion_1', v)} placeholder="Calle y número" autoComplete="street-address" />
-                <FormField label="Dirección (2)" value={formData.customer.direccion_2} onChangeText={(v) => updateCustomer('direccion_2', v)} placeholder="Piso, nave, población…" />
-                <View style={styles.fieldRow}>
-                  <FormField label="Código postal" value={formData.customer.codigo_postal} onChangeText={(v) => updateCustomer('codigo_postal', v)} keyboardType="number-pad" half autoComplete="postal-code" />
-                  <FormField label="Provincia" value={formData.customer.provincia} onChangeText={(v) => updateCustomer('provincia', v)} half />
-                </View>
-                <FormField label="País" value={formData.customer.pais} onChangeText={(v) => updateCustomer('pais', v)} autoComplete="country" />
-                <View style={styles.fieldRow}>
-                  <FormField label="Teléfono" value={formData.customer.telefono_1} onChangeText={(v) => updateCustomer('telefono_1', v)} keyboardType="phone-pad" half autoComplete="tel" />
-                  <FormField label="Teléfono 2" value={formData.customer.telefono_2} onChangeText={(v) => updateCustomer('telefono_2', v)} keyboardType="phone-pad" half />
-                </View>
-                <FormField label="Email" value={formData.customer.email} onChangeText={(v) => updateCustomer('email', v.trim())} keyboardType="email-address" autoCapitalize="none" autoComplete="email" hint={warnings.email} />
               </FormSection>
-            </View>
-          </View>
+            );
 
-          <FormSection
-            title={`Productos · ${formData.items.length}`}
-            subtitle="Pon el precio de venta unitario o el importe de la línea. Si rellenas los dos, se usa el importe de la línea."
-            action={
-              <Pressable style={[styles.addBtn, { backgroundColor: colors.primarySoft }]} onPress={addItem} accessibilityRole="button" accessibilityLabel="Añadir producto">
-                <Plus size={14} color={colors.primary} />
-                <Text style={[styles.addBtnText, { color: colors.primary }]}>Añadir producto</Text>
-              </Pressable>
-            }
-          >
-            {formData.items.map((item, index) => {
-              const calc = calculateItemTotals(item);
-              return (
-                <View key={index} style={[styles.itemCard, { backgroundColor: colors.background, borderColor: colors.border }]}>
-                  <View style={styles.itemHeader}>
-                    <Text style={[styles.itemTitle, { color: colors.textSecondary }]}>Línea {index + 1}</Text>
-                    {formData.items.length > 1 && (
-                      <Pressable onPress={() => removeItem(index)} hitSlop={8} style={[styles.deleteBtn, { backgroundColor: colors.errorBg }]} accessibilityRole="button" accessibilityLabel={`Quitar línea ${index + 1}`}>
-                        <Trash2 size={14} color={colors.error} />
-                      </Pressable>
-                    )}
+            // ---------- Productos: tabla editable en pantallas anchas, tarjetas en móvil
+            const productosSection = (
+              <FormSection
+                title={`Productos · ${formData.items.length}`}
+                subtitle="Pon el precio de venta unitario o el importe de la línea. Si rellenas los dos, se usa el importe de la línea."
+                icon={Package}
+                flush={productTable}
+                action={
+                  <Pressable style={({ hovered }: { pressed: boolean; hovered?: boolean }) => [styles.addBtn, { backgroundColor: hovered ? colors.primarySoftAlt : colors.primarySoft }]} onPress={addItem} accessibilityRole="button" accessibilityLabel="Añadir producto" testID="add-item-btn">
+                    <Plus size={14} color={colors.primary} />
+                    <Text style={[styles.addBtnText, { color: colors.primary }]}>Añadir producto</Text>
+                  </Pressable>
+                }
+              >
+                {productTable ? (
+                  <View>
+                    <View style={[styles.tRow, styles.tHead, { borderBottomColor: colors.divider }]}>
+                      <Text style={[styles.tTh, styles.tQty, { color: colors.textSecondary }]}>Cant.</Text>
+                      <Text style={[styles.tTh, styles.tName, { color: colors.textSecondary }]}>Equipo y referencia</Text>
+                      <Text style={[styles.tTh, styles.tMoney, { color: colors.textSecondary }]}>Precio venta ud.</Text>
+                      <Text style={[styles.tTh, styles.tMoney, { color: colors.textSecondary }]}>Importe antes de dto.</Text>
+                      <Text style={[styles.tTh, styles.tPct, { color: colors.textSecondary }]}>Dto. %</Text>
+                      <Text style={[styles.tTh, styles.tPct, { color: colors.textSecondary }]}>IVA %</Text>
+                      <Text style={[styles.tTh, styles.tMoney, { color: colors.textSecondary }]}>Coste ud.</Text>
+                      <Text style={[styles.tTh, styles.tCalc, { color: colors.textSecondary }]}>Calculado</Text>
+                      <View style={styles.tDel} />
+                    </View>
+                    {formData.items.map((item, index) => {
+                      const calc = calculateItemTotals(item);
+                      return (
+                        <View key={index} style={[styles.tRow, index > 0 && { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.divider }]}>
+                          <View style={styles.tQty}>
+                            <NumberFormField bare align="center" label="Cantidad" required value={item.quantity} onChangeValue={(n) => updateItem(index, 'quantity', n)} integer emptyValue={1} error={err(`item_qty_${index}`)} />
+                          </View>
+                          <View style={styles.tName}>
+                            <FormField bare label="Producto" required value={item.product_name} onChangeText={(v) => updateItem(index, 'product_name', v)} testID={`product-name-${index}`} error={err(`item_name_${index}`)} placeholder="Equipo, modelo y referencia" multiline={item.product_name.length > 50} />
+                            {!!err(`item_name_${index}`) && <Text style={[styles.tErr, { color: colors.error }]}>{err(`item_name_${index}`)}</Text>}
+                          </View>
+                          <View style={styles.tMoney}><NumberFormField bare align="right" label="Precio venta unit. (sin IVA)" value={item.tpv_unitario} onChangeValue={(n) => updateItem(index, 'tpv_unitario', n)} /></View>
+                          <View style={styles.tMoney}><NumberFormField bare align="right" label="Importe línea antes de dto." value={item.total_sin_iva} onChangeValue={(n) => updateItem(index, 'total_sin_iva', n)} /></View>
+                          <View style={styles.tPct}><NumberFormField bare align="right" label="Descuento %" value={item.descuento_porcentaje} onChangeValue={(n) => updateItem(index, 'descuento_porcentaje', Math.min(100, Math.max(0, n)))} /></View>
+                          <View style={styles.tPct}><NumberFormField bare align="right" label="IVA %" value={item.vat_percentage} onChangeValue={(n) => updateItem(index, 'vat_percentage', n)} /></View>
+                          <View style={styles.tMoney}><NumberFormField bare align="right" label="Coste unitario (fabricante)" value={item.costo_unitario} onChangeValue={(n) => updateItem(index, 'costo_unitario', n)} /></View>
+                          <View style={styles.tCalc} accessibilityLabel={`Calculado: ${formatCurrency(calc.valor_sin_iva)} sin IVA, ${formatCurrency(calc.valor_con_iva)} con IVA`}>
+                            <Text style={[styles.tCalcMain, { color: colors.text }]} numberOfLines={1}>{formatCurrency(calc.valor_sin_iva)}</Text>
+                            <Text style={[styles.tCalcSub, { color: colors.textSecondary }]} numberOfLines={1}>con IVA {formatCurrency(calc.valor_con_iva)}</Text>
+                            {item.costo_unitario > 0 && (
+                              <Text style={[styles.tCalcSub, { color: calc.beneficio_bruto >= 0 ? colors.success : colors.error, fontWeight: '600' }]} numberOfLines={1}>
+                                benef. {formatCurrency(calc.beneficio_bruto)}
+                              </Text>
+                            )}
+                          </View>
+                          <View style={styles.tDel}>
+                            {formData.items.length > 1 && (
+                              <Pressable onPress={() => removeItem(index)} style={({ hovered }: { pressed: boolean; hovered?: boolean }) => [styles.tDelBtn, hovered && { backgroundColor: colors.errorBg }]} accessibilityRole="button" accessibilityLabel={`Quitar línea ${index + 1}`}>
+                                <Trash2 size={16} color={colors.error} />
+                              </Pressable>
+                            )}
+                          </View>
+                        </View>
+                      );
+                    })}
                   </View>
-                  <FormField label="Producto" required value={item.product_name} onChangeText={(v) => updateItem(index, 'product_name', v)} testID={`product-name-${index}`} error={err(`item_name_${index}`)} multiline={item.product_name.length > 60} />
-                  <View style={styles.fieldGrid}>
-                    <NumberFormField label="Cantidad" required value={item.quantity} onChangeValue={(n) => updateItem(index, 'quantity', n)} integer emptyValue={1} grid error={err(`item_qty_${index}`)} />
-                    <NumberFormField label="Precio venta unit. (sin IVA)" value={item.tpv_unitario} onChangeValue={(n) => updateItem(index, 'tpv_unitario', n)} grid />
-                    <NumberFormField label="Importe línea antes de dto." value={item.total_sin_iva} onChangeValue={(n) => updateItem(index, 'total_sin_iva', n)} grid />
-                    <NumberFormField label="Descuento %" value={item.descuento_porcentaje} onChangeValue={(n) => updateItem(index, 'descuento_porcentaje', Math.min(100, Math.max(0, n)))} grid />
-                    <NumberFormField label="IVA %" value={item.vat_percentage} onChangeValue={(n) => updateItem(index, 'vat_percentage', n)} grid />
-                    <NumberFormField label="Coste unitario (fabricante)" value={item.costo_unitario} onChangeValue={(n) => updateItem(index, 'costo_unitario', n)} grid />
+                ) : (
+                  <>
+                    {formData.items.map((item, index) => {
+                      const calc = calculateItemTotals(item);
+                      return (
+                        <View key={index} style={[styles.itemCard, { backgroundColor: colors.background, borderColor: colors.border }]}>
+                          <View style={styles.itemHeader}>
+                            <Text style={[styles.itemTitle, { color: colors.textSecondary }]}>Línea {index + 1}</Text>
+                            {formData.items.length > 1 && (
+                              <Pressable onPress={() => removeItem(index)} hitSlop={8} style={[styles.deleteBtn, { backgroundColor: colors.errorBg }]} accessibilityRole="button" accessibilityLabel={`Quitar línea ${index + 1}`}>
+                                <Trash2 size={14} color={colors.error} />
+                              </Pressable>
+                            )}
+                          </View>
+                          <FormField label="Producto" required value={item.product_name} onChangeText={(v) => updateItem(index, 'product_name', v)} testID={`product-name-${index}`} error={err(`item_name_${index}`)} multiline={item.product_name.length > 60} />
+                          <View style={styles.fieldGrid}>
+                            <NumberFormField label="Cantidad" required value={item.quantity} onChangeValue={(n) => updateItem(index, 'quantity', n)} integer emptyValue={1} grid error={err(`item_qty_${index}`)} />
+                            <NumberFormField label="Precio venta unit. (sin IVA)" value={item.tpv_unitario} onChangeValue={(n) => updateItem(index, 'tpv_unitario', n)} grid />
+                            <NumberFormField label="Importe línea antes de dto." value={item.total_sin_iva} onChangeValue={(n) => updateItem(index, 'total_sin_iva', n)} grid />
+                            <NumberFormField label="Descuento %" value={item.descuento_porcentaje} onChangeValue={(n) => updateItem(index, 'descuento_porcentaje', Math.min(100, Math.max(0, n)))} grid />
+                            <NumberFormField label="IVA %" value={item.vat_percentage} onChangeValue={(n) => updateItem(index, 'vat_percentage', n)} grid />
+                            <NumberFormField label="Coste unitario (fabricante)" value={item.costo_unitario} onChangeValue={(n) => updateItem(index, 'costo_unitario', n)} grid />
+                          </View>
+                          <View style={[styles.calcRow, { borderTopColor: colors.divider }]} accessibilityLabel={`Calculado: ${formatCurrency(calc.valor_sin_iva)} sin IVA`}>
+                            <Text style={[styles.calcTag, { color: colors.textSecondary, backgroundColor: colors.fill }]}>Calculado</Text>
+                            <Text style={[styles.calcText, { color: colors.textSecondary }]}>Neto sin IVA <Text style={{ color: colors.text, fontWeight: '600' }}>{formatCurrency(calc.valor_sin_iva)}</Text></Text>
+                            <Text style={[styles.calcText, { color: colors.textSecondary }]}>Con IVA <Text style={{ color: colors.text, fontWeight: '600' }}>{formatCurrency(calc.valor_con_iva)}</Text></Text>
+                            {item.costo_unitario > 0 && (
+                              <Text style={[styles.calcText, { color: colors.textSecondary }]}>
+                                Beneficio <Text style={{ color: calc.beneficio_bruto >= 0 ? colors.success : colors.error, fontWeight: '600' }}>{formatCurrency(calc.beneficio_bruto)}</Text>
+                              </Text>
+                            )}
+                          </View>
+                        </View>
+                      );
+                    })}
+                  </>
+                )}
+              </FormSection>
+            );
+
+            // ---------- Resumen: total y guardar (en ordenador, fijo a la derecha mientras te desplazas)
+            const resumenCard = (
+              <View style={[styles.totalsCard, { backgroundColor: colors.surface }, cardShadow(isDark)]}>
+                <View style={styles.totalsHead}>
+                  <View style={[formFieldStyles.sectionIcon, { backgroundColor: colors.brand }]}>
+                    <Euro size={16} color={colors.onPrimary} strokeWidth={2.3} />
                   </View>
-                  <View style={[styles.calcRow, { borderTopColor: colors.divider }]} accessibilityLabel={`Calculado: ${formatCurrency(calc.valor_sin_iva)} sin IVA`}>
-                    <Text style={[styles.calcTag, { color: colors.textSecondary, backgroundColor: colors.fill }]}>Calculado</Text>
-                    <Text style={[styles.calcText, { color: colors.textSecondary }]}>Neto sin IVA <Text style={{ color: colors.text, fontWeight: '600' }}>{formatCurrency(calc.valor_sin_iva)}</Text></Text>
-                    <Text style={[styles.calcText, { color: colors.textSecondary }]}>Con IVA <Text style={{ color: colors.text, fontWeight: '600' }}>{formatCurrency(calc.valor_con_iva)}</Text></Text>
-                    {item.costo_unitario > 0 && (
-                      <Text style={[styles.calcText, { color: colors.textSecondary }]}>
-                        Beneficio <Text style={{ color: calc.beneficio_bruto >= 0 ? colors.success : colors.error, fontWeight: '600' }}>{formatCurrency(calc.beneficio_bruto)}</Text>
+                  <Text style={[formFieldStyles.sectionTitle, { color: colors.text, flex: 1 }]} accessibilityRole="header">Resumen</Text>
+                  <Text style={[styles.calcTag, { color: colors.textSecondary, backgroundColor: colors.fill }]}>Calculado</Text>
+                </View>
+                <View style={styles.totalRow}>
+                  <Text style={[styles.totalsLabel, { color: colors.textSecondary }]}>Productos (sin IVA)</Text>
+                  <Text style={[styles.totalsValue, { color: colors.text }]}>{formatCurrency(totals.totalExVat)}</Text>
+                </View>
+                <View style={styles.totalRow}>
+                  <Text style={[styles.totalsLabel, { color: colors.textSecondary }]}>IVA de los productos</Text>
+                  <Text style={[styles.totalsValue, { color: colors.text }]}>{formatCurrency(totals.totalVat)}</Text>
+                </View>
+                <View style={styles.totalRow}>
+                  <Text style={[styles.totalsLabel, { color: colors.textSecondary }]}>Gastos de envío (con IVA)</Text>
+                  <Text style={[styles.totalsValue, { color: colors.text }]}>{formatCurrency(totals.shippingTotal)}</Text>
+                </View>
+                <View style={styles.totalRow}>
+                  <Text style={[styles.totalsLabel, { color: colors.textSecondary }]}>Envío extra</Text>
+                  <Text style={[styles.totalsValue, { color: colors.text }]}>{formatCurrency(formData.shipping_cost)}</Text>
+                </View>
+                <View style={[styles.grandRow, { backgroundColor: colors.primarySoft }]}>
+                  <Text style={[styles.grandTotalLabel, { color: colors.text }]}>Total</Text>
+                  <Text style={[styles.grandTotalValue, { color: colors.text }]}>{formatCurrency(totals.grandTotal)}</Text>
+                </View>
+                {wideForm && !compact && (
+                  <View style={{ gap: 8, marginTop: 4 }}>
+                    {showErrors && errorCount > 0 && (
+                      <Text style={[styles.saveBarError, { color: colors.error }]} accessibilityLiveRegion="assertive">
+                        {errorCount === 1 ? 'Falta 1 dato obligatorio' : `Faltan ${errorCount} datos obligatorios`}: están marcados en rojo.
                       </Text>
                     )}
+                    {submitButton}
                   </View>
-                </View>
-              );
-            })}
-          </FormSection>
+                )}
+              </View>
+            );
 
-          <FormSection
-            title="Envío"
-            subtitle="«Gastos de envío» son líneas de portes con su IVA. «Envío extra» es un importe fijo que se suma tal cual al total, sin añadirle IVA."
-            action={
-              <Pressable style={[styles.addBtn, { backgroundColor: colors.primarySoft }]} onPress={addShippingItem} accessibilityRole="button" accessibilityLabel="Añadir gasto de envío">
-                <Plus size={14} color={colors.primary} />
-                <Text style={[styles.addBtnText, { color: colors.primary }]}>Añadir gasto</Text>
-              </Pressable>
-            }
-          >
-            {formData.shipping_items.length === 0 && <Text style={[styles.emptyText, { color: colors.textTertiary }]}>Sin gastos de envío</Text>}
-            {formData.shipping_items.map((sh, index) => {
-              const st = calculateShippingTotals(sh);
-              return (
-                <View key={index} style={[styles.itemCard, { backgroundColor: colors.background, borderColor: colors.border }]}>
-                  <View style={styles.itemHeader}>
-                    <Text style={[styles.itemTitle, { color: colors.textSecondary }]}>Gasto de envío {index + 1}</Text>
-                    <Pressable onPress={() => removeShippingItem(index)} hitSlop={8} style={[styles.deleteBtn, { backgroundColor: colors.errorBg }]} accessibilityRole="button" accessibilityLabel={`Quitar gasto de envío ${index + 1}`}>
-                      <Trash2 size={14} color={colors.error} />
+            return wideForm ? (
+              // Ordenador: cliente y productos a la izquierda; pedido, total y guardar a la derecha (fijos al desplazarse)
+              <View style={styles.formCols}>
+                <View style={styles.formMain}>
+                  {clienteSection}
+                  {documentsSection}
+                  {productosSection}
+                  <FormSection
+                    title="Envío"
+                    icon={Truck}
+                    subtitle="«Gastos de envío» son líneas de portes con su IVA. «Envío extra» es un importe fijo que se suma tal cual al total, sin añadirle IVA."
+                    action={
+                      <Pressable style={[styles.addBtn, { backgroundColor: colors.primarySoft }]} onPress={addShippingItem} accessibilityRole="button" accessibilityLabel="Añadir gasto de envío">
+                        <Plus size={14} color={colors.primary} />
+                        <Text style={[styles.addBtnText, { color: colors.primary }]}>Añadir gasto</Text>
+                      </Pressable>
+                    }
+                  >
+                    {formData.shipping_items.length === 0 && <Text style={[styles.emptyText, { color: colors.textTertiary }]}>Sin gastos de envío</Text>}
+                    {formData.shipping_items.map((sh, index) => {
+                      const st = calculateShippingTotals(sh);
+                      return (
+                        <View key={index} style={[styles.itemCard, { backgroundColor: colors.background, borderColor: colors.border }]}>
+                          <View style={styles.itemHeader}>
+                            <Text style={[styles.itemTitle, { color: colors.textSecondary }]}>Gasto de envío {index + 1}</Text>
+                            <Pressable onPress={() => removeShippingItem(index)} hitSlop={8} style={[styles.deleteBtn, { backgroundColor: colors.errorBg }]} accessibilityRole="button" accessibilityLabel={`Quitar gasto de envío ${index + 1}`}>
+                              <Trash2 size={14} color={colors.error} />
+                            </Pressable>
+                          </View>
+                          <FormField label="Descripción" value={sh.description} onChangeText={(v) => updateShippingItem(index, 'description', v)} placeholder="Ej.: Transporte urgente" />
+                          <View style={styles.fieldGrid}>
+                            <NumberFormField label="Cantidad" value={sh.quantity} onChangeValue={(n) => updateShippingItem(index, 'quantity', n)} integer emptyValue={1} grid />
+                            <NumberFormField label="Coste unit. (sin IVA)" value={sh.costo_unitario} onChangeValue={(n) => updateShippingItem(index, 'costo_unitario', n)} grid />
+                            <NumberFormField label="IVA %" value={sh.vat_percentage} onChangeValue={(n) => updateShippingItem(index, 'vat_percentage', n)} grid />
+                          </View>
+                          <View style={[styles.calcRow, { borderTopColor: colors.divider }]}>
+                            <Text style={[styles.calcTag, { color: colors.textSecondary, backgroundColor: colors.fill }]}>Calculado</Text>
+                            <Text style={[styles.calcText, { color: colors.textSecondary }]}>Con IVA <Text style={{ color: colors.text, fontWeight: '600' }}>{formatCurrency(st.valor_con_iva)}</Text></Text>
+                          </View>
+                        </View>
+                      );
+                    })}
+                    <View style={[styles.fieldRow, { marginTop: 8 }]}>
+                      <NumberFormField label="Envío extra (€, importe fijo)" value={formData.shipping_cost} onChangeValue={(n) => setFormData(prev => ({ ...prev, shipping_cost: n }))} half />
+                      <View style={{ flex: 1 }} />
+                    </View>
+                  </FormSection>
+                                  <FormSection
+                    title="Seguimiento"
+                    icon={CalendarClock}
+                    subtitle="Opcional · sirve para avisar de pedidos retrasados en el inicio"
+                    collapsible
+                    startOpen={followList.length > 0}
+                    summary={followList.length ? followList.join(' · ') : undefined}
+                  >
+                    <View style={[styles.fieldRow, { flexWrap: 'wrap' }]}>
+                      <DateField
+                        label="Fecha prevista"
+                        value={formData.expected_date}
+                        onChange={d => setFormData(prev => ({ ...prev, expected_date: d }))}
+                        tone={expectedLate ? 'danger' : 'normal'}
+                        hint={expectedLate ? `Ya ha pasado (${formatISODate(formData.expected_date)}): aparecerá como retrasado.` : undefined}
+                      />
+                      <View style={{ flex: 1, minWidth: 150 }}>
+                        <FormField label="Responsable" value={formData.owner} onChangeText={v => setFormData(prev => ({ ...prev, owner: v }))} placeholder="Quién lo lleva" autoCapitalize="words" />
+                      </View>
+                    </View>
+                    {ownerOptions.length > 0 && (
+                      <View style={[styles.chipWrap, { marginTop: -4 }]}>
+                        {ownerOptions.slice(0, 6).map(n => (
+                          <Pressable
+                            key={n}
+                            onPress={() => setFormData(prev => ({ ...prev, owner: prev.owner === n ? '' : n }))}
+                            style={[styles.chipSmall, { backgroundColor: formData.owner === n ? colors.primarySoftAlt : colors.fill }]}
+                            accessibilityRole="button"
+                            accessibilityState={{ selected: formData.owner === n }}
+                            accessibilityLabel={`Responsable: ${n}`}
+                          >
+                            <Text style={[styles.chipSmallText, { color: formData.owner === n ? colors.primary : colors.textSecondary }]}>{n}</Text>
+                          </Pressable>
+                        ))}
+                      </View>
+                    )}
+                    <FormField label="Siguiente acción" value={formData.next_action} onChangeText={v => setFormData(prev => ({ ...prev, next_action: v }))} placeholder="Ej.: confirmar fecha de envío con el fabricante" multiline={formData.next_action.length > 50} />
+                  </FormSection>
+                </View>
+                <View style={[styles.formSide, Platform.OS === 'web' && ({ position: 'sticky', top: 12 } as object)]}>
+                  {pedidoSection}
+                  {resumenCard}
+                </View>
+              </View>
+            ) : (
+              <>
+                {pedidoSection}
+                {clienteSection}
+                {productosSection}
+                <FormSection
+                  title="Envío"
+                  icon={Truck}
+                  subtitle="«Gastos de envío» son líneas de portes con su IVA. «Envío extra» es un importe fijo que se suma tal cual al total, sin añadirle IVA."
+                  action={
+                    <Pressable style={[styles.addBtn, { backgroundColor: colors.primarySoft }]} onPress={addShippingItem} accessibilityRole="button" accessibilityLabel="Añadir gasto de envío">
+                      <Plus size={14} color={colors.primary} />
+                      <Text style={[styles.addBtnText, { color: colors.primary }]}>Añadir gasto</Text>
                     </Pressable>
+                  }
+                >
+                  {formData.shipping_items.length === 0 && <Text style={[styles.emptyText, { color: colors.textTertiary }]}>Sin gastos de envío</Text>}
+                  {formData.shipping_items.map((sh, index) => {
+                    const st = calculateShippingTotals(sh);
+                    return (
+                      <View key={index} style={[styles.itemCard, { backgroundColor: colors.background, borderColor: colors.border }]}>
+                        <View style={styles.itemHeader}>
+                          <Text style={[styles.itemTitle, { color: colors.textSecondary }]}>Gasto de envío {index + 1}</Text>
+                          <Pressable onPress={() => removeShippingItem(index)} hitSlop={8} style={[styles.deleteBtn, { backgroundColor: colors.errorBg }]} accessibilityRole="button" accessibilityLabel={`Quitar gasto de envío ${index + 1}`}>
+                            <Trash2 size={14} color={colors.error} />
+                          </Pressable>
+                        </View>
+                        <FormField label="Descripción" value={sh.description} onChangeText={(v) => updateShippingItem(index, 'description', v)} placeholder="Ej.: Transporte urgente" />
+                        <View style={styles.fieldGrid}>
+                          <NumberFormField label="Cantidad" value={sh.quantity} onChangeValue={(n) => updateShippingItem(index, 'quantity', n)} integer emptyValue={1} grid />
+                          <NumberFormField label="Coste unit. (sin IVA)" value={sh.costo_unitario} onChangeValue={(n) => updateShippingItem(index, 'costo_unitario', n)} grid />
+                          <NumberFormField label="IVA %" value={sh.vat_percentage} onChangeValue={(n) => updateShippingItem(index, 'vat_percentage', n)} grid />
+                        </View>
+                        <View style={[styles.calcRow, { borderTopColor: colors.divider }]}>
+                          <Text style={[styles.calcTag, { color: colors.textSecondary, backgroundColor: colors.fill }]}>Calculado</Text>
+                          <Text style={[styles.calcText, { color: colors.textSecondary }]}>Con IVA <Text style={{ color: colors.text, fontWeight: '600' }}>{formatCurrency(st.valor_con_iva)}</Text></Text>
+                        </View>
+                      </View>
+                    );
+                  })}
+                  <View style={[styles.fieldRow, { marginTop: 8 }]}>
+                    <NumberFormField label="Envío extra (€, importe fijo)" value={formData.shipping_cost} onChangeValue={(n) => setFormData(prev => ({ ...prev, shipping_cost: n }))} half />
+                    <View style={{ flex: 1 }} />
                   </View>
-                  <FormField label="Descripción" value={sh.description} onChangeText={(v) => updateShippingItem(index, 'description', v)} placeholder="Ej.: Transporte urgente" />
-                  <View style={styles.fieldGrid}>
-                    <NumberFormField label="Cantidad" value={sh.quantity} onChangeValue={(n) => updateShippingItem(index, 'quantity', n)} integer emptyValue={1} grid />
-                    <NumberFormField label="Coste unit. (sin IVA)" value={sh.costo_unitario} onChangeValue={(n) => updateShippingItem(index, 'costo_unitario', n)} grid />
-                    <NumberFormField label="IVA %" value={sh.vat_percentage} onChangeValue={(n) => updateShippingItem(index, 'vat_percentage', n)} grid />
+                </FormSection>
+                <FormSection
+                  title="Seguimiento"
+                  icon={CalendarClock}
+                  subtitle="Opcional · sirve para avisar de pedidos retrasados en el inicio"
+                  collapsible
+                  startOpen={followList.length > 0}
+                  summary={followList.length ? followList.join(' · ') : undefined}
+                >
+                  <View style={[styles.fieldRow, { flexWrap: 'wrap' }]}>
+                    <DateField
+                      label="Fecha prevista"
+                      value={formData.expected_date}
+                      onChange={d => setFormData(prev => ({ ...prev, expected_date: d }))}
+                      tone={expectedLate ? 'danger' : 'normal'}
+                      hint={expectedLate ? `Ya ha pasado (${formatISODate(formData.expected_date)}): aparecerá como retrasado.` : undefined}
+                    />
+                    <View style={{ flex: 1, minWidth: 150 }}>
+                      <FormField label="Responsable" value={formData.owner} onChangeText={v => setFormData(prev => ({ ...prev, owner: v }))} placeholder="Quién lo lleva" autoCapitalize="words" />
+                    </View>
                   </View>
-                  <View style={[styles.calcRow, { borderTopColor: colors.divider }]}>
-                    <Text style={[styles.calcTag, { color: colors.textSecondary, backgroundColor: colors.fill }]}>Calculado</Text>
-                    <Text style={[styles.calcText, { color: colors.textSecondary }]}>Con IVA <Text style={{ color: colors.text, fontWeight: '600' }}>{formatCurrency(st.valor_con_iva)}</Text></Text>
-                  </View>
-                </View>
-              );
-            })}
-            <View style={[styles.fieldRow, { marginTop: 8 }]}>
-              <NumberFormField label="Envío extra (€, importe fijo)" value={formData.shipping_cost} onChangeValue={(n) => setFormData(prev => ({ ...prev, shipping_cost: n }))} half />
-              <View style={{ flex: 1 }} />
-            </View>
-          </FormSection>
-
-          {!isDesktop && documentsSection}
-
-          <View style={[styles.totalsCard, { backgroundColor: colors.surface }]}>
-            <Text style={[styles.calcTag, { color: colors.textSecondary, backgroundColor: colors.fill, alignSelf: 'flex-start', marginBottom: 8 }]}>Resumen calculado</Text>
-            <View style={styles.totalRow}>
-              <Text style={[styles.totalsLabel, { color: colors.textSecondary }]}>Productos (sin IVA)</Text>
-              <Text style={[styles.totalsValue, { color: colors.text }]}>{formatCurrency(totals.totalExVat)}</Text>
-            </View>
-            <View style={styles.totalRow}>
-              <Text style={[styles.totalsLabel, { color: colors.textSecondary }]}>IVA de los productos</Text>
-              <Text style={[styles.totalsValue, { color: colors.text }]}>{formatCurrency(totals.totalVat)}</Text>
-            </View>
-            <View style={styles.totalRow}>
-              <Text style={[styles.totalsLabel, { color: colors.textSecondary }]}>Gastos de envío (con IVA)</Text>
-              <Text style={[styles.totalsValue, { color: colors.text }]}>{formatCurrency(totals.shippingTotal)}</Text>
-            </View>
-            <View style={styles.totalRow}>
-              <Text style={[styles.totalsLabel, { color: colors.textSecondary }]}>Envío extra</Text>
-              <Text style={[styles.totalsValue, { color: colors.text }]}>{formatCurrency(formData.shipping_cost)}</Text>
-            </View>
-            <View style={[styles.totalDivider, { backgroundColor: colors.border }]} />
-            <View style={styles.totalRow}>
-              <Text style={[styles.grandTotalLabel, { color: colors.text }]}>Total</Text>
-              <Text style={[styles.grandTotalValue, { color: colors.text }]}>{formatCurrency(totals.grandTotal)}</Text>
-            </View>
-          </View>
+                  {ownerOptions.length > 0 && (
+                    <View style={[styles.chipWrap, { marginTop: -4 }]}>
+                      {ownerOptions.slice(0, 6).map(n => (
+                        <Pressable
+                          key={n}
+                          onPress={() => setFormData(prev => ({ ...prev, owner: prev.owner === n ? '' : n }))}
+                          style={[styles.chipSmall, { backgroundColor: formData.owner === n ? colors.primarySoftAlt : colors.fill }]}
+                          accessibilityRole="button"
+                          accessibilityState={{ selected: formData.owner === n }}
+                          accessibilityLabel={`Responsable: ${n}`}
+                        >
+                          <Text style={[styles.chipSmallText, { color: formData.owner === n ? colors.primary : colors.textSecondary }]}>{n}</Text>
+                        </Pressable>
+                      ))}
+                    </View>
+                  )}
+                  <FormField label="Siguiente acción" value={formData.next_action} onChangeText={v => setFormData(prev => ({ ...prev, next_action: v }))} placeholder="Ej.: confirmar fecha de envío con el fabricante" multiline={formData.next_action.length > 50} />
+                </FormSection>
+                {documentsSection}
+                {resumenCard}
+              </>
+            );
+          })()}
         </ScrollView>
-        {!compact && (
+        {!compact && !wideForm && (
         <View style={[styles.saveBar, { borderTopColor: colors.divider, paddingBottom: 10 + insets.bottom, paddingHorizontal: pad }, glass(colors.headerBackground, 24)]}>
           <View style={[styles.saveBarInner, { maxWidth: PAGE_MAX - pad * 2 }]}>
             <View style={{ flex: 1, minWidth: 0 }}>
@@ -940,20 +1114,26 @@ interface FormFieldProps {
   onBlur?: () => void;
   autoCapitalize?: 'none' | 'sentences' | 'words' | 'characters';
   autoComplete?: React.ComponentProps<typeof TextInput>['autoComplete'];
+  /** Sin etiqueta visible (dentro de una tabla): la etiqueta sigue siendo el nombre accesible */
+  bare?: boolean;
+  /** Alineación del texto (los importes en tabla van a la derecha) */
+  align?: 'left' | 'right' | 'center';
 }
 
-function FormField({ label, value, onChangeText, placeholder, keyboardType, multiline, testID, half, third, grid, required, error, hint, onFocus, onBlur, autoCapitalize, autoComplete }: FormFieldProps) {
+function FormField({ label, value, onChangeText, placeholder, keyboardType, multiline, testID, half, third, grid, required, error, hint, onFocus, onBlur, autoCapitalize, autoComplete, bare, align }: FormFieldProps) {
   const { colors } = useTheme();
   const [focused, setFocused] = useState(false);
   const borderColor = error ? colors.error : focused ? colors.primary : 'transparent';
   return (
-    <View style={[formFieldStyles.container, half && formFieldStyles.halfContainer, third && formFieldStyles.thirdContainer, grid && formFieldStyles.gridContainer]}>
-      <Text style={[formFieldStyles.label, { color: error ? colors.error : colors.textSecondary }]}>
-        {label}
-        {required ? <Text style={{ color: colors.error }}> *</Text> : null}
-      </Text>
+    <View style={[formFieldStyles.container, half && formFieldStyles.halfContainer, third && formFieldStyles.thirdContainer, grid && formFieldStyles.gridContainer, bare && formFieldStyles.bareContainer]}>
+      {!bare && (
+        <Text style={[formFieldStyles.label, { color: error ? colors.error : colors.textSecondary }]}>
+          {label}
+          {required ? <Text style={{ color: colors.error }}> *</Text> : null}
+        </Text>
+      )}
       <TextInput
-        style={[formFieldStyles.input, { backgroundColor: colors.fill, borderColor, color: colors.text }, multiline && formFieldStyles.multiline]}
+        style={[formFieldStyles.input, { backgroundColor: colors.fill, borderColor, color: colors.text }, multiline && formFieldStyles.multiline, bare && formFieldStyles.bareInput, align && { textAlign: align }]}
         onFocus={() => {
           setFocused(true);
           onFocus?.();
@@ -978,7 +1158,7 @@ function FormField({ label, value, onChangeText, placeholder, keyboardType, mult
         aria-invalid={!!error}
         aria-required={required}
       />
-      {!!error && <Text style={[formFieldStyles.message, { color: colors.error }]}>{error}</Text>}
+      {!!error && !bare && <Text style={[formFieldStyles.message, { color: colors.error }]}>{error}</Text>}
       {!error && !!hint && <Text style={[formFieldStyles.message, { color: colors.warning }]}>{hint}</Text>}
     </View>
   );
@@ -988,7 +1168,7 @@ function FormField({ label, value, onChangeText, placeholder, keyboardType, mult
  * Sección agrupada del formulario. Con `collapsible`, en móvil se puede plegar (empieza plegada salvo `startOpen`)
  * y muestra `summary` mientras está cerrada; en tablet y ordenador siempre está abierta.
  */
-function FormSection({ title, subtitle, action, children, collapsible, startOpen, summary }: { title: string; subtitle?: string; action?: React.ReactNode; children: React.ReactNode; collapsible?: boolean; startOpen?: boolean; summary?: string }) {
+function FormSection({ title, subtitle, action, children, collapsible, startOpen, summary, icon: Icon, flush }: { title: string; subtitle?: string; action?: React.ReactNode; children: React.ReactNode; collapsible?: boolean; startOpen?: boolean; summary?: string; icon?: React.ComponentType<{ size?: number; color?: string; strokeWidth?: number }>; flush?: boolean }) {
   const { colors, isDark } = useTheme();
   const { width } = useWindowDimensions();
   const canCollapse = !!collapsible && width < 768;
@@ -1002,6 +1182,11 @@ function FormSection({ title, subtitle, action, children, collapsible, startOpen
   return (
     <View style={formFieldStyles.sectionWrap}>
       <View style={formFieldStyles.sectionHead}>
+        {!!Icon && (
+          <View style={[formFieldStyles.sectionIcon, { backgroundColor: colors.brand }]}>
+            <Icon size={16} color={colors.onPrimary} strokeWidth={2.3} />
+          </View>
+        )}
         <View style={{ flex: 1, minWidth: 0 }}>
           <Text style={[formFieldStyles.sectionTitle, { color: colors.text }]} accessibilityRole="header">
             {title}
@@ -1010,7 +1195,7 @@ function FormSection({ title, subtitle, action, children, collapsible, startOpen
         </View>
         {isOpen && action}
       </View>
-      <View style={[formFieldStyles.section, { backgroundColor: colors.surface }, cardShadow(isDark), !isOpen && { padding: 0, paddingBottom: 0 }]}>
+      <View style={[formFieldStyles.section, { backgroundColor: colors.surface }, cardShadow(isDark), (!isOpen || flush) && { padding: 0, paddingBottom: 0 }]}>
         {canCollapse && (
           <Pressable
             onPress={() => { touched.current = true; setOpen(!open); }}
@@ -1043,6 +1228,8 @@ interface NumberFormFieldProps {
   grid?: boolean;
   required?: boolean;
   error?: string;
+  bare?: boolean;
+  align?: 'left' | 'right' | 'center';
 }
 
 /** Acepta coma o punto decimal y conserva lo que se está escribiendo ("12," / "0.") */
@@ -1057,7 +1244,7 @@ function formatForInput(n: number): string {
   return Number.isFinite(n) ? String(n).replace('.', ',') : '';
 }
 
-function NumberFormField({ label, value, onChangeValue, integer, emptyValue = 0, half, third, grid, required, error }: NumberFormFieldProps) {
+function NumberFormField({ label, value, onChangeValue, integer, emptyValue = 0, half, third, grid, required, error, bare, align }: NumberFormFieldProps) {
   const [text, setText] = useState<string>(formatForInput(value));
   useEffect(() => {
     const current = parseLocaleNumber(text, integer);
@@ -1082,11 +1269,16 @@ function NumberFormField({ label, value, onChangeValue, integer, emptyValue = 0,
       required={required}
       error={error}
       placeholder={integer ? undefined : '0,00'}
+      bare={bare}
+      align={align}
     />
   );
 }
 
 const formFieldStyles = StyleSheet.create({
+  bareContainer: { marginBottom: 0 },
+  bareInput: { paddingVertical: 8, paddingHorizontal: 10, fontSize: 15, minHeight: 40 },
+  sectionIcon: { width: 28, height: 28, borderRadius: 8, alignItems: 'center', justifyContent: 'center', alignSelf: 'center' },
   collapseRow: { flexDirection: 'row', alignItems: 'center', gap: 8, minHeight: 48, marginBottom: 4 },
   collapseText: { flex: 1, minWidth: 0, fontSize: 16, letterSpacing: -0.2 },
   container: {
@@ -1478,4 +1670,22 @@ const styles = StyleSheet.create({
   },
   selectField: { flexDirection: 'row', alignItems: 'center', gap: 8, minHeight: 44, borderRadius: 10, borderWidth: 1.5, paddingHorizontal: 12, marginBottom: 14 },
   selectText: { flex: 1, minWidth: 0, fontSize: 16, letterSpacing: -0.2 },
+  formCols: { flexDirection: 'row', gap: 20, alignItems: 'flex-start' },
+  formMain: { flex: 1.9, minWidth: 0 },
+  formSide: { flex: 1, minWidth: 320, maxWidth: 440 },
+  totalsHead: { flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 6 },
+  grandRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', borderRadius: 10, paddingHorizontal: 12, paddingVertical: 10, marginTop: 6 },
+  tRow: { flexDirection: 'row', alignItems: 'flex-start', gap: 8, paddingHorizontal: 12, paddingVertical: 8 },
+  tHead: { paddingVertical: 10, borderBottomWidth: StyleSheet.hairlineWidth, alignItems: 'flex-end' },
+  tTh: { fontSize: 12, fontWeight: '600' as const },
+  tQty: { width: 64 },
+  tName: { flex: 1, minWidth: 180 },
+  tMoney: { width: 104, textAlign: 'right' },
+  tPct: { width: 64, textAlign: 'right' },
+  tCalc: { width: 132, alignItems: 'flex-end', paddingTop: 2 },
+  tCalcMain: { fontSize: 15, fontWeight: '700' as const, fontVariant: ['tabular-nums'] },
+  tCalcSub: { fontSize: 12, fontVariant: ['tabular-nums'] },
+  tDel: { width: 36, alignItems: 'center' },
+  tDelBtn: { width: 36, height: 40, borderRadius: 10, alignItems: 'center', justifyContent: 'center' },
+  tErr: { fontSize: 12, marginTop: 2 },
 });

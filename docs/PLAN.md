@@ -59,6 +59,7 @@ Pedido del propietario: más color y aprovechar el ancho; que la referencia y lo
 - [x] Ancho máximo 1.600 px. Lista: referencia en naranja, cliente, contacto (teléfono y email), población y calle, fabricante y año, estado con retraso en una línea, total.
 - [x] Ficha estilo Excel: cabecera con referencia y total, tarjeta Cliente destacada (teléfono y email con enlace), Pedido y documentos, productos en tabla (≥ 1.200 px), dos columnas sin huecos.
 - [x] Buscadores en «Por año y fabricante»: todos los años, un año y un fabricante (`components/SearchField.tsx`, `matchesQuery`). Prueba: `t12-buscadores.js`.
+- [x] Formulario con la marca: secciones con icono naranja; Cliente en el orden del Excel (rejilla de 3), Documentos debajo; en ordenador, Pedido y Resumen con «Guardar» fijos a la derecha; productos en tabla editable desde 1.680 px (tarjetas por debajo).
 
 ## Fase 2 · Pantalla por pantalla
 
