@@ -117,11 +117,20 @@ export default function AppNav({ state, navigation }: BottomTabBarProps) {
     );
   }
 
+  // Barra lateral flotante: un panel navy de vidrio con esquinas redondeadas, separado del borde de la ventana
   return (
+    <View style={[styles.sideWrap, { width: full ? NAV_WIDTH_FULL : NAV_WIDTH_COMPACT }]}>
     <View
       style={[
         styles.side,
-        { width: full ? NAV_WIDTH_FULL : NAV_WIDTH_COMPACT, backgroundColor: colors.nav, borderRightColor: colors.nav },
+        { backgroundColor: colors.nav },
+        web &&
+          ({
+            backgroundColor: isDark ? 'rgba(0, 24, 33, 0.82)' : 'rgba(0, 42, 57, 0.88)',
+            backdropFilter: 'blur(24px) saturate(160%)',
+            WebkitBackdropFilter: 'blur(24px) saturate(160%)',
+            boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.10), 0 18px 40px rgba(0,42,57,0.22)',
+          } as ViewStyle),
       ]}
       accessibilityRole={web ? ('navigation' as never) : undefined}
     >
@@ -200,6 +209,7 @@ export default function AppNav({ state, navigation }: BottomTabBarProps) {
         </View>
       )}
     </View>
+    </View>
   );
 }
 
@@ -211,7 +221,8 @@ const styles = StyleSheet.create({
   bottom: { flexDirection: 'row', alignItems: 'center', gap: 4, padding: 6, borderRadius: 32, width: '100%', maxWidth: 420 },
   bottomItem: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 2, minHeight: 52, borderRadius: 26 },
   bottomLabel: { fontSize: 11, fontWeight: '500', letterSpacing: 0.1 },
-  side: { height: '100%', borderRightWidth: StyleSheet.hairlineWidth, paddingTop: 18, paddingBottom: 14, paddingHorizontal: 12, gap: 8 },
+  sideWrap: { height: '100%', paddingLeft: 10, paddingVertical: 10 },
+  side: { flex: 1, borderRadius: 22, overflow: 'hidden', paddingTop: 18, paddingBottom: 14, paddingHorizontal: 10, gap: 8 },
   brand: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 6, marginBottom: 10, minHeight: 40 },
   brandCompact: { justifyContent: 'center', paddingHorizontal: 0 },
   brandText: { fontSize: 17, fontWeight: '800', letterSpacing: 0.6 },

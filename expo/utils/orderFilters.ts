@@ -176,3 +176,20 @@ export function sortOrders(list: Order[], sort: SortKey): Order[] {
 export function activeFilterCount(f: OrderFilters): number {
   return [f.status !== 'all', !!f.manufacturerId, !!f.owner, !!f.year, f.period !== 'all', !!f.query.trim()].filter(Boolean).length;
 }
+
+/** Resumen de productos para la lista y la cabecera: cuántas líneas, cuántas unidades y «2× Nombre» de cada una */
+export function itemsSummary(o: Order): { count: number; units: number; names: string[]; label: string } {
+  const items = (o.items ?? []).filter(i => !!i.product_name?.trim() || Number(i.quantity) > 0);
+  const units = items.reduce((a, i) => a + (Number(i.quantity) || 0), 0);
+  const names = items.map(i => `${Number(i.quantity) || 1}× ${i.product_name?.trim() || 'Sin nombre'}`);
+  const count = items.length;
+  const label = count === 0 ? 'Sin productos' : `${count} producto${count === 1 ? '' : 's'}${units > count ? ` · ${units} uds` : ''}`;
+  return { count, units, names, label };
+}
+
+/** Dirección en una línea: «Calle…, 28001 Madrid» (o el país si no hay más) */
+export function addressLine(c: Order['customer'] | undefined): string {
+  if (!c) return '';
+  const place = [c.codigo_postal, c.provincia].filter(x => x?.trim()).join(' ');
+  return [c.direccion_1, place || c.pais].filter(x => x?.trim()).join(', ');
+}
