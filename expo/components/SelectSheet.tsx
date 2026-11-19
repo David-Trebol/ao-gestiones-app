@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { Modal, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View, useWindowDimensions } from 'react-native';
 import { Check, Search } from 'lucide-react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { enter } from '@/constants/motion';
 import { useTheme } from '@/contexts/ThemeContext';
 import { radius, webInputReset } from '@/constants/theme';
 
@@ -50,6 +51,7 @@ export default function SelectSheet<T extends string>({ visible, title, options,
             styles.sheet,
             { backgroundColor: colors.surface, maxHeight: height * 0.75, paddingBottom: wide ? 8 : 8 + insets.bottom },
             wide ? styles.sheetWide : styles.sheetMobile,
+            enter(0, wide ? 'pop' : 'rise', { duration: 300 }),
           ]}
           accessibilityRole={Platform.OS === 'web' ? ('dialog' as never) : undefined}
           accessibilityLabel={title}

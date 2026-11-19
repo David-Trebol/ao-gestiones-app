@@ -5,6 +5,7 @@ import { Briefcase, Building2, CalendarDays, Check, ChevronDown, ChevronLeft, Cl
 import * as Haptics from 'expo-haptics';
 import { CompactTitleBar, useCollapsingTitle, usePageLayout } from '@/components/Page';
 import { canvas, heroFill, panel, type, webInputReset } from '@/constants/theme';
+import { enter, useCountUp } from '@/constants/motion';
 import { useTheme } from '@/contexts/ThemeContext';
 import { useData } from '@/contexts/DataContext';
 import { ThemeColors } from '@/constants/colors';
@@ -28,6 +29,8 @@ export default function OrderDetailScreen() {
   const tableWide = width >= 1600;
   const s = useMemo(() => makeStyles(colors), [colors]);
   const order = useMemo(() => orders.find(o => o.id === orderId), [orders, orderId]);
+  // el total cuenta hasta su valor al abrir el pedido
+  const totalShown = useCountUp(order?.total_with_vat ?? 0);
 
   const [sheet, setSheet] = useState<Sheet>(null);
   const [editingRef, setEditingRef] = useState(false);
@@ -144,8 +147,9 @@ export default function OrderDetailScreen() {
   const person = [c.contacto, c.departamento].filter(v => !!v?.trim()).join(' · ');
   const addr = addressLine(c);
   const it = itemsSummary(order);
+  let tileN = 0;
   const tile = (icon: React.ReactNode, label: string, value: string, sub: string) => (
-    <View style={[s.tile, panel(colors, isDark), mobileTiles && s.tileHalf]}>
+    <View style={[s.tile, panel(colors, isDark), mobileTiles && s.tileHalf, enter(++tileN, 'pop', { base: 80, step: 60 })]}>
       <View style={s.tileHead}>
         <View style={s.tileIcon}>{icon}</View>
         <Text style={s.tileLabel} numberOfLines={1}>{label}</Text>
@@ -174,7 +178,7 @@ export default function OrderDetailScreen() {
       </View>
 
       {/* Cabecera protagonista (la única tarjeta naranja): lo primero que se busca de un pedido, como en el Excel */}
-      <View style={[s.heroCard, heroFill(colors)]}>
+      <View style={[s.heroCard, heroFill(colors), enter(0, 'pop')]}>
         <View style={s.heroMain}>
           <View style={s.heroTopRow}>
             <View style={{ minWidth: 0, flexShrink: 1 }}>
@@ -239,7 +243,7 @@ export default function OrderDetailScreen() {
           <View style={{ flexShrink: 1, minWidth: 0 }}>
             <Text style={[s.heroCaption, desktop && { textAlign: 'right' }]}>Total con IVA</Text>
             <Text style={[s.total, desktop && { textAlign: 'right' }, narrow && { fontSize: 30 }]} numberOfLines={1} adjustsFontSizeToFit accessibilityLabel={`Total ${formatCurrency(order.total_with_vat)}`}>
-              {formatCurrency(order.total_with_vat)}
+              {formatCurrency(totalShown)}
             </Text>
             <Text style={[s.heroLine, desktop && { textAlign: 'right' }]}>{it.label}</Text>
           </View>
@@ -268,8 +272,9 @@ export default function OrderDetailScreen() {
   );
 
   // ---------------------------------------------------------------- bloques
+  let cardN = 0;
   const card = (title: string, icon: React.ReactNode, body: React.ReactNode, opts: { trailing?: React.ReactNode; footer?: string; flush?: boolean; grow?: boolean } = {}) => (
-    <View style={[s.card, panel(colors, isDark), opts.grow && { flexGrow: 1 }]}>
+    <View style={[s.card, panel(colors, isDark), opts.grow && { flexGrow: 1 }, enter(cardN++, 'rise', { base: 320, step: 70 })]}>
       <View style={s.cardHead}>
         <View style={s.cardIcon}>{icon}</View>
         <Text style={s.cardTitle} accessibilityRole="header">{title}</Text>

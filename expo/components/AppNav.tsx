@@ -2,6 +2,7 @@ import React from 'react';
 import { Platform, Pressable, StyleSheet, Text, View, ViewStyle, useWindowDimensions } from 'react-native';
 import type { BottomTabBarProps } from '@react-navigation/bottom-tabs';
 import { useRouter, usePathname } from 'expo-router';
+import { StackActions } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Building2, FolderOpen, Plus, Settings } from 'lucide-react-native';
 import { useTheme } from '@/contexts/ThemeContext';
@@ -80,10 +81,17 @@ export default function AppNav({ state, navigation }: BottomTabBarProps) {
     if (!route) return;
     const focused = state.routes[state.index]?.key === route.key;
     const event = navigation.emit({ type: 'tabPress', target: route.key, canPreventDefault: true });
-    if (!event.defaultPrevented) {
-      if (focused && name === '(home)' && pathname !== '/') router.replace('/');
-      else if (!focused) navigation.navigate(route.name, route.params);
+    if (event.defaultPrevented) return;
+    // «Pedidos» siempre lleva a la lista: si dentro quedó abierto un pedido o el formulario, se cierran
+    // (antes, al volver desde otra sección o pulsar «Pedidos» con un pedido abierto, seguía el pedido).
+    const nested = route.state as { key?: string; index?: number } | undefined;
+    if (name === '(home)' && nested?.key && (nested.index ?? 0) > 0) {
+      navigation.dispatch({ ...StackActions.popToTop(), target: nested.key });
+      if (!focused) navigation.navigate(route.name);
+      return;
     }
+    if (focused && name === '(home)' && pathname !== '/') router.replace('/');
+    else if (!focused) navigation.navigate(route.name, route.params);
   };
   const isActive = (name: string) => state.routes[state.index]?.name === name;
 

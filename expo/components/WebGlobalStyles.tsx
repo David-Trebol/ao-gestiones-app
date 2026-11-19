@@ -2,6 +2,7 @@ import { useEffect } from 'react';
 import { Platform } from 'react-native';
 import { useTheme } from '@/contexts/ThemeContext';
 import { FONT_FAMILY } from '@/constants/theme';
+import { MOTION_KEYFRAMES_CSS } from '@/constants/motion';
 
 /**
  * Ajustes globales solo para web: fuente del sistema con suavizado,
@@ -36,6 +37,11 @@ export default function WebGlobalStyles() {
       [role="button"]:focus-visible, [role="link"]:focus-visible, button:focus-visible, [tabindex]:not(input):not(textarea):focus-visible {
         outline: 2px solid ${colors.primary}; outline-offset: 2px; border-radius: 10px;
       }
+      ${MOTION_KEYFRAMES_CSS}
+      /* Respuesta al pulsar: los botones se hunden un poco; filas y tarjetas apenas */
+      [role="button"], [role="link"], [role="tab"] { transition: transform .18s cubic-bezier(.2,.8,.2,1), background-color .18s ease, box-shadow .2s ease, opacity .18s ease; }
+      [role="button"]:active, [role="tab"]:active { transform: scale(0.96); }
+      [role="link"]:active { transform: scale(0.992); }
       ::-webkit-scrollbar { width: 10px; height: 10px; }
       ::-webkit-scrollbar-thumb { background: ${isDark ? 'rgba(255,255,255,0.18)' : 'rgba(0,0,0,0.18)'}; border-radius: 10px; border: 2px solid transparent; background-clip: padding-box; }
       ::-webkit-scrollbar-track { background: transparent; }

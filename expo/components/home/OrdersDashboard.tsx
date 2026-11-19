@@ -6,6 +6,7 @@ import { useTheme } from '@/contexts/ThemeContext';
 import { useData } from '@/contexts/DataContext';
 import { ThemeColors , SystemTint } from '@/constants/colors';
 import { cardShadow, panel, radius, webInputReset } from '@/constants/theme';
+import { enter, useCountUp } from '@/constants/motion';
 import StatusBadge, { STATUS_ICONS, STATUS_ORDER, statusConfig } from '@/components/StatusBadge';
 import SelectSheet, { SheetOption } from '@/components/SelectSheet';
 import { usePageLayout } from '@/components/Page';
@@ -213,6 +214,7 @@ export default function OrdersDashboard() {
               style={({ hovered, pressed }: { pressed: boolean; hovered?: boolean }) => [
                 s.counter,
                 panel(colors, isDark),
+                enter(STATUS_ORDER.indexOf(st), 'pop', { step: 55 }),
                 width < 700 ? s.counterScroll : s.counterGrid,
                 sel ? { backgroundColor: tint } : (hovered || pressed) ? { backgroundColor: colors.glassStrong } : null,
                 Platform.OS === 'web' && ({ cursor: 'pointer', transitionProperty: 'background-color', transitionDuration: '160ms' } as object),
@@ -226,7 +228,7 @@ export default function OrdersDashboard() {
                 <View style={[s.counterIcon, { backgroundColor: sel ? '#FFFFFF' : tint }]}>
                   <Icon size={17} color={sel ? tint : '#FFFFFF'} strokeWidth={2.4} />
                 </View>
-                <Text style={[s.counterValue, sel && { color: '#FFFFFF' }]}>{counts[st].n}</Text>
+                <CountText style={[s.counterValue, sel && { color: '#FFFFFF' }]} value={counts[st].n} />
               </View>
               <Text style={[s.counterLabel, sel && { color: '#FFFFFF' }]} numberOfLines={1}>
                 {cfg.label}
@@ -329,7 +331,7 @@ export default function OrdersDashboard() {
         ) : (
           <View style={twoCols ? [s.cardsWrap, s.cardsWrapTwo] : [s.card, s.grouped, panel(colors, isDark)]}>
             {shown.map((o, i) => (
-              <OrderCardItem key={o.id} order={o} onOpen={open} twoCols={twoCols} grouped={!twoCols} first={i === 0} showReasons={showReasons} />
+              <OrderCardItem key={o.id} order={o} onOpen={open} twoCols={twoCols} grouped={!twoCols} first={i === 0} index={i} showReasons={showReasons} />
             ))}
           </View>
         )}
@@ -348,6 +350,12 @@ export default function OrdersDashboard() {
 }
 
 // ------------------------------------------------------------------ piezas reutilizables
+
+/** Número que cuenta hasta su valor (contadores de estado) */
+function CountText({ value, style }: { value: number; style: React.ComponentProps<typeof Text>['style'] }) {
+  const v = useCountUp(value, 700, 200);
+  return <Text style={style}>{Math.round(v)}</Text>;
+}
 
 export function ExpectedText({ o, prefix = '' }: { o: Order; prefix?: string }) {
   const { colors } = useTheme();
@@ -400,7 +408,7 @@ export function OrderTable({ orders, onOpen, showReasons }: { orders: Order[]; o
           <Pressable
             key={o.id}
             onPress={() => onOpen(o)}
-            style={({ hovered, pressed }: { pressed: boolean; hovered?: boolean }) => [s.tr, s.trBody, i > 0 && s.rowBorder, (hovered || pressed) && { backgroundColor: colors.primarySoft }, Platform.OS === 'web' && ({ cursor: 'pointer' } as object)]}
+            style={({ hovered, pressed }: { pressed: boolean; hovered?: boolean }) => [s.tr, s.trBody, enter(i, 'rise', { base: 120, step: 35 }), i > 0 && s.rowBorder, (hovered || pressed) && { backgroundColor: colors.primarySoft }, Platform.OS === 'web' && ({ cursor: 'pointer' } as object)]}
             accessibilityRole="link"
             accessibilityLabel={`Pedido ${o.reference_number}, ${c?.nombre_empresa || 'sin cliente'}, ${it.label}, ${statusConfig[o.status].label}, ${formatCurrency(o.total_with_vat)}`}
             testID={`order-row-${o.id}`}
@@ -472,7 +480,7 @@ export function OrderTable({ orders, onOpen, showReasons }: { orders: Order[]; o
  * Pedido como tarjeta (2 columnas) o como fila de una lista agrupada (`grouped`, móvil). Mismo orden que el Excel:
  * referencia y estado, cliente, dirección, productos y, abajo, fabricante y total.
  */
-export function OrderCardItem({ order: o, onOpen, twoCols, showReasons, grouped, first }: { order: Order; onOpen: (o: Order) => void; twoCols?: boolean; showReasons?: boolean; grouped?: boolean; first?: boolean }) {
+export function OrderCardItem({ order: o, onOpen, twoCols, showReasons, grouped, first, index = 0 }: { order: Order; onOpen: (o: Order) => void; twoCols?: boolean; showReasons?: boolean; grouped?: boolean; first?: boolean; index?: number }) {
   const { colors, isDark } = useTheme();
   const s = useMemo(() => makeStyles(colors), [colors]);
   const reasons = showReasons ? attentionReasons(o) : [];
@@ -486,6 +494,7 @@ export function OrderCardItem({ order: o, onOpen, twoCols, showReasons, grouped,
       style={({ pressed, hovered }: { pressed: boolean; hovered?: boolean }) => [
         s.oCard,
         twoCols && s.oCardTwo,
+        enter(index, 'rise', { base: 120, step: 40 }),
         grouped ? s.oRow : panel(colors, isDark),
         (pressed || hovered) && { backgroundColor: grouped ? colors.fill : colors.primarySoft },
       ]}
