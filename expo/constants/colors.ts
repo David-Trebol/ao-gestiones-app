@@ -155,9 +155,9 @@ export const LightColors: ThemeColors = {
   heroTileTextSecondary: 'rgba(245, 245, 247, 0.66)',
   fill: 'rgba(0, 42, 57, 0.06)',
   primaryFill: '#FF8718',
-  glass: 'rgba(255, 255, 255, 0.58)',
+  glass: 'rgba(255, 255, 255, 0.56)',
   glassStrong: 'rgba(255, 255, 255, 0.78)',
-  glassBorder: 'rgba(255, 255, 255, 0.65)',
+  glassBorder: 'rgba(255, 255, 255, 0.72)',
   glassHighlight: 'rgba(255, 255, 255, 0.9)',
   onPrimary: '#002A39',
   brand: '#FF8718',
@@ -168,7 +168,8 @@ export const LightColors: ThemeColors = {
   navActiveBg: 'rgba(255, 135, 24, 0.16)',
   navActiveText: '#FFA24A',
   navDivider: 'rgba(255, 255, 255, 0.10)',
-  ambient: 'radial-gradient(1100px 560px at 0% 0%, rgba(127, 164, 183, 0.22), transparent 60%), radial-gradient(900px 520px at 100% 0%, rgba(255, 135, 24, 0.10), transparent 60%), radial-gradient(900px 600px at 50% 110%, rgba(0, 42, 57, 0.06), transparent 60%)',
+  // Fondo cálido difuminado (estilo «vidrio»): brillo naranja de la marca arriba a la derecha, melocotón a la izquierda y azul acero abajo
+  ambient: 'radial-gradient(900px 620px at 92% -8%, rgba(255, 135, 24, 0.30), transparent 62%), radial-gradient(820px 620px at 4% 28%, rgba(255, 186, 128, 0.26), transparent 64%), radial-gradient(1100px 720px at 58% 112%, rgba(127, 164, 183, 0.30), transparent 62%), linear-gradient(180deg, #F7F1EC 0%, #F1F4F6 100%)',
 };
 
 export const DarkColors: ThemeColors = {
@@ -224,7 +225,7 @@ export const DarkColors: ThemeColors = {
   heroTileTextSecondary: 'rgba(245, 245, 247, 0.62)',
   fill: 'rgba(158, 193, 211, 0.14)',
   primaryFill: '#FF8718',
-  glass: 'rgba(10, 42, 55, 0.6)',
+  glass: 'rgba(10, 42, 55, 0.58)',
   glassStrong: 'rgba(10, 42, 55, 0.82)',
   glassBorder: 'rgba(255, 255, 255, 0.12)',
   glassHighlight: 'rgba(255, 255, 255, 0.18)',
@@ -237,7 +238,7 @@ export const DarkColors: ThemeColors = {
   navActiveBg: 'rgba(255, 135, 24, 0.18)',
   navActiveText: '#FFA24A',
   navDivider: 'rgba(255, 255, 255, 0.08)',
-  ambient: 'radial-gradient(1100px 560px at 0% 0%, rgba(127, 164, 183, 0.16), transparent 60%), radial-gradient(900px 520px at 100% 0%, rgba(255, 135, 24, 0.10), transparent 60%)',
+  ambient: 'radial-gradient(900px 620px at 92% -8%, rgba(255, 135, 24, 0.20), transparent 62%), radial-gradient(820px 620px at 4% 28%, rgba(200, 110, 40, 0.14), transparent 64%), radial-gradient(1100px 720px at 58% 112%, rgba(127, 164, 183, 0.18), transparent 62%)',
 };
 
 export const Colors = LightColors;

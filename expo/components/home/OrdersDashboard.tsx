@@ -1,11 +1,11 @@
 import React, { useMemo, useState } from 'react';
 import { Alert, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { useRouter } from 'expo-router';
-import { AlertTriangle, ChevronDown, Download, Mail, MapPin, Phone, Search, SlidersHorizontal, X } from 'lucide-react-native';
+import { AlertTriangle, ChevronDown, Download, Factory, Mail, MapPin, Package, Phone, Search, SlidersHorizontal, X } from 'lucide-react-native';
 import { useTheme } from '@/contexts/ThemeContext';
 import { useData } from '@/contexts/DataContext';
 import { ThemeColors , SystemTint } from '@/constants/colors';
-import { cardShadow, radius, webInputReset } from '@/constants/theme';
+import { cardShadow, panel, radius, webInputReset } from '@/constants/theme';
 import StatusBadge, { STATUS_ICONS, STATUS_ORDER, statusConfig } from '@/components/StatusBadge';
 import SelectSheet, { SheetOption } from '@/components/SelectSheet';
 import { usePageLayout } from '@/components/Page';
@@ -25,6 +25,8 @@ import {
   filterOrders,
   formatISODate,
   overdueDays,
+  itemsSummary,
+  addressLine,
 } from '@/utils/orderFilters';
 
 // Se conservan al volver de un pedido o al cambiar de vista
@@ -210,9 +212,9 @@ export default function OrdersDashboard() {
               onPress={() => setFilters({ status: sel ? 'all' : st })}
               style={({ hovered, pressed }: { pressed: boolean; hovered?: boolean }) => [
                 s.counter,
+                panel(colors, isDark),
                 width < 700 ? s.counterScroll : s.counterGrid,
-                sel ? { backgroundColor: tint } : (hovered || pressed) ? { backgroundColor: colors.surfaceAlt } : null,
-                cardShadow(isDark),
+                sel ? { backgroundColor: tint } : (hovered || pressed) ? { backgroundColor: colors.glassStrong } : null,
                 Platform.OS === 'web' && ({ cursor: 'pointer', transitionProperty: 'background-color', transitionDuration: '160ms' } as object),
               ]}
               accessibilityRole="button"
@@ -310,12 +312,12 @@ export default function OrdersDashboard() {
         })()}
 
         {orders.length === 0 ? (
-          <View style={[s.card, s.empty, cardShadow(isDark)]}>
+          <View style={[s.card, s.empty, panel(colors, isDark)]}>
             <Text style={s.emptyTitle}>Aún no hay pedidos</Text>
             <Text style={s.emptyText}>Crea el primero con «Nuevo pedido».</Text>
           </View>
         ) : list.length === 0 ? (
-          <View style={[s.card, s.empty, cardShadow(isDark)]}>
+          <View style={[s.card, s.empty, panel(colors, isDark)]}>
             <Text style={s.emptyTitle}>Ningún pedido coincide</Text>
             <Text style={s.emptyText}>Prueba con otra búsqueda o quita los filtros.</Text>
             <Pressable onPress={() => setFilters({ ...DEFAULT_FILTERS, sort: filters.sort })} style={[s.emptyBtn, { backgroundColor: colors.fill }]} accessibilityRole="button">
@@ -325,7 +327,7 @@ export default function OrdersDashboard() {
         ) : table ? (
           <OrderTable orders={shown} onOpen={open} showReasons={showReasons} showUpdated={wideTable} />
         ) : (
-          <View style={twoCols ? [s.cardsWrap, s.cardsWrapTwo] : [s.card, s.grouped, cardShadow(isDark)]}>
+          <View style={twoCols ? [s.cardsWrap, s.cardsWrapTwo] : [s.card, s.grouped, panel(colors, isDark)]}>
             {shown.map((o, i) => (
               <OrderCardItem key={o.id} order={o} onOpen={open} twoCols={twoCols} grouped={!twoCols} first={i === 0} showReasons={showReasons} />
             ))}
@@ -372,89 +374,93 @@ function LateLine({ o }: { o: Order }) {
   return <Text style={s.tdSub} numberOfLines={1}>{late === 0 ? 'Previsto hoy' : `Previsto ${formatISODate(o.expected_date).slice(0, 5)}`}</Text>;
 }
 
-/** Población del cliente para la lista: «CP Provincia», o el país si no hay más */
-function placeOf(c: Order['customer'] | undefined): string {
-  if (!c) return '';
-  const local = [c.codigo_postal, c.provincia].filter(x => x?.trim()).join(' ');
-  return local || c.pais || '';
-}
-
 /**
- * Tabla de pedidos (ordenador). Como el Excel del propietario: la referencia destaca en naranja y se ven
- * de un vistazo el cliente, cómo contactarlo y dónde está, además del fabricante, el estado y el total.
+ * Lista de pedidos (ordenador) como la hoja Excel del propietario: cada pedido es un bloque que se lee de un vistazo,
+ * de izquierda a derecha y de lo más importante a lo menos: quién es el cliente y dónde está, qué pedido es,
+ * qué se le vende y cuánto suma.
  */
 export function OrderTable({ orders, onOpen, showReasons }: { orders: Order[]; onOpen: (o: Order) => void; showReasons?: boolean; showUpdated?: boolean }) {
   const { colors, isDark } = useTheme();
   const s = useMemo(() => makeStyles(colors), [colors]);
   return (
-    <View style={[s.card, cardShadow(isDark)]}>
+    <View style={[s.card, panel(colors, isDark)]}>
       <View style={[s.tr, s.th]}>
-        <Text style={[s.thText, s.cRef]}>Referencia</Text>
-        <Text style={[s.thText, s.cClient]}>Cliente</Text>
-        <Text style={[s.thText, s.cContact]}>Contacto</Text>
-        <Text style={[s.thText, s.cPlace]}>Población</Text>
-        <Text style={[s.thText, s.cMf]}>Fabricante</Text>
-        <Text style={[s.thText, s.cStatus]}>Estado</Text>
-        <Text style={[s.thText, s.cTotal]}>Total</Text>
+        <Text style={[s.thText, s.cClient]}>Cliente y dirección</Text>
+        <Text style={[s.thText, s.cRef]}>Pedido</Text>
+        <Text style={[s.thText, s.cItems]}>Productos</Text>
+        <Text style={[s.thText, s.cTotal]}>Total y estado</Text>
       </View>
       {orders.map((o, i) => {
         const reasons = showReasons ? attentionReasons(o) : [];
         const c = o.customer;
         const person = [c?.contacto, c?.departamento].filter(x => x?.trim()).join(' · ');
+        const addr = addressLine(c);
+        const it = itemsSummary(o);
         return (
           <Pressable
             key={o.id}
             onPress={() => onOpen(o)}
             style={({ hovered, pressed }: { pressed: boolean; hovered?: boolean }) => [s.tr, s.trBody, i > 0 && s.rowBorder, (hovered || pressed) && { backgroundColor: colors.primarySoft }, Platform.OS === 'web' && ({ cursor: 'pointer' } as object)]}
             accessibilityRole="link"
-            accessibilityLabel={`Pedido ${o.reference_number}, ${c?.nombre_empresa || 'sin cliente'}, ${statusConfig[o.status].label}, ${formatCurrency(o.total_with_vat)}`}
+            accessibilityLabel={`Pedido ${o.reference_number}, ${c?.nombre_empresa || 'sin cliente'}, ${it.label}, ${statusConfig[o.status].label}, ${formatCurrency(o.total_with_vat)}`}
             testID={`order-row-${o.id}`}
           >
-            <View style={s.cRef}>
+            <View style={[s.cClient, { gap: 3 }]}>
+              <Text style={s.clientText} numberOfLines={1}>{c?.nombre_empresa || 'Sin cliente'}</Text>
+              {reasons.length > 0 ? (
+                <Text style={[s.tdSub, { color: colors.warning }]} numberOfLines={1}>{reasons.join(' · ')}</Text>
+              ) : person ? (
+                <Text style={s.tdSub} numberOfLines={1}>{person}</Text>
+              ) : null}
+              {!!addr && (
+                <View style={s.iconLine}>
+                  <MapPin size={13} color={colors.accent} />
+                  <Text style={[s.td, { flexShrink: 1 }]} numberOfLines={1}>{addr}</Text>
+                </View>
+              )}
+              {(!!c?.telefono_1 || !!c?.email) && (
+                <View style={s.contactRow}>
+                  {!!c?.telefono_1 && (
+                    <View style={[s.iconLine, { flexShrink: 0 }]}>
+                      <Phone size={13} color={colors.accent} />
+                      <Text style={s.tdSub} numberOfLines={1}>{c.telefono_1}</Text>
+                    </View>
+                  )}
+                  {!!c?.email && (
+                    <View style={[s.iconLine, { flexShrink: 1 }]}>
+                      <Mail size={13} color={colors.accent} />
+                      <Text style={[s.tdSub, { flexShrink: 1 }]} numberOfLines={1}>{c.email}</Text>
+                    </View>
+                  )}
+                </View>
+              )}
+            </View>
+            <View style={[s.cRef, { gap: 3 }]}>
               <Text style={s.refText} numberOfLines={1}>{o.reference_number}</Text>
               <Text style={s.tdSub} numberOfLines={1}>
                 {formatDate(o.created_at)}
                 {o.custom_reference ? ` · ${o.custom_reference}` : ''}
               </Text>
+              <View style={s.iconLine}>
+                <Factory size={13} color={colors.accent} />
+                <Text style={[s.tdSub, { flexShrink: 1 }]} numberOfLines={1}>{o.manufacturer_name} · {o.year}</Text>
+              </View>
             </View>
-            <View style={s.cClient}>
-              <Text style={s.clientText} numberOfLines={1}>{c?.nombre_empresa || '—'}</Text>
-              {reasons.length > 0 ? (
-                <Text style={[s.tdSub, { color: colors.warning }]} numberOfLines={1}>{reasons.join(' · ')}</Text>
-              ) : person ? (
-                <Text style={s.tdSub} numberOfLines={1}>{person}</Text>
-              ) : c?.numero_referencia_pedido ? (
-                <Text style={s.tdSub} numberOfLines={1}>Su pedido {c.numero_referencia_pedido}</Text>
-              ) : null}
+            <View style={[s.cItems, { gap: 3 }]}>
+              <View style={s.iconLine}>
+                <Package size={14} color={colors.brand} />
+                <Text style={s.itemsLabel} numberOfLines={1}>{it.label}</Text>
+              </View>
+              {it.names.slice(0, 2).map((n, k) => (
+                <Text key={k} style={s.td} numberOfLines={1}>{n}</Text>
+              ))}
+              {it.names.length > 2 && <Text style={s.tdSub}>y {it.names.length - 2} más</Text>}
             </View>
-            <View style={s.cContact}>
-              {c?.telefono_1 ? (
-                <View style={s.iconLine}>
-                  <Phone size={13} color={colors.accent} />
-                  <Text style={s.td} numberOfLines={1}>{c.telefono_1}</Text>
-                </View>
-              ) : null}
-              {c?.email ? (
-                <View style={s.iconLine}>
-                  <Mail size={13} color={colors.accent} />
-                  <Text style={s.tdSub} numberOfLines={1}>{c.email}</Text>
-                </View>
-              ) : null}
-              {!c?.telefono_1 && !c?.email && <Text style={s.tdSub}>—</Text>}
-            </View>
-            <View style={s.cPlace}>
-              <Text style={s.td} numberOfLines={1}>{placeOf(c) || '—'}</Text>
-              {!!c?.direccion_1 && <Text style={s.tdSub} numberOfLines={1}>{c.direccion_1}</Text>}
-            </View>
-            <View style={s.cMf}>
-              <Text style={s.td} numberOfLines={1}>{o.manufacturer_name}</Text>
-              <Text style={s.tdSub}>{o.year}</Text>
-            </View>
-            <View style={[s.cStatus, { gap: 3 }]}>
+            <View style={[s.cTotal, { gap: 4, alignItems: 'flex-end' }]}>
+              <Text style={s.totalText}>{formatCurrency(o.total_with_vat)}</Text>
               <StatusBadge status={o.status} size="sm" />
               <LateLine o={o} />
             </View>
-            <Text style={[s.totalText, s.cTotal]}>{formatCurrency(o.total_with_vat)}</Text>
           </Pressable>
         );
       })}
@@ -463,24 +469,28 @@ export function OrderTable({ orders, onOpen, showReasons }: { orders: Order[]; o
 }
 
 /**
- * Pedido como tarjeta (2 columnas) o como fila de una lista agrupada de iOS (`grouped`: sin sombra,
- * separadas por una línea fina que empieza en el margen del texto, como en Mail).
+ * Pedido como tarjeta (2 columnas) o como fila de una lista agrupada (`grouped`, móvil). Mismo orden que el Excel:
+ * referencia y estado, cliente, dirección, productos y, abajo, fabricante y total.
  */
 export function OrderCardItem({ order: o, onOpen, twoCols, showReasons, grouped, first }: { order: Order; onOpen: (o: Order) => void; twoCols?: boolean; showReasons?: boolean; grouped?: boolean; first?: boolean }) {
   const { colors, isDark } = useTheme();
   const s = useMemo(() => makeStyles(colors), [colors]);
   const reasons = showReasons ? attentionReasons(o) : [];
+  const c = o.customer;
+  const person = [c?.contacto, c?.departamento].filter(x => x?.trim()).join(' · ');
+  const addr = addressLine(c);
+  const it = itemsSummary(o);
   return (
     <Pressable
       onPress={() => onOpen(o)}
       style={({ pressed, hovered }: { pressed: boolean; hovered?: boolean }) => [
         s.oCard,
         twoCols && s.oCardTwo,
-        grouped ? s.oRow : cardShadow(isDark),
-        (pressed || hovered) && { backgroundColor: grouped ? colors.fill : colors.surfaceAlt },
+        grouped ? s.oRow : panel(colors, isDark),
+        (pressed || hovered) && { backgroundColor: grouped ? colors.fill : colors.primarySoft },
       ]}
       accessibilityRole="link"
-      accessibilityLabel={`Pedido ${o.reference_number}, ${o.customer?.nombre_empresa || 'sin cliente'}, ${statusConfig[o.status].label}, ${formatCurrency(o.total_with_vat)}`}
+      accessibilityLabel={`Pedido ${o.reference_number}, ${c?.nombre_empresa || 'sin cliente'}, ${it.label}, ${statusConfig[o.status].label}, ${formatCurrency(o.total_with_vat)}`}
       testID={`order-card-${o.id}`}
     >
       {grouped && !first && <View style={s.oSep} />}
@@ -488,35 +498,40 @@ export function OrderCardItem({ order: o, onOpen, twoCols, showReasons, grouped,
         <Text style={s.oRef}>{o.reference_number}</Text>
         <StatusBadge status={o.status} size="sm" />
       </View>
-      <Text style={s.oClient} numberOfLines={2}>{o.customer?.nombre_empresa || 'Sin cliente'}</Text>
-      {(() => {
-        const c = o.customer;
-        const person = [c?.contacto, c?.departamento].filter(x => x?.trim()).join(' · ');
-        const place = placeOf(c);
-        return (
-          <View style={s.oInfo}>
-            {!!person && <Text style={s.tdSub} numberOfLines={1}>{person}</Text>}
-            {!!c?.telefono_1 && (
-              <View style={s.iconLine}>
-                <Phone size={13} color={colors.accent} />
-                <Text style={s.tdSub} numberOfLines={1}>{c.telefono_1}</Text>
-              </View>
-            )}
-            {!!c?.email && (
-              <View style={s.iconLine}>
-                <Mail size={13} color={colors.accent} />
-                <Text style={s.tdSub} numberOfLines={1}>{c.email}</Text>
-              </View>
-            )}
-            {!!place && (
-              <View style={s.iconLine}>
-                <MapPin size={13} color={colors.accent} />
-                <Text style={s.tdSub} numberOfLines={1}>{place}</Text>
-              </View>
-            )}
+      <Text style={s.oClient} numberOfLines={2}>{c?.nombre_empresa || 'Sin cliente'}</Text>
+      <View style={s.oInfo}>
+        {!!person && <Text style={s.tdSub} numberOfLines={1}>{person}</Text>}
+        {!!addr && (
+          <View style={s.iconLine}>
+            <MapPin size={13} color={colors.accent} />
+            <Text style={[s.tdSub, { flexShrink: 1 }]} numberOfLines={1}>{addr}</Text>
           </View>
-        );
-      })()}
+        )}
+        {!!c?.telefono_1 && (
+          <View style={s.iconLine}>
+            <Phone size={13} color={colors.accent} />
+            <Text style={s.tdSub} numberOfLines={1}>{c.telefono_1}</Text>
+          </View>
+        )}
+        {!!c?.email && (
+          <View style={s.iconLine}>
+            <Mail size={13} color={colors.accent} />
+            <Text style={[s.tdSub, { flexShrink: 1 }]} numberOfLines={1}>{c.email}</Text>
+          </View>
+        )}
+      </View>
+      <View style={[s.oItems, { backgroundColor: colors.fill }]}>
+        <View style={s.iconLine}>
+          <Package size={14} color={colors.brand} />
+          <Text style={s.itemsLabel} numberOfLines={1}>{it.label}</Text>
+        </View>
+        {it.names.length > 0 && (
+          <Text style={s.td} numberOfLines={1}>
+            {it.names[0]}
+            {it.names.length > 1 ? ` y ${it.names.length - 1} más` : ''}
+          </Text>
+        )}
+      </View>
       {!!o.custom_reference && <Text style={s.tdSub}>Ref. {o.custom_reference}</Text>}
       {reasons.length > 0 && <Text style={[s.tdSub, { color: colors.warning }]}>{reasons.join(' · ')}</Text>}
       {(!!o.expected_date || !!o.owner || !!o.next_action) && (
@@ -548,7 +563,7 @@ function makeStyles(c: ThemeColors) {
     clearBtn: { width: 36, height: 36, alignItems: 'center', justifyContent: 'center' },
     counters: { flexDirection: 'row', flexWrap: 'wrap', gap: 12 },
     countersScroll: { flexDirection: 'row', gap: 10, paddingVertical: 2 },
-    counter: { borderRadius: 14, padding: 12, backgroundColor: c.surface, gap: 6 },
+    counter: { borderRadius: 18, padding: 12, backgroundColor: c.surface, gap: 6 },
     counterGrid: { flexGrow: 1, flexBasis: '17%' as unknown as number },
     counterScroll: { width: 148 },
     counterTop: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
@@ -570,7 +585,7 @@ function makeStyles(c: ThemeColors) {
     filterIcon: { width: 24, alignItems: 'center' },
     chip: { flexDirection: 'row', alignItems: 'center', gap: 4, height: 40, paddingHorizontal: 14, borderRadius: radius.pill, maxWidth: 260 },
     chipText: { fontSize: 14, color: c.text, fontWeight: '500' },
-    card: { backgroundColor: c.surface, borderRadius: radius.lg, overflow: 'hidden' },
+    card: { backgroundColor: c.surface, borderRadius: 20, overflow: 'hidden' },
     empty: { padding: 28, alignItems: 'center', gap: 6 },
     emptyTitle: { fontSize: 17, fontWeight: '600', color: c.text },
     emptyText: { fontSize: 14, color: c.textSecondary, textAlign: 'center' },
@@ -582,23 +597,27 @@ function makeStyles(c: ThemeColors) {
     td: { fontSize: 14, color: c.text },
     tdStrong: { fontSize: 14, color: c.text, fontWeight: '600', fontVariant: ['tabular-nums'] },
     tdSub: { fontSize: 13, color: c.textSecondary, fontVariant: ['tabular-nums'] },
-    cRef: { flex: 1.25, minWidth: 0 },
-    cClient: { flex: 2, minWidth: 0 },
+    cRef: { flex: 1.35, minWidth: 0 },
+    cClient: { flex: 2.5, minWidth: 0 },
+    cItems: { flex: 2.1, minWidth: 0 },
+    itemsLabel: { fontSize: 14, fontWeight: '700', color: c.text, flexShrink: 1 },
+    contactRow: { flexDirection: 'row', alignItems: 'center', columnGap: 12, minWidth: 0 },
+    oItems: { gap: 2, marginTop: 8, paddingHorizontal: 10, paddingVertical: 8, borderRadius: 10 },
     cContact: { flex: 2, minWidth: 0, gap: 2 },
     cPlace: { flex: 1.5, minWidth: 0 },
     cMf: { flex: 1.1, minWidth: 0 },
     cStatus: { width: 130, alignItems: 'flex-start' },
-    trBody: { alignItems: 'flex-start', paddingVertical: 14 },
-    refText: { fontSize: 15, fontWeight: '800', color: c.reference, letterSpacing: 0.1, fontVariant: ['tabular-nums'] },
-    clientText: { fontSize: 15, fontWeight: '700', color: c.text, letterSpacing: -0.1 },
-    totalText: { fontSize: 15, fontWeight: '800', color: c.text, fontVariant: ['tabular-nums'], ...(Platform.OS === 'web' ? ({ whiteSpace: 'nowrap' } as object) : {}) },
+    trBody: { alignItems: 'flex-start', paddingVertical: 16 },
+    refText: { fontSize: 16, fontWeight: '800', color: c.reference, letterSpacing: 0.1, fontVariant: ['tabular-nums'] },
+    clientText: { fontSize: 16.5, fontWeight: '800', color: c.text, letterSpacing: -0.1 },
+    totalText: { fontSize: 18, letterSpacing: -0.3, fontWeight: '800', color: c.text, fontVariant: ['tabular-nums'], ...(Platform.OS === 'web' ? ({ whiteSpace: 'nowrap' } as object) : {}) },
     iconLine: { flexDirection: 'row', alignItems: 'center', gap: 6, minWidth: 0 },
     oInfo: { gap: 3, marginTop: 4 },
     cDate: { flex: 1, minWidth: 0 },
-    cTotal: { flex: 1.1, minWidth: 136, textAlign: 'right' },
+    cTotal: { width: 156, flexShrink: 0, textAlign: 'right' },
     cardsWrap: { gap: 10 },
     cardsWrapTwo: { flexDirection: 'row', flexWrap: 'wrap', gap: 12 },
-    oCard: { backgroundColor: c.surface, borderRadius: radius.lg, padding: 16, gap: 4 },
+    oCard: { backgroundColor: c.surface, borderRadius: 20, padding: 16, gap: 4 },
     oCardTwo: { width: '48.8%' as unknown as number },
     grouped: { paddingVertical: 0 },
     oRow: { borderRadius: 0, backgroundColor: 'transparent', paddingTop: 14, paddingBottom: 14 },

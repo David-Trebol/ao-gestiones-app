@@ -4,7 +4,7 @@ import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import { Briefcase, Building2, CalendarDays, Check, ChevronDown, ChevronLeft, Clock, Copy, Euro, Factory, FileText, IdCard, Mail, MapPin, MoreHorizontal, Package, Pencil, Phone, Receipt, Truck, User, X } from 'lucide-react-native';
 import * as Haptics from 'expo-haptics';
 import { CompactTitleBar, useCollapsingTitle, usePageLayout } from '@/components/Page';
-import { canvas, cardShadow, type, webInputReset } from '@/constants/theme';
+import { canvas, heroFill, panel, type, webInputReset } from '@/constants/theme';
 import { useTheme } from '@/contexts/ThemeContext';
 import { useData } from '@/contexts/DataContext';
 import { ThemeColors } from '@/constants/colors';
@@ -12,7 +12,7 @@ import StatusBadge, { STATUS_ORDER, statusConfig } from '@/components/StatusBadg
 import SelectSheet from '@/components/SelectSheet';
 import type { OrderStatus } from '@/types';
 import { formatCurrency, formatDate } from '@/utils/calculations';
-import { formatISODate, overdueDays } from '@/utils/orderFilters';
+import { addressLine, formatISODate, itemsSummary, overdueDays } from '@/utils/orderFilters';
 
 type Sheet = 'more' | 'status' | null;
 
@@ -135,10 +135,25 @@ export default function OrderDetailScreen() {
   const lateTone = late !== null && late > 0;
   const hasFollowUp = !!(order.expected_date || order.owner || order.next_action);
   const wide = width >= 1280;
+  const mobileTiles = width < 760;
   const narrow = width < 420; // móvil estrecho: cabecera compacta para que el cliente se vea en la primera pantalla
   const phones = [c.telefono_1, c.telefono_2].filter(v => !!v?.trim());
   const cityLine = [c.codigo_postal, c.provincia].filter(Boolean).join(' ');
   const addressLines = [c.direccion_1, c.direccion_2, cityLine, c.pais].filter(v => !!v?.trim());
+
+  const person = [c.contacto, c.departamento].filter(v => !!v?.trim()).join(' · ');
+  const addr = addressLine(c);
+  const it = itemsSummary(order);
+  const tile = (icon: React.ReactNode, label: string, value: string, sub: string) => (
+    <View style={[s.tile, panel(colors, isDark), mobileTiles && s.tileHalf]}>
+      <View style={s.tileHead}>
+        <View style={s.tileIcon}>{icon}</View>
+        <Text style={s.tileLabel} numberOfLines={1}>{label}</Text>
+      </View>
+      <Text style={[s.tileValue, mobileTiles && { fontSize: 19, letterSpacing: -0.3 }]} numberOfLines={1} adjustsFontSizeToFit>{value}</Text>
+      <Text style={s.tileSub} numberOfLines={1}>{sub}</Text>
+    </View>
+  );
 
   // ---------------------------------------------------------------- cabecera
   const header = (
@@ -158,23 +173,20 @@ export default function OrderDetailScreen() {
         </View>
       </View>
 
-      <View style={[s.heroCard, cardShadow(isDark)]}>
-        <View style={[s.heroAccent, { backgroundColor: colors.brand }]} />
+      {/* Cabecera protagonista (la única tarjeta naranja): lo primero que se busca de un pedido, como en el Excel */}
+      <View style={[s.heroCard, heroFill(colors)]}>
         <View style={s.heroMain}>
-          <Text style={s.caption}>Referencia</Text>
-          <Text style={s.ref} selectable accessibilityRole="header">
-            {order.reference_number}
-          </Text>
-          {narrow && !!c.nombre_empresa && (
-            <Text style={s.heroCompany} numberOfLines={2}>
-              {c.nombre_empresa}
-            </Text>
-          )}
-          <View style={s.heroMeta}>
+          <View style={s.heroTopRow}>
+            <View style={{ minWidth: 0, flexShrink: 1 }}>
+              <Text style={s.heroCaption}>Referencia</Text>
+              <Text style={s.ref} selectable accessibilityRole="header" numberOfLines={1} adjustsFontSizeToFit>
+                {order.reference_number}
+              </Text>
+            </View>
             <Pressable
               onPress={() => setSheet('status')}
               disabled={busy}
-              style={({ hovered }: { pressed: boolean; hovered?: boolean }) => [s.statusBtn, { backgroundColor: colors[statusConfig[order.status].bgKey] }, hovered && { opacity: 0.85 }]}
+              style={({ hovered }: { pressed: boolean; hovered?: boolean }) => [s.statusBtn, isDark && { backgroundColor: 'rgba(0, 30, 41, 0.86)' }, hovered && { backgroundColor: isDark ? 'rgba(0, 30, 41, 0.96)' : 'rgba(255,255,255,0.92)' }]}
               hitSlop={6}
               accessibilityRole="button"
               accessibilityLabel={`Estado: ${statusConfig[order.status].label}. Cambiar estado`}
@@ -183,54 +195,81 @@ export default function OrderDetailScreen() {
               <StatusBadge status={order.status} />
               <ChevronDown size={15} color={colors[statusConfig[order.status].textKey]} strokeWidth={2.5} />
             </Pressable>
-            <View style={s.metaChip}>
-              <Factory size={14} color={colors.accent} />
-              <Text style={s.metaChipText} numberOfLines={1}>{order.manufacturer_name} · {order.year}</Text>
-            </View>
-            {!narrow && (
-              <View style={s.metaChip}>
-                <CalendarDays size={14} color={colors.accent} />
-                <Text style={s.metaChipText} numberOfLines={1}>Creado el {formatDate(order.created_at)}</Text>
+          </View>
+          <Text style={[s.heroClient, narrow && { fontSize: 24, lineHeight: 29 }]} numberOfLines={2} selectable>
+            {c.nombre_empresa || 'Sin nombre de empresa'}
+          </Text>
+          {!!person && <Text style={s.heroLine} numberOfLines={1}>{person}</Text>}
+          <View style={s.heroFacts}>
+            {!!addr && (
+              <View style={s.heroFact}>
+                <MapPin size={15} color={colors.onPrimary} />
+                <Text style={s.heroFactText} numberOfLines={2}>{addr}</Text>
               </View>
             )}
-            {!narrow && !!c.numero_factura && (
-              <View style={s.metaChip}>
-                <Receipt size={14} color={colors.accent} />
-                <Text style={s.metaChipText} numberOfLines={1}>Factura {c.numero_factura}</Text>
-              </View>
+            {!!phones[0] && (
+              <Pressable style={s.heroFact} onPress={() => void Linking.openURL(`tel:${phones[0].replace(/\s/g, '')}`)} accessibilityRole="link">
+                <Phone size={15} color={colors.onPrimary} />
+                <Text style={s.heroFactText} numberOfLines={1}>{phones[0]}</Text>
+              </Pressable>
+            )}
+            {!!c.email && (
+              <Pressable style={[s.heroFact, { flexShrink: 1 }]} onPress={() => void Linking.openURL(`mailto:${c.email}`)} accessibilityRole="link">
+                <Mail size={15} color={colors.onPrimary} />
+                <Text style={s.heroFactText} numberOfLines={1}>{c.email}</Text>
+              </Pressable>
             )}
           </View>
-          {narrow && (
-            <Text style={s.heroSmall} numberOfLines={2}>
-              Creado el {formatDate(order.created_at)}
-              {c.numero_factura ? ` · Factura ${c.numero_factura}` : ''}
-            </Text>
+          {it.names.length > 0 && (
+            <View style={s.heroItems}>
+              {it.names.slice(0, 3).map((n, k) => (
+                <View key={k} style={s.heroItem}>
+                  <Text style={s.heroItemText} numberOfLines={1}>{n}</Text>
+                </View>
+              ))}
+              {it.names.length > 3 && (
+                <View style={s.heroItem}>
+                  <Text style={s.heroItemText}>y {it.names.length - 3} más</Text>
+                </View>
+              )}
+            </View>
           )}
         </View>
-        <View style={[s.heroSide, desktop && { alignItems: 'flex-end' }, narrow && s.heroSideRow]}>
-          <View style={narrow ? { flexShrink: 1, minWidth: 0 } : undefined}>
-            <Text style={[s.caption, desktop && { textAlign: 'right' }]}>Total con IVA</Text>
-            <Text style={[s.total, desktop && { textAlign: 'right' }, narrow && { fontSize: 26, letterSpacing: -0.6 }]} numberOfLines={1} adjustsFontSizeToFit accessibilityLabel={`Total ${formatCurrency(order.total_with_vat)}`}>
+        <View style={[s.heroSide, desktop ? { alignItems: 'flex-end' } : s.heroSideRow]}>
+          <View style={{ flexShrink: 1, minWidth: 0 }}>
+            <Text style={[s.heroCaption, desktop && { textAlign: 'right' }]}>Total con IVA</Text>
+            <Text style={[s.total, desktop && { textAlign: 'right' }, narrow && { fontSize: 30 }]} numberOfLines={1} adjustsFontSizeToFit accessibilityLabel={`Total ${formatCurrency(order.total_with_vat)}`}>
               {formatCurrency(order.total_with_vat)}
             </Text>
+            <Text style={[s.heroLine, desktop && { textAlign: 'right' }]}>{it.label}</Text>
           </View>
           <Pressable
             onPress={handleEdit}
-            style={({ pressed, hovered }: { pressed: boolean; hovered?: boolean }) => [s.btn, { backgroundColor: hovered ? colors.primaryDark : colors.primaryFill, opacity: pressed ? 0.85 : 1 }]}
+            style={({ pressed, hovered }: { pressed: boolean; hovered?: boolean }) => [s.btn, { backgroundColor: hovered ? '#013A4F' : colors.onPrimary, opacity: pressed ? 0.85 : 1 }]}
             accessibilityRole="button"
             testID="edit-order-btn"
           >
-            <Pencil size={16} color={colors.onPrimary} />
-            <Text style={[s.btnText, { color: colors.onPrimary }]}>{narrow ? 'Editar' : 'Editar pedido'}</Text>
+            <Pencil size={16} color="#FFFFFF" />
+            <Text style={[s.btnText, { color: '#FFFFFF' }]}>{narrow ? 'Editar' : 'Editar pedido'}</Text>
           </Pressable>
         </View>
+      </View>
+
+      {/* Cifras clave en vidrio, debajo de la cabecera */}
+      <View style={s.tiles}>
+        {tile(<Package size={16} color={colors.brand} />, 'Productos', String(it.count), it.units > it.count ? `${it.units} unidades` : it.count === 1 ? '1 línea' : `${it.count} líneas`)}
+        {tile(<Euro size={16} color={colors.brand} />, 'Base sin IVA', formatCurrency(order.total_ex_vat), `IVA ${formatCurrency(order.total_vat)}`)}
+        {hasCost
+          ? tile(<Receipt size={16} color={colors.brand} />, 'Beneficio', formatCurrency(profit), 'Venta menos coste')
+          : tile(<Truck size={16} color={colors.brand} />, 'Envío', shipTotal > 0 ? formatCurrency(shipTotal) : 'Sin envío', shipLines.length ? `${shipLines.length} línea${shipLines.length === 1 ? '' : 's'}` : 'Incluido o no aplica')}
+        {tile(<Factory size={16} color={colors.brand} />, 'Fabricante', order.manufacturer_name || '—', `Año ${order.year}`)}
       </View>
     </View>
   );
 
   // ---------------------------------------------------------------- bloques
   const card = (title: string, icon: React.ReactNode, body: React.ReactNode, opts: { trailing?: React.ReactNode; footer?: string; flush?: boolean; grow?: boolean } = {}) => (
-    <View style={[s.card, cardShadow(isDark), opts.grow && { flexGrow: 1 }]}>
+    <View style={[s.card, panel(colors, isDark), opts.grow && { flexGrow: 1 }]}>
       <View style={s.cardHead}>
         <View style={s.cardIcon}>{icon}</View>
         <Text style={s.cardTitle} accessibilityRole="header">{title}</Text>
@@ -737,27 +776,39 @@ function makeStyles(c: ThemeColors) {
     backText: { fontSize: 17, color: c.primary, letterSpacing: -0.3, fontWeight: '600' },
     topActions: { flexDirection: 'row', gap: 10 },
     roundBtn: { width: 44, height: 44, borderRadius: 22, alignItems: 'center', justifyContent: 'center', backgroundColor: c.primarySoft },
-    heroCard: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'flex-end', gap: 16, backgroundColor: c.surface, borderRadius: 18, padding: 20, paddingLeft: 26, overflow: 'hidden' },
-    heroAccent: { position: 'absolute', left: 0, top: 0, bottom: 0, width: 6 },
+    heroCard: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'flex-end', gap: 20, borderRadius: 26, padding: 24, overflow: 'hidden' },
     // base 240 (no 320): en móviles de 320 px la cabecera se salía de la tarjeta
-    heroMain: { flexGrow: 1, flexBasis: 240, minWidth: 0, maxWidth: '100%' },
-    heroSide: { gap: 6, alignItems: 'flex-start' },
-    caption: { fontSize: 13, fontWeight: '600', color: c.textSecondary },
-    ref: { ...type.largeTitle, fontWeight: '800', color: c.reference, fontVariant: ['tabular-nums'] },
-    heroMeta: { flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 10, flexWrap: 'wrap' },
-    // la flecha va dentro de la misma píldora que el estado (antes flotaba suelta)
-    statusBtn: { flexDirection: 'row', alignItems: 'center', gap: 0, minHeight: 36, paddingRight: 10, borderRadius: 999 },
-    metaChip: { flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: c.fill, borderRadius: 999, paddingHorizontal: 12, minHeight: 32, flexShrink: 1, maxWidth: '100%', minWidth: 0 },
-    metaChipText: { fontSize: 14, color: c.text, fontWeight: '500', flexShrink: 1, minWidth: 0 },
-    heroCompany: { fontSize: 17, fontWeight: '700', color: c.text, marginTop: 4, letterSpacing: -0.2 },
-    heroSmall: { fontSize: 13, color: c.textSecondary, marginTop: 8 },
-    heroSideRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', width: '100%', gap: 12 },
-    total: { fontSize: 34, fontWeight: '800', color: c.text, letterSpacing: -0.8, fontVariant: ['tabular-nums'] },
+    heroMain: { flexGrow: 1, flexBasis: 240, minWidth: 0, maxWidth: '100%', gap: 4 },
+    heroTopRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap', marginBottom: 6 },
+    heroSide: { gap: 10, alignItems: 'flex-start' },
+    heroCaption: { fontSize: 13, fontWeight: '700', color: 'rgba(0, 42, 57, 0.72)' },
+    ref: { fontSize: 20, lineHeight: 25, fontWeight: '800', color: c.onPrimary, letterSpacing: 0.2, fontVariant: ['tabular-nums'] },
+    // la flecha va dentro de la misma píldora que el estado, sobre un vidrio claro para que se lea encima del naranja
+    statusBtn: { flexDirection: 'row', alignItems: 'center', gap: 0, minHeight: 36, paddingRight: 10, borderRadius: 999, backgroundColor: 'rgba(255,255,255,0.78)' },
+    heroClient: { fontSize: 32, lineHeight: 37, fontWeight: '800', color: c.onPrimary, letterSpacing: -0.9 },
+    heroLine: { fontSize: 15, color: 'rgba(0, 42, 57, 0.78)', fontWeight: '600' },
+    heroFacts: { flexDirection: 'row', flexWrap: 'wrap', columnGap: 18, rowGap: 6, marginTop: 8 },
+    heroFact: { flexDirection: 'row', alignItems: 'center', gap: 6, minWidth: 0, maxWidth: '100%', minHeight: 28 },
+    heroFactText: { fontSize: 15, color: c.onPrimary, fontWeight: '500', flexShrink: 1 },
+    heroItems: { flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginTop: 12 },
+    heroItem: { backgroundColor: 'rgba(255,255,255,0.42)', borderRadius: 999, paddingHorizontal: 12, paddingVertical: 6, maxWidth: '100%' },
+    heroItemText: { fontSize: 13.5, fontWeight: '600', color: c.onPrimary },
+    heroSideRow: { flexDirection: 'row', alignItems: 'flex-end', justifyContent: 'space-between', width: '100%', gap: 12 },
+    total: { fontSize: 40, fontWeight: '800', color: c.onPrimary, letterSpacing: -1.2, fontVariant: ['tabular-nums'] },
+    // cifras clave
+    tiles: { flexDirection: 'row', flexWrap: 'wrap', gap: 12 },
+    tile: { flexGrow: 1, flexBasis: 0, minWidth: 180, borderRadius: 20, padding: 16, gap: 4 },
+    tileHalf: { flexBasis: '45%' as unknown as number, minWidth: 0 },
+    tileHead: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 4 },
+    tileIcon: { width: 30, height: 30, borderRadius: 15, alignItems: 'center', justifyContent: 'center', backgroundColor: c.primarySoft },
+    tileLabel: { fontSize: 13.5, fontWeight: '700', color: c.textSecondary, flexShrink: 1 },
+    tileValue: { fontSize: 24, fontWeight: '800', color: c.text, letterSpacing: -0.5, fontVariant: ['tabular-nums'] },
+    tileSub: { fontSize: 12.5, color: c.textSecondary },
     btn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, minHeight: 44, paddingHorizontal: 20, borderRadius: 999, marginTop: 4 },
     btnSecondary: { backgroundColor: c.fill },
     btnText: { fontSize: 15, fontWeight: '700' },
     // tarjetas
-    card: { backgroundColor: c.surface, borderRadius: 16, overflow: 'hidden' },
+    card: { backgroundColor: c.surface, borderRadius: 22, overflow: 'hidden' },
     cardHead: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 16, paddingTop: 14, paddingBottom: 10 },
     cardIcon: { width: 28, height: 28, borderRadius: 8, alignItems: 'center', justifyContent: 'center', backgroundColor: c.brand },
     cardTitle: { flex: 1, fontSize: 18, fontWeight: '800', color: c.text, letterSpacing: -0.3 },
