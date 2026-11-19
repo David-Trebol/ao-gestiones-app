@@ -3,6 +3,7 @@ import { Platform, Pressable, StyleSheet, Text, View, ViewStyle } from 'react-na
 import { ChevronRight, Copy } from 'lucide-react-native';
 import { useTheme } from '@/contexts/ThemeContext';
 import { cardShadow } from '@/constants/theme';
+import { enter } from '@/constants/motion';
 import { STATUS_ORDER, statusConfig } from '@/components/StatusBadge';
 import { STATUS_TINT } from '@/components/home/OrdersDashboard';
 import { formatCurrency, formatDate } from '@/utils/calculations';
@@ -96,7 +97,7 @@ export default function FolderTile({ kind, title, code, orders, extraLabel, extr
       <View style={[styles.bar, { backgroundColor: colors.fill }]} accessibilityElementsHidden importantForAccessibility="no-hide-descendants">
         {n > 0 &&
           STATUS_ORDER.filter(s => stats.counts[s] > 0).map(s => (
-            <View key={s} style={{ flex: stats.counts[s], backgroundColor: STATUS_TINT[s] }} />
+            <View key={s} style={[{ flex: stats.counts[s], backgroundColor: STATUS_TINT[s] }, enter(0, 'grow', { base: 200 })]} />
           ))}
       </View>
       <View style={styles.legend}>

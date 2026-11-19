@@ -1,6 +1,7 @@
 import React, { useCallback, useRef, useState } from 'react';
 import { NativeScrollEvent, NativeSyntheticEvent, Platform, StyleSheet, Text, View, ViewStyle, useWindowDimensions } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { enter } from '@/constants/motion';
 import { useTheme } from '@/contexts/ThemeContext';
 import { glass, type } from '@/constants/theme';
 import { TAB_BAR_SPACE } from '@/components/AppNav';
@@ -35,7 +36,7 @@ export function PageHeader({ title, subtitle, actions, topInset = true }: Props)
   const insets = useSafeAreaInsets();
   const { pad, short } = usePageLayout();
   return (
-    <View style={[styles.wrap, { paddingTop: (topInset ? insets.top : 0) + (short ? 12 : pad > 16 ? 28 : 16) }]}>
+    <View style={[styles.wrap, enter(0, 'fade', { duration: 380 }), { paddingTop: (topInset ? insets.top : 0) + (short ? 12 : pad > 16 ? 28 : 16) }]}>
       <View style={{ flex: 1, minWidth: 0 }}>
         <Text style={[styles.title, { color: colors.text }, short && { fontSize: 22, lineHeight: 28 }]} accessibilityRole="header" numberOfLines={1}>
           {title}
