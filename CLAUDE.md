@@ -31,6 +31,7 @@ npx expo export --platform web --output-dir ../tools/out/dist     # compilación
 
 ## Docs (abre solo el que necesites)
 
+- `docs/historial.md` — todo lo hablado y decidido con el propietario, cómo trabaja él y qué no volver a preguntar; léelo al empezar una sesión nueva.
 - `docs/PLAN.md` — plan por fases y estado; léelo antes de cualquier tarea.
 - `docs/estructura.md` — mapa de carpetas y rutas; al buscar dónde está algo.
 - `docs/datos.md` — tablas, RLS, funciones Edge, estados y referencias; al tocar datos o Supabase.
