@@ -9,7 +9,7 @@ Resumen de todo lo hablado y decidido con el propietario (David) desde que la ap
 - Escribe en español, a menudo por voz y con prisa: mensajes largos, con erratas («clawd code» = Claude Code, «planin» = planning). Interpretar la intención, no la letra.
 - Revisa **siempre en la web publicada** (https://ao-gestiones-pedidos.vercel.app), sobre todo en ordenador y móvil. Si un cambio no está publicado, para él no existe («publícalo ya, para que se vean los cambios»).
 - Valora que se le diga claramente qué está hecho, qué está probado y qué falta. No le gustan las sorpresas con sus datos.
-- Le gusta ver referencias visuales (capturas del Excel antiguo, un vídeo de TikTok) y que se adapte el estilo, **no** que se cambie lo que guarda la app.
+- Le gusta ver referencias visuales (capturas del Excel antiguo) y que se adapte el estilo, **no** que se cambie lo que guarda la app.
 - Aprueba o rechaza propuestas con frases cortas («vale», «hazlos», «actívalo pausando otra cosa»). Las decisiones de negocio y de dinero (plan de pago, pausar proyectos, borrar datos) son suyas: preguntar antes.
 
 ## Línea de tiempo
@@ -41,12 +41,10 @@ Resumen de todo lo hablado y decidido con el propietario (David) desde que la ap
 ### 17/11/2026 · Marca Alpha Omega
 - Pidió más color, aprovechar el ancho y ver referencia y cliente «de un golpe, como su Excel». Se tomó la marca de alphaomega-electronics.com: azul petróleo `#002A39`, naranja `#FF8718`, azul acero `#7FA4B7`, tipografía Figtree. Entrada, lista, ficha (como una factura), formulario, Fabricantes, Ajustes y vista por año rehechos con la marca. Auditoría con detector de solapes.
 
-### 19/11/2026 · Vídeo de TikTok: «vidrio cálido» y pedidos como el Excel
-- Mandó un TikTok (https://vm.tiktok.com/ZN8aGXAS3/) con un panel de estilo translúcido («Glassy dashboard»: colores, posición, partes translúcidas) y pidió:
-  1. un «plugin» para adaptar la web a ese estilo → se hizo como **skill del proyecto** `.claude/skills/estilo-vidrio-ao/SKILL.md` (reglas del estilo) + piezas `panel`, `heroFill`, `liquidGlass`, `colors.ambient`;
-  2. reordenar los pedidos, que eran «un tocho de información», poniendo primero lo importante: **nombre del cliente, referencia, importe total, cantidad de productos, breve descripción de productos y dirección**, como en el Excel «que entrabas y veías todo de una».
-- Resultado en `main` (commits `a586334` y `a7508d1`): fondo cálido difuminado, paneles de vidrio, una tarjeta naranja protagonista, barra lateral navy flotante, lista en bloques cliente | pedido | productos | total, ficha con cliente, dirección, contacto, productos y total arriba; animaciones que respetan «reducir movimiento»; «Pedidos» en la navegación vuelve siempre a la lista.
-- **Sin confirmar por el propietario** que el resultado se parece a lo que quería del vídeo (Claude no puede ver vídeos de TikTok; se trabajó con su descripción). Si dice que no, pedirle capturas del vídeo.
+### 19/11/2026 · «Vidrio cálido» y pedidos como el Excel
+- Pidió reordenar los pedidos, que eran «un tocho de información», poniendo primero lo importante: **nombre del cliente, referencia, importe total, cantidad de productos, breve descripción de productos y dirección**, como en el Excel «que entrabas y veías todo de una».
+- Resultado en `main` (commits `a586334` y `a7508d1`): estilo «vidrio cálido» (reglas en `.claude/skills/estilo-vidrio-ao`), lista en bloques cliente | pedido | productos | total, ficha con cliente, dirección, contacto, productos y total arriba; animaciones que respetan «reducir movimiento»; «Pedidos» en la navegación vuelve siempre a la lista.
+- 24/11/2026: el propietario pidió **olvidarse del vídeo de TikTok** que usó de referencia. No volver a mencionarlo ni tomarlo como referencia.
 
 ## Decisiones ya tomadas (no volver a preguntar)
 
@@ -64,7 +62,6 @@ Resumen de todo lo hablado y decidido con el propietario (David) desde que la ap
 ## Decisiones que siguen abiertas
 
 Ver la lista al final de `docs/PLAN.md` (vista «Por año», punto de miles, columnas del Excel exportado, fichas de clientes, Población y Vencimiento del recibo, significado de «Enviado», precios de venta o coste al leer documentos, otros usuarios y permisos). Además:
-- Confirmar que el estilo del TikTok quedó como quería.
 - Comprobar en Supabase Auth el Site URL del correo de recuperar contraseña y activar la protección de contraseñas filtradas (lo tiene que hacer él en el panel o aprobarlo).
 - Probar en un iPhone real.
 
