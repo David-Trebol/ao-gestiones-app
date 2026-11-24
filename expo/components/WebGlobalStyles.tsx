@@ -26,7 +26,10 @@ export default function WebGlobalStyles() {
       html { background-color: ${colors.background}; }
       body { background-color: transparent; }
       /* Brillo de color en una capa fija propia: «background-attachment: fixed» hace que Safari de iOS repinte sin parar */
-      body { min-height: 100vh; }
+      /* Alto = zona visible real. En Safari de iPhone, 100vh mide la pantalla SIN las barras del navegador,
+         así que la barra de pestañas y los botones de abajo quedaban debajo de la barra de Safari y no se podían pulsar. */
+      html, body, #root { height: 100%; height: 100dvh; }
+      body { overscroll-behavior: none; }
       body::before { content: ''; position: fixed; inset: 0; z-index: -1; pointer-events: none; background-image: ${colors.ambient}; background-repeat: no-repeat; }
       body, input, textarea, button, [dir] { font-family: ${FONT_FAMILY}; }
       body { -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale; text-rendering: optimizeLegibility; }
