@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import createContextHook from '@nkzw/create-context-hook';
-import { Order, Manufacturer, OrderFormData } from '@/types';
+import { Order, Manufacturer, OrderFormData, ItemStatus } from '@/types';
 import { calculateItemTotals, calculateShippingTotals, generateReferenceNumber, generateId } from '@/utils/calculations';
 import { supabase, describeError } from '@/lib/supabase';
 import { useAuth } from '@/contexts/AuthContext';
@@ -246,6 +246,21 @@ export const [DataProvider, useData] = createContextHook(() => {
     setOrders(prev => prev.map(o => (o.id === orderId ? updated : o)));
   }, [setOrders]);
 
+  /** Cambia solo el estado de un producto del pedido (no toca importes ni el estado del pedido) */
+  const updateItemStatus = useCallback(async (orderId: string, index: number, status: ItemStatus) => {
+    const order = orders.find(o => o.id === orderId);
+    if (!order || !order.items[index]) throw new Error('No se encontró el producto');
+    const items = order.items.map((it, k) => {
+      if (k !== index) return it;
+      const { item_status: _old, ...rest } = it;
+      return status === 'none' ? rest : { ...rest, item_status: status };
+    });
+    const { data, error } = await supabase.from('orders').update({ items }).eq('id', orderId).select().single();
+    if (error) fail(error);
+    const updated = normalizeOrder(data);
+    setOrders(prev => prev.map(o => (o.id === orderId ? updated : o)));
+  }, [orders, setOrders]);
+
   const deleteOrder = useCallback(async (orderId: string) => {
     const { error } = await supabase.from('orders').delete().eq('id', orderId);
     if (error) fail(error);
@@ -269,6 +284,8 @@ export const [DataProvider, useData] = createContextHook(() => {
       // Una copia empieza como pedido nuevo: pendiente y sin factura/recibo
       status: 'pending',
       customer: { ...original.customer, numero_factura: '', numero_recibo: '' },
+      // los productos de la copia empiezan sin enviar
+      items: original.items.map(({ item_status: _s, ...it }) => it),
       // Se mantiene el responsable; la fecha prevista y la siguiente acción son del pedido original
       expected_date: null,
       next_action: '',
@@ -435,6 +452,7 @@ export const [DataProvider, useData] = createContextHook(() => {
     addOrder,
     updateOrder,
     updateOrderField,
+    updateItemStatus,
     deleteOrder,
     duplicateOrder,
     duplicateOrders,

@@ -31,6 +31,7 @@ export function calculateItemTotals(item: OrderFormItem): OrderItem {
     valor_sin_iva: Math.round(valor_sin_iva * 100) / 100,
     beneficio_bruto: Math.round(beneficio_bruto * 100) / 100,
     valor_con_iva: Math.round(valor_con_iva * 100) / 100,
+    ...(item.item_status && item.item_status !== 'none' ? { item_status: item.item_status } : {}),
   };
 }
 

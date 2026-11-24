@@ -21,6 +21,9 @@ export interface Customer {
   numero_recibo: string;
 }
 
+/** Estado de cada producto dentro del pedido (opcional; sin valor = sin empezar) */
+export type ItemStatus = 'none' | 'pending' | 'shipped';
+
 export interface OrderItem {
   product_name: string;
   quantity: number;
@@ -33,6 +36,7 @@ export interface OrderItem {
   beneficio_bruto: number;
   valor_con_iva: number;
   vat_percentage: number;
+  item_status?: ItemStatus;
 }
 
 export interface ShippingItem {
@@ -107,6 +111,7 @@ export interface OrderFormData {
 }
 
 export interface OrderFormItem {
+  item_status?: ItemStatus;
   product_name: string;
   quantity: number;
   costo_unitario: number;

@@ -6,7 +6,8 @@ import { useTheme } from '@/contexts/ThemeContext';
 import { useData } from '@/contexts/DataContext';
 import { ThemeColors , SystemTint } from '@/constants/colors';
 import { cardShadow, panel, radius, webInputReset } from '@/constants/theme';
-import { enter, useCountUp } from '@/constants/motion';
+import { fx, enter, useCountUp } from '@/constants/motion';
+import { itemProgress, itemStatusOf, itemTone } from '@/constants/itemStatus';
 import StatusBadge, { STATUS_ICONS, STATUS_ORDER, statusConfig } from '@/components/StatusBadge';
 import SelectSheet, { SheetOption } from '@/components/SelectSheet';
 import { usePageLayout } from '@/components/Page';
@@ -459,6 +460,7 @@ export function OrderTable({ orders, onOpen, showReasons }: { orders: Order[]; o
                 <Package size={14} color={colors.brand} />
                 <Text style={s.itemsLabel} numberOfLines={1}>{it.label}</Text>
               </View>
+              <ItemDots o={o} />
               {it.names.slice(0, 2).map((n, k) => (
                 <Text key={k} style={s.td} numberOfLines={1}>{n}</Text>
               ))}
@@ -501,6 +503,7 @@ export function OrderCardItem({ order: o, onOpen, twoCols, showReasons, grouped,
       accessibilityRole="link"
       accessibilityLabel={`Pedido ${o.reference_number}, ${c?.nombre_empresa || 'sin cliente'}, ${it.label}, ${statusConfig[o.status].label}, ${formatCurrency(o.total_with_vat)}`}
       testID={`order-card-${o.id}`}
+      {...(grouped ? {} : fx('lift'))}
     >
       {grouped && !first && <View style={s.oSep} />}
       <View style={s.oTop}>
@@ -534,6 +537,7 @@ export function OrderCardItem({ order: o, onOpen, twoCols, showReasons, grouped,
           <Package size={14} color={colors.brand} />
           <Text style={s.itemsLabel} numberOfLines={1}>{it.label}</Text>
         </View>
+        <ItemDots o={o} />
         {it.names.length > 0 && (
           <Text style={s.td} numberOfLines={1}>
             {it.names[0]}
@@ -643,4 +647,22 @@ function makeStyles(c: ThemeColors) {
     oTotal: { flexShrink: 0, fontSize: 18, fontWeight: '800', color: c.text, fontVariant: ['tabular-nums'], letterSpacing: -0.3 },
     moreBtn: { alignSelf: 'center', marginTop: 12, minHeight: 44, paddingHorizontal: 18, justifyContent: 'center' },
   });
+}
+
+/** Un punto de color por producto (verde enviado, amarillo pendiente, gris sin empezar) y el recuento; solo si alguno tiene estado */
+function ItemDots({ o }: { o: Order }) {
+  const { colors, isDark } = useTheme();
+  const p = itemProgress(o.items ?? []);
+  if (p.total === 0 || p.shipped + p.pending === 0) return null;
+  const parts = [p.shipped ? `${p.shipped} enviado${p.shipped === 1 ? '' : 's'}` : '', p.pending ? `${p.pending} pendiente${p.pending === 1 ? '' : 's'}` : ''].filter(Boolean);
+  return (
+    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, flexWrap: 'wrap' }} accessibilityLabel={parts.join(', ')}>
+      <View style={{ flexDirection: 'row', gap: 3 }}>
+        {(o.items ?? []).slice(0, 10).map((x, k) => (
+          <View key={k} style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: itemTone(itemStatusOf(x), colors, isDark).dot }} />
+        ))}
+      </View>
+      <Text style={{ fontSize: 12.5, fontWeight: '600', color: colors.textSecondary }} numberOfLines={1}>{parts.join(' · ')}</Text>
+    </View>
+  );
 }

@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { Platform, Pressable, StyleSheet, Text, View, ViewStyle, useWindowDimensions } from 'react-native';
 import type { BottomTabBarProps } from '@react-navigation/bottom-tabs';
 import { useRouter, usePathname } from 'expo-router';
@@ -8,6 +8,12 @@ import { Building2, FolderOpen, Plus, Settings } from 'lucide-react-native';
 import { useTheme } from '@/contexts/ThemeContext';
 import { useAuth } from '@/contexts/AuthContext';
 import { liquidGlass } from '@/constants/theme';
+import { enter } from '@/constants/motion';
+
+/** Transición del indicador de la pestaña activa: se desliza con un pequeño rebote */
+const slide = (Platform.OS === 'web'
+  ? { transitionProperty: 'transform, height, width', transitionDuration: '480ms', transitionTimingFunction: 'cubic-bezier(0.34, 1.3, 0.64, 1)' }
+  : {}) as ViewStyle;
 
 /** Ancho desde el que la navegación pasa a ser lateral */
 export const NAV_SIDE_MIN = 768;
@@ -94,6 +100,10 @@ export default function AppNav({ state, navigation }: BottomTabBarProps) {
     else if (!focused) navigation.navigate(route.name, route.params);
   };
   const isActive = (name: string) => state.routes[state.index]?.name === name;
+  const activeIdx = ITEMS.findIndex(i => isActive(i.name));
+  // medidas para el indicador que se desliza entre pestañas
+  const [barW, setBarW] = useState(0);
+  const [rows, setRows] = useState<{ y: number; h: number }[]>([]);
 
   if (!side) {
     if (pathname.startsWith('/order-form')) return null;
@@ -101,21 +111,30 @@ export default function AppNav({ state, navigation }: BottomTabBarProps) {
       <View pointerEvents="box-none" style={[styles.bottomWrap, { paddingBottom: Math.max(insets.bottom, 12) }]}>
         <View
           style={[styles.bottom, liquidGlass(colors, isDark)]}
+          onLayout={e => setBarW(e.nativeEvent.layout.width)}
           accessibilityRole={web ? ('navigation' as never) : undefined}
         >
+          {activeIdx >= 0 && barW > 0 && (
+            <View
+              pointerEvents="none"
+              style={[styles.bottomPill, { backgroundColor: colors.primarySoftAlt, width: (barW - 12 - 8) / 3, transform: [{ translateX: activeIdx * ((barW - 12 - 8) / 3 + 4) }] }, slide]}
+            />
+          )}
           {ITEMS.map(({ name, label, Icon }) => {
             const active = isActive(name);
             return (
               <Pressable
                 key={name}
                 onPress={() => go(name)}
-                style={[styles.bottomItem, active && { backgroundColor: colors.primarySoft }, pointer]}
+                style={[styles.bottomItem, pointer]}
                 accessibilityRole="tab"
                 accessibilityState={{ selected: active }}
                 accessibilityLabel={label}
                 testID={`nav-${label}`}
               >
-                <Icon size={22} color={active ? colors.primary : colors.text} strokeWidth={active ? 2.3 : 1.8} />
+                <View key={active ? 'on' : 'off'} style={active ? enter(0, 'bump') : undefined}>
+                  <Icon size={22} color={active ? colors.primary : colors.text} strokeWidth={active ? 2.3 : 1.8} />
+                </View>
                 <Text style={[styles.bottomLabel, { color: active ? colors.primary : colors.text }, active && { fontWeight: '600' }]}>{label}</Text>
               </Pressable>
             );
@@ -169,17 +188,29 @@ export default function AppNav({ state, navigation }: BottomTabBarProps) {
       </Pressable>
 
       <View style={styles.items}>
-        {ITEMS.map(({ name, label, Icon, tint }) => {
+        {activeIdx >= 0 && rows[activeIdx] && (
+          <View
+            pointerEvents="none"
+            style={[styles.sidePill, { backgroundColor: colors.navActiveBg, height: rows[activeIdx].h, transform: [{ translateY: rows[activeIdx].y }] }, slide]}
+          >
+            {full && <View style={[styles.activeBar, { backgroundColor: colors.brand }]} />}
+          </View>
+        )}
+        {ITEMS.map(({ name, label, Icon, tint }, idx) => {
           const active = isActive(name);
           return (
             <Pressable
               key={name}
+              onLayout={e => {
+                const { y, height: h } = e.nativeEvent.layout;
+                setRows(prev => (prev[idx]?.y === y && prev[idx]?.h === h ? prev : Object.assign([...prev], { [idx]: { y, h } })));
+              }}
               onPress={() => go(name)}
               style={({ hovered }: { pressed: boolean; hovered?: boolean }) => [
                 styles.item,
                 !full && styles.itemCompact,
                 !full && low && { minHeight: 52, paddingVertical: 4 },
-                active ? { backgroundColor: colors.navActiveBg } : hovered ? { backgroundColor: 'rgba(255,255,255,0.06)' } : null,
+                !active && hovered ? { backgroundColor: 'rgba(255,255,255,0.06)' } : null,
                 pointer,
               ]}
               accessibilityRole="tab"
@@ -193,7 +224,6 @@ export default function AppNav({ state, navigation }: BottomTabBarProps) {
               ) : (
                 <Text style={[styles.itemTextCompact, { color: active ? colors.navActiveText : colors.navMuted }, active && { fontWeight: '700' }]}>{label}</Text>
               )}
-              {full && active && <View style={[styles.activeBar, { backgroundColor: colors.brand }]} />}
             </Pressable>
           );
         })}
@@ -227,6 +257,8 @@ const styles = StyleSheet.create({
   chip: { alignItems: 'center', justifyContent: 'center' },
   bottomWrap: { position: 'absolute', left: 0, right: 0, bottom: 0, alignItems: 'center', paddingHorizontal: 16 },
   bottom: { flexDirection: 'row', alignItems: 'center', gap: 4, padding: 6, borderRadius: 32, width: '100%', maxWidth: 420 },
+  bottomPill: { position: 'absolute', left: 6, top: 6, bottom: 6, borderRadius: 26 },
+  sidePill: { position: 'absolute', left: 0, right: 0, top: 0, borderRadius: 12, overflow: 'hidden' },
   bottomItem: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 2, minHeight: 52, borderRadius: 26 },
   bottomLabel: { fontSize: 11, fontWeight: '500', letterSpacing: 0.1 },
   sideWrap: { height: '100%', paddingLeft: 10, paddingVertical: 10 },

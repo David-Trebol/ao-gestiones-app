@@ -1,38 +1,42 @@
 import React, { useCallback, useMemo, useState } from 'react';
 import { Alert, Platform, Linking, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
-import { Briefcase, Building2, CalendarDays, Check, ChevronDown, ChevronLeft, Clock, Copy, Euro, Factory, FileText, IdCard, Mail, MapPin, MoreHorizontal, Package, Pencil, Phone, Receipt, Truck, User, X } from 'lucide-react-native';
+import { Briefcase, CalendarDays, Check, ChevronDown, ChevronLeft, Clock, Copy, Euro, Factory, FileText, IdCard, Mail, MapPin, MoreHorizontal, Package, Pencil, Phone, Receipt, Route, Truck, User, UserRound, X, XCircle } from 'lucide-react-native';
 import * as Haptics from 'expo-haptics';
 import { CompactTitleBar, useCollapsingTitle, usePageLayout } from '@/components/Page';
-import { canvas, heroFill, panel, type, webInputReset } from '@/constants/theme';
-import { enter, useCountUp } from '@/constants/motion';
+import { canvas, heroFill, panel, webInputReset } from '@/constants/theme';
+import { enter, fx, pulse, sheen, useCountUp } from '@/constants/motion';
+import { ITEM_STATUS_HINT, ITEM_STATUS_LABEL, ITEM_STATUS_ORDER, itemProgress, itemStatusOf, itemTone } from '@/constants/itemStatus';
 import { useTheme } from '@/contexts/ThemeContext';
 import { useData } from '@/contexts/DataContext';
 import { ThemeColors } from '@/constants/colors';
-import StatusBadge, { STATUS_ORDER, statusConfig } from '@/components/StatusBadge';
+import { STATUS_ICONS, STATUS_ORDER, statusConfig } from '@/components/StatusBadge';
 import SelectSheet from '@/components/SelectSheet';
-import type { OrderStatus } from '@/types';
+import type { ItemStatus, OrderItem, OrderStatus } from '@/types';
 import { formatCurrency, formatDate } from '@/utils/calculations';
 import { addressLine, formatISODate, itemsSummary, overdueDays } from '@/utils/orderFilters';
+
+/** Pasos del pedido en la barra de progreso (Cancelado va aparte) */
+const STEPS: OrderStatus[] = ['pending', 'processing', 'shipped', 'delivered'];
 
 type Sheet = 'more' | 'status' | null;
 
 export default function OrderDetailScreen() {
   const { orderId } = useLocalSearchParams<{ orderId: string }>();
   const router = useRouter();
-  const { orders, deleteOrder, updateOrderField, duplicateOrder } = useData();
+  const { orders, deleteOrder, updateOrderField, updateItemStatus, duplicateOrder } = useData();
   const { colors, isDark } = useTheme();
   const { width, content, bottomSpace } = usePageLayout();
   const { shown: compactShown, scrollProps } = useCollapsingTitle(90);
   const desktop = width >= 1024;
-  // Tabla de productos solo si la columna tiene sitio para todas las cifras (en 1024 se cortaba «Con IVA»)
-  const tableWide = width >= 1600;
   const s = useMemo(() => makeStyles(colors), [colors]);
   const order = useMemo(() => orders.find(o => o.id === orderId), [orders, orderId]);
   // el total cuenta hasta su valor al abrir el pedido
   const totalShown = useCountUp(order?.total_with_vat ?? 0);
 
   const [sheet, setSheet] = useState<Sheet>(null);
+  /** Producto cuyo estado se está cambiando (índice) */
+  const [itemSheet, setItemSheet] = useState<number | null>(null);
   const [editingRef, setEditingRef] = useState(false);
   const [refValue, setRefValue] = useState('');
   const [busy, setBusy] = useState(false);
@@ -101,6 +105,19 @@ export default function OrderDetailScreen() {
     [order, updateOrderField],
   );
 
+  const changeItemStatus = useCallback(
+    async (index: number, st: ItemStatus) => {
+      if (!order || itemStatusOf(order.items[index] ?? {}) === st) return;
+      try {
+        await updateItemStatus(order.id, index, st);
+        void Haptics.selectionAsync();
+      } catch (e) {
+        Alert.alert('No se pudo cambiar el estado del producto', (e as Error).message);
+      }
+    },
+    [order, updateItemStatus],
+  );
+
   const saveRef = useCallback(async () => {
     if (!order) return;
     setBusy(true);
@@ -134,12 +151,11 @@ export default function OrderDetailScreen() {
   const hasCost = order.items.some(i => i.costo_unitario > 0);
   const c = order.customer;
 
-  // ---------------------------------------------------------------- bloques
   const lateTone = late !== null && late > 0;
   const hasFollowUp = !!(order.expected_date || order.owner || order.next_action);
-  const wide = width >= 1280;
   const mobileTiles = width < 760;
-  const narrow = width < 420; // móvil estrecho: cabecera compacta para que el cliente se vea en la primera pantalla
+  const narrow = width < 420;
+  const tiny = width < 360; // móviles de 320 px: textos un punto más pequeños para que no se corten // móvil estrecho: cabecera compacta para que el cliente se vea en la primera pantalla
   const phones = [c.telefono_1, c.telefono_2].filter(v => !!v?.trim());
   const cityLine = [c.codigo_postal, c.provincia].filter(Boolean).join(' ');
   const addressLines = [c.direccion_1, c.direccion_2, cityLine, c.pais].filter(v => !!v?.trim());
@@ -147,17 +163,49 @@ export default function OrderDetailScreen() {
   const person = [c.contacto, c.departamento].filter(v => !!v?.trim()).join(' · ');
   const addr = addressLine(c);
   const it = itemsSummary(order);
+  const prog = itemProgress(order.items);
+  const st = statusConfig[order.status];
+  const StIcon = STATUS_ICONS[order.status];
+  const stColor = colors[st.textKey];
+
   let tileN = 0;
-  const tile = (icon: React.ReactNode, label: string, value: string, sub: string) => (
-    <View style={[s.tile, panel(colors, isDark), mobileTiles && s.tileHalf, enter(++tileN, 'pop', { base: 80, step: 60 })]}>
+  const tile = (Icon: typeof Euro, tint: string, label: string, value: string, sub: string, valueColor?: string) => (
+    <View style={[s.tile, panel(colors, isDark), mobileTiles && s.tileHalf, enter(++tileN, 'pop', { base: 120, step: 70 })]} {...fx('lift')}>
       <View style={s.tileHead}>
-        <View style={s.tileIcon}>{icon}</View>
-        <Text style={s.tileLabel} numberOfLines={1}>{label}</Text>
+        <View style={[s.tileIcon, { backgroundColor: tint }]}><Icon size={15} color="#FFFFFF" strokeWidth={2.4} /></View>
+        <Text style={[s.tileLabel, tiny && { fontSize: 12 }]} numberOfLines={1}>{label}</Text>
       </View>
-      <Text style={[s.tileValue, mobileTiles && { fontSize: 19, letterSpacing: -0.3 }]} numberOfLines={1} adjustsFontSizeToFit>{value}</Text>
-      <Text style={s.tileSub} numberOfLines={1}>{sub}</Text>
+      <Text style={[s.tileValue, mobileTiles && { fontSize: value.length > 12 ? 16 : 19, letterSpacing: -0.3 }, valueColor ? { color: valueColor } : null]} numberOfLines={1} adjustsFontSizeToFit>{value}</Text>
+      <Text style={[s.tileSub, tiny && { fontSize: 11 }]} numberOfLines={1}>{sub}</Text>
     </View>
   );
+
+  /** Chapa de estado de un producto: se pulsa para cambiarlo */
+  const itemChip = (i: number, item: OrderItem) => {
+    const ist = itemStatusOf(item);
+    const tone = itemTone(ist, colors, isDark);
+    return (
+      <Pressable
+        key={`chip-${i}-${ist}`}
+        onPress={() => setItemSheet(i)}
+        style={[s.chip, { backgroundColor: tone.bg, borderColor: tone.border }, enter(0, 'bump', { base: 0 })]}
+        {...fx('tint')}
+        hitSlop={6}
+        accessibilityRole="button"
+        accessibilityLabel={`Estado del producto: ${ITEM_STATUS_LABEL[ist]}. Cambiar`}
+        testID={`item-status-${i}`}
+      >
+        <View style={[s.chipDot, { backgroundColor: tone.dot }]} />
+        <Text style={[s.chipText, { color: tone.text }]} numberOfLines={1}>{ITEM_STATUS_LABEL[ist]}</Text>
+        <ChevronDown size={13} color={tone.text} strokeWidth={2.6} />
+      </Pressable>
+    );
+  };
+  /** Fondo y franja de color de la fila según el estado del producto */
+  const rowTone = (item: OrderItem) => {
+    const tone = itemTone(itemStatusOf(item), colors, isDark);
+    return { backgroundColor: tone.row, borderLeftWidth: 4, borderLeftColor: itemStatusOf(item) === 'none' ? 'transparent' : tone.dot };
+  };
 
   // ---------------------------------------------------------------- cabecera
   const header = (
@@ -179,6 +227,7 @@ export default function OrderDetailScreen() {
 
       {/* Cabecera protagonista (la única tarjeta naranja): lo primero que se busca de un pedido, como en el Excel */}
       <View style={[s.heroCard, heroFill(colors), enter(0, 'pop')]}>
+        <View style={sheen(500)} pointerEvents="none" />
         <View style={s.heroMain}>
           <View style={s.heroTopRow}>
             <View style={{ minWidth: 0, flexShrink: 1 }}>
@@ -187,17 +236,28 @@ export default function OrderDetailScreen() {
                 {order.reference_number}
               </Text>
             </View>
+            {/* Botón de estado: una sola píldora sólida (color del estado + flecha), que se lee bien encima del naranja */}
             <Pressable
+              key={`st-${order.status}`}
               onPress={() => setSheet('status')}
               disabled={busy}
-              style={({ hovered }: { pressed: boolean; hovered?: boolean }) => [s.statusBtn, isDark && { backgroundColor: 'rgba(0, 30, 41, 0.86)' }, hovered && { backgroundColor: isDark ? 'rgba(0, 30, 41, 0.96)' : 'rgba(255,255,255,0.92)' }]}
+              style={({ hovered }: { pressed: boolean; hovered?: boolean }) => [
+                s.statusBtn,
+                { backgroundColor: isDark ? '#0B2733' : '#FFFFFF' },
+                hovered && { transform: [{ translateY: -1 }] },
+                enter(0, 'bump', { base: 380 }),
+              ]}
+              {...fx('tint')}
               hitSlop={6}
               accessibilityRole="button"
-              accessibilityLabel={`Estado: ${statusConfig[order.status].label}. Cambiar estado`}
+              accessibilityLabel={`Estado: ${st.label}. Cambiar estado`}
               testID="change-status"
             >
-              <StatusBadge status={order.status} />
-              <ChevronDown size={15} color={colors[statusConfig[order.status].textKey]} strokeWidth={2.5} />
+              <View style={[s.statusIcon, { backgroundColor: colors[st.bgKey] }]}>
+                <StIcon size={14} color={stColor} strokeWidth={2.6} />
+              </View>
+              <Text style={[s.statusBtnText, { color: stColor }]}>{st.label}</Text>
+              <ChevronDown size={16} color={stColor} strokeWidth={2.6} />
             </Pressable>
           </View>
           <Text style={[s.heroClient, narrow && { fontSize: 24, lineHeight: 29 }]} numberOfLines={2} selectable>
@@ -226,9 +286,10 @@ export default function OrderDetailScreen() {
           </View>
           {it.names.length > 0 && (
             <View style={s.heroItems}>
-              {it.names.slice(0, 3).map((n, k) => (
-                <View key={k} style={s.heroItem}>
-                  <Text style={s.heroItemText} numberOfLines={1}>{n}</Text>
+              {order.items.filter(x => !!x.product_name?.trim() || Number(x.quantity) > 0).slice(0, 3).map((x, k) => (
+                <View key={k} style={[s.heroItem, enter(k, 'pop', { base: 260, step: 70 })]}>
+                  <View style={[s.heroDot, { backgroundColor: itemTone(itemStatusOf(x), colors, isDark).dot }]} />
+                  <Text style={s.heroItemText} numberOfLines={1}>{`${Number(x.quantity) || 1}× ${x.product_name?.trim() || 'Sin nombre'}`}</Text>
                 </View>
               ))}
               {it.names.length > 3 && (
@@ -259,24 +320,24 @@ export default function OrderDetailScreen() {
         </View>
       </View>
 
-      {/* Cifras clave en vidrio, debajo de la cabecera */}
+      {/* Cifras clave: cada una con su color para distinguirlas de un vistazo */}
       <View style={s.tiles}>
-        {tile(<Package size={16} color={colors.brand} />, 'Productos', String(it.count), it.units > it.count ? `${it.units} unidades` : it.count === 1 ? '1 línea' : `${it.count} líneas`)}
-        {tile(<Euro size={16} color={colors.brand} />, 'Base sin IVA', formatCurrency(order.total_ex_vat), `IVA ${formatCurrency(order.total_vat)}`)}
+        {tile(Euro, '#FF8718', tiny ? 'Base' : 'Base sin IVA', formatCurrency(order.total_ex_vat), `+ IVA ${formatCurrency(order.total_vat)}`)}
         {hasCost
-          ? tile(<Receipt size={16} color={colors.brand} />, 'Beneficio', formatCurrency(profit), 'Venta menos coste')
-          : tile(<Truck size={16} color={colors.brand} />, 'Envío', shipTotal > 0 ? formatCurrency(shipTotal) : 'Sin envío', shipLines.length ? `${shipLines.length} línea${shipLines.length === 1 ? '' : 's'}` : 'Incluido o no aplica')}
-        {tile(<Factory size={16} color={colors.brand} />, 'Fabricante', order.manufacturer_name || '—', `Año ${order.year}`)}
+          ? tile(Receipt, '#22A447', 'Beneficio', formatCurrency(profit), tiny ? 'Venta − coste' : 'Venta sin IVA − coste', profit >= 0 ? colors.success : colors.error)
+          : tile(Truck, '#22A447', 'Envío', shipTotal > 0 ? formatCurrency(shipTotal) : 'Sin envío', shipLines.length ? `${shipLines.length} línea${shipLines.length === 1 ? '' : 's'}` : 'Incluido o no aplica')}
+        {tile(Package, '#3F6E92', 'Productos', `${prog.shipped} de ${prog.total}`, prog.total === 0 ? 'Sin productos' : `enviados · ${it.units} ud${it.units === 1 ? '' : 's'}.`)}
+        {tile(Factory, '#7B5CC4', 'Fabricante', order.manufacturer_name || '—', `${order.manufacturer_code ? order.manufacturer_code + ' · ' : ''}año ${order.year}`)}
       </View>
     </View>
   );
 
   // ---------------------------------------------------------------- bloques
   let cardN = 0;
-  const card = (title: string, icon: React.ReactNode, body: React.ReactNode, opts: { trailing?: React.ReactNode; footer?: string; flush?: boolean; grow?: boolean } = {}) => (
-    <View style={[s.card, panel(colors, isDark), opts.grow && { flexGrow: 1 }, enter(cardN++, 'rise', { base: 320, step: 70 })]}>
+  const card = (title: string, icon: React.ReactNode, body: React.ReactNode, opts: { trailing?: React.ReactNode; footer?: string; flush?: boolean; grow?: boolean; tint?: string; testID?: string } = {}) => (
+    <View style={[s.card, panel(colors, isDark), opts.grow && { flexGrow: 1 }, enter(cardN++, 'rise', { base: 360, step: 90 })]} testID={opts.testID}>
       <View style={s.cardHead}>
-        <View style={s.cardIcon}>{icon}</View>
+        <View style={[s.cardIcon, opts.tint ? { backgroundColor: opts.tint } : null]}>{icon}</View>
         <Text style={s.cardTitle} accessibilityRole="header">{title}</Text>
         {opts.trailing}
       </View>
@@ -285,165 +346,190 @@ export default function OrderDetailScreen() {
     </View>
   );
 
-  const clientCols = wide ? 3 : width >= 600 ? 2 : 1;
+  // ---- Progreso: pasos del pedido + productos enviados
+  const stepIdx = STEPS.indexOf(order.status);
+  const allShipped = prog.total > 0 && prog.shipped === prog.total;
+  const progress = card(
+    'Progreso del pedido',
+    <Route size={16} color="#FFFFFF" />,
+    <View style={{ gap: 18 }}>
+      {order.status === 'cancelled' ? (
+        <View style={[s.cancelBox, { backgroundColor: colors.statusCancelledBg }]}>
+          <XCircle size={22} color={colors.statusCancelledText} />
+          <View style={{ flex: 1, minWidth: 0 }}>
+            <Text style={[s.cancelTitle, { color: colors.statusCancelledText }]}>Pedido cancelado</Text>
+            <Text style={s.muted}>No cuenta en la facturación. Puedes reactivarlo cambiando el estado.</Text>
+          </View>
+          <Pressable onPress={() => setSheet('status')} style={[s.smallBtn, { backgroundColor: colors.surface }]} accessibilityRole="button" testID="reactivate-btn">
+            <Text style={[s.smallBtnText, { color: colors.text }]}>Cambiar estado</Text>
+          </Pressable>
+        </View>
+      ) : (
+        <View style={s.steps} accessibilityRole={'list' as never}>
+          <View style={[s.track, { backgroundColor: colors.fill }]}>
+            <View style={[s.trackFill, { width: `${(Math.max(stepIdx, 0) / (STEPS.length - 1)) * 100}%`, backgroundColor: stColor }, enter(0, 'grow', { base: 500 })]} />
+          </View>
+          {STEPS.map((step, k) => {
+            const cfg = statusConfig[step];
+            const Icon = STATUS_ICONS[step];
+            const done = k < stepIdx;
+            const current = k === stepIdx;
+            const col = current || done ? stColor : colors.textTertiary;
+            return (
+              <Pressable
+                key={step}
+                onPress={() => void changeStatus(step)}
+                disabled={busy || current}
+                style={s.step}
+                accessibilityRole="button"
+                accessibilityState={{ selected: current }}
+                accessibilityLabel={`${cfg.label}${current ? ' (estado actual)' : done ? ' (hecho)' : ''}`}
+                testID={`step-${step}`}
+              >
+                <View
+                  key={`${step}-${order.status}`}
+                  style={[
+                    s.stepDot,
+                    current || done ? { backgroundColor: stColor, borderColor: stColor } : { backgroundColor: colors.surface, borderColor: colors.border },
+                    enter(k, 'bump', { base: 420, step: 110 }),
+                    current && pulse(stColor + '88'),
+                  ]}
+                >
+                  {done ? <Check size={16} color="#FFFFFF" strokeWidth={3} /> : <Icon size={15} color={current ? '#FFFFFF' : colors.textTertiary} strokeWidth={2.4} />}
+                </View>
+                <Text style={[s.stepLabel, tiny && { fontSize: 11, letterSpacing: -0.2 }, { color: current ? col : done ? colors.text : colors.textSecondary }, current && { fontWeight: '800' }]} numberOfLines={1}>{cfg.label}</Text>
+              </Pressable>
+            );
+          })}
+        </View>
+      )}
+
+      {prog.total > 0 && (
+        <View style={s.prodProg}>
+          <View style={s.prodProgHead}>
+            <Text style={s.prodProgTitle}>Productos</Text>
+            <View style={s.legend}>
+              {(['shipped', 'pending', 'none'] as ItemStatus[]).filter(k => prog[k] > 0).map(k => (
+                <View key={k} style={s.legendItem}>
+                  <View style={[s.chipDot, { backgroundColor: itemTone(k, colors, isDark).dot }]} />
+                  <Text style={s.legendText}>{prog[k]} {k === 'shipped' ? (prog[k] === 1 ? 'enviado' : 'enviados') : k === 'pending' ? (prog[k] === 1 ? 'pendiente' : 'pendientes') : 'sin empezar'}</Text>
+                </View>
+              ))}
+            </View>
+          </View>
+          <View style={s.segments}>
+            {order.items.map((x, k) => (
+              <View key={k} style={[s.segment, { backgroundColor: itemStatusOf(x) === 'none' ? colors.fill : itemTone(itemStatusOf(x), colors, isDark).dot }, enter(k, 'grow', { base: 600, step: 90, duration: 700 })]} {...fx('tint')} />
+            ))}
+          </View>
+          {allShipped && (order.status === 'pending' || order.status === 'processing') && (
+            <Pressable onPress={() => void changeStatus('shipped')} style={[s.suggest, { backgroundColor: colors.successBg, borderColor: colors.successBorder }, enter(0, 'pop', { base: 300 })]} accessibilityRole="button" testID="suggest-shipped">
+              <Truck size={18} color={colors.success} />
+              <Text style={[s.suggestText, { color: colors.success }]}>Todos los productos están enviados. Marcar el pedido como «Enviado»</Text>
+            </Pressable>
+          )}
+        </View>
+      )}
+    </View>,
+    { tint: stColor, testID: 'progress-card' },
+  );
+
+  // ---- Cliente (el nombre ya está arriba): datos en bloques cortos
+  const clientCols = width >= 1280 ? 3 : width >= 360 ? 2 : 1;
   const client = card(
     'Cliente',
-    <Building2 size={16} color={colors.onPrimary} />,
-    <>
-      <Text style={s.company} selectable>{c.nombre_empresa || 'Sin nombre de empresa'}</Text>
-      <View style={s.grid}>
-        <Cell s={s} cols={clientCols} icon={<User size={14} color={colors.accent} />} label="Contacto" value={c.contacto} />
-        <Cell s={s} cols={clientCols} icon={<Briefcase size={14} color={colors.accent} />} label="Departamento" value={c.departamento} />
-        <Cell s={s} cols={clientCols} icon={<IdCard size={14} color={colors.accent} />} label="NIF" value={c.nif} />
-        <Cell s={s} cols={clientCols} icon={<Phone size={14} color={colors.accent} />} label={phones.length > 1 ? 'Teléfonos' : 'Teléfono'} value={phones.length ? undefined : ''}>
-          {phones.map(t => (
-            <Text key={t} style={[s.cellValue, s.link]} onPress={() => void Linking.openURL(`tel:${t.replace(/\s/g, '')}`)} accessibilityRole="link" selectable>
-              {t}
-            </Text>
-          ))}
-        </Cell>
-        <Cell s={s} cols={clientCols} icon={<Mail size={14} color={colors.accent} />} label="Email" value={c.email ? undefined : ''}>
-          {!!c.email && (
-            <Text style={[s.cellValue, s.link]} onPress={() => void Linking.openURL(`mailto:${c.email}`)} accessibilityRole="link" selectable numberOfLines={2}>
-              {c.email}
-            </Text>
-          )}
-        </Cell>
-        <Cell s={s} cols={clientCols} icon={<MapPin size={14} color={colors.accent} />} label="Dirección" value={addressLines.length ? addressLines.join('\n') : ''} />
-      </View>
-    </>,
-    { grow: true },
+    <UserRound size={16} color="#FFFFFF" />,
+    <View style={s.grid}>
+      <Cell s={s} cols={clientCols} icon={<User size={14} color={colors.accent} />} label="Contacto" value={c.contacto} />
+      <Cell s={s} cols={clientCols} icon={<Briefcase size={14} color={colors.accent} />} label="Departamento" value={c.departamento} />
+      <Cell s={s} cols={clientCols} icon={<IdCard size={14} color={colors.accent} />} label="NIF" value={c.nif} />
+      <Cell s={s} cols={clientCols} icon={<Phone size={14} color={colors.accent} />} label={phones.length > 1 ? 'Teléfonos' : 'Teléfono'} value={phones.length ? undefined : ''}>
+        {phones.map(t => (
+          <Text key={t} style={[s.cellValue, s.link]} onPress={() => void Linking.openURL(`tel:${t.replace(/\s/g, '')}`)} accessibilityRole="link" selectable>
+            {t}
+          </Text>
+        ))}
+      </Cell>
+      <Cell s={s} cols={clientCols} full={clientCols < 3} icon={<Mail size={14} color={colors.accent} />} label="Email" value={c.email ? undefined : ''}>
+        {!!c.email && (
+          <Text style={[s.cellValue, s.link]} onPress={() => void Linking.openURL(`mailto:${c.email}`)} accessibilityRole="link" selectable numberOfLines={2}>
+            {c.email}
+          </Text>
+        )}
+      </Cell>
+      <Cell s={s} cols={clientCols} full={clientCols < 3} icon={<MapPin size={14} color={colors.accent} />} label="Dirección" value={addressLines.length ? addressLines.join('\n') : ''} />
+    </View>,
+    { grow: true, tint: '#3F6E92' },
   );
 
+  const refRow = editingRef ? (
+    // Editando: una fila normal (no un botón), porque en web un botón desactivado bloqueaba el clic en ✓ y ✗
+    <View style={[s.row, s.rowSep]}>
+      <Text style={s.rowLabel}>Ref. manual</Text>
+      <View style={s.refEditRow}>
+        <TextInput
+          value={refValue}
+          onChangeText={setRefValue}
+          placeholder="Referencia manual"
+          placeholderTextColor={colors.textTertiary}
+          style={s.refInput}
+          autoFocus
+          onSubmitEditing={saveRef}
+          returnKeyType="done"
+          accessibilityLabel="Referencia manual"
+          testID="ref-input"
+        />
+        <Pressable onPress={saveRef} disabled={busy} style={[s.iconBtn, { backgroundColor: colors.primaryFill }]} accessibilityRole="button" accessibilityLabel="Guardar referencia manual" testID="ref-save">
+          <Check size={18} color={colors.onPrimary} />
+        </Pressable>
+        <Pressable onPress={() => setEditingRef(false)} style={[s.iconBtn, { backgroundColor: colors.fill }]} accessibilityRole="button" accessibilityLabel="Cancelar" testID="ref-cancel">
+          <X size={18} color={colors.text} />
+        </Pressable>
+      </View>
+    </View>
+  ) : (
+    <Pressable
+      onPress={() => {
+        setRefValue(order.custom_reference || '');
+        setEditingRef(true);
+      }}
+      style={({ hovered }: { pressed: boolean; hovered?: boolean }) => [s.row, s.rowSep, hovered && { backgroundColor: colors.fill }]}
+      accessibilityRole="button"
+      accessibilityLabel="Editar referencia manual"
+      testID="ref-edit"
+    >
+      <Text style={s.rowLabel}>Ref. manual</Text>
+      <View style={s.rowRight}>
+        <Text style={s.rowValue}>{order.custom_reference || '—'}</Text>
+        <Pencil size={14} color={colors.textSecondary} />
+      </View>
+    </Pressable>
+  );
+
+  // ---- Pedido y documentos: rejilla de datos cortos, en todos los tamaños
+  const docCols = width >= 1280 ? 2 : width >= 600 ? 3 : 2;
   const orderInfo = card(
     'Pedido y documentos',
-    <FileText size={16} color={colors.onPrimary} />,
-    <>
-      <InfoRow s={s} first label="Fabricante" value={`${order.manufacturer_name} (${order.manufacturer_code})`} />
-      <InfoRow s={s} label="Año" value={String(order.year)} />
-      <InfoRow s={s} label="Nº pedido del cliente" value={c.numero_referencia_pedido} strong />
-      <InfoRow s={s} label="Oferta / proforma" value={c.oferta_proforma} />
-      <InfoRow s={s} label="Nº factura" value={c.numero_factura} strong />
-      <InfoRow s={s} label="Nº recibo / albarán" value={c.numero_recibo} />
-      <InfoRow s={s} label="Condiciones de entrega" value={c.condiciones_entrega} stacked />
-      <InfoRow s={s} label="Condiciones de pago" value={c.condiciones_pago} stacked />
-      {/* Editando: una fila normal (no un botón), porque en web un botón desactivado bloqueaba el clic en ✓ y ✗ */}
-      {editingRef ? (
-        <View style={[s.row, s.rowSep]}>
-          <Text style={s.rowLabel}>Ref. manual</Text>
-          <View style={s.refEditRow}>
-            <TextInput
-              value={refValue}
-              onChangeText={setRefValue}
-              placeholder="Referencia manual"
-              placeholderTextColor={colors.textTertiary}
-              style={s.refInput}
-              autoFocus
-              onSubmitEditing={saveRef}
-              returnKeyType="done"
-              accessibilityLabel="Referencia manual"
-              testID="ref-input"
-            />
-            <Pressable onPress={saveRef} disabled={busy} style={[s.iconBtn, { backgroundColor: colors.primaryFill }]} accessibilityRole="button" accessibilityLabel="Guardar referencia manual" testID="ref-save">
-              <Check size={18} color={colors.onPrimary} />
-            </Pressable>
-            <Pressable onPress={() => setEditingRef(false)} style={[s.iconBtn, { backgroundColor: colors.fill }]} accessibilityRole="button" accessibilityLabel="Cancelar" testID="ref-cancel">
-              <X size={18} color={colors.text} />
-            </Pressable>
-          </View>
-        </View>
-      ) : (
-        <Pressable
-          onPress={() => {
-            setRefValue(order.custom_reference || '');
-            setEditingRef(true);
-          }}
-          style={({ hovered }: { pressed: boolean; hovered?: boolean }) => [s.row, s.rowSep, hovered && { backgroundColor: colors.fill }]}
-          accessibilityRole="button"
-          accessibilityLabel="Editar referencia manual"
-          testID="ref-edit"
-        >
-          <Text style={s.rowLabel}>Ref. manual</Text>
-          <View style={s.rowRight}>
-            <Text style={s.rowValue}>{order.custom_reference || '—'}</Text>
-            <Pencil size={14} color={colors.textSecondary} />
-          </View>
-        </Pressable>
-      )}
-      <InfoRow s={s} label="Creado" value={formatDate(order.created_at)} />
-      <InfoRow s={s} label="Última actualización" value={formatDate(order.updated_at)} />
-    </>,
-    { flush: true },
-  );
-
-  /** Pedido y documentos en rejilla de dos columnas (ordenador): los mismos datos que la lista, en la mitad de alto */
-  // lado a lado con el cliente desde 1280 px (2 columnas); por debajo, a todo el ancho (3 columnas)
-  const sideBySide = width >= 1280;
-  const docCols = sideBySide ? 2 : 3;
-  const orderInfoGrid = card(
-    'Pedido y documentos',
-    <FileText size={16} color={colors.onPrimary} />,
+    <FileText size={16} color="#FFFFFF" />,
     <>
       <View style={[s.grid, s.cardBody]}>
-        <Cell s={s} cols={docCols} icon={<Factory size={14} color={colors.accent} />} label="Fabricante" value={`${order.manufacturer_name} (${order.manufacturer_code}) · ${order.year}`} />
-        <Cell s={s} cols={docCols} icon={<Receipt size={14} color={colors.accent} />} label="Nº pedido del cliente" value={c.numero_referencia_pedido} />
+        <Cell s={s} cols={docCols} icon={<Receipt size={14} color={colors.accent} />} label="Nº pedido del cliente" value={c.numero_referencia_pedido} strong />
         <Cell s={s} cols={docCols} icon={<FileText size={14} color={colors.accent} />} label="Oferta / proforma" value={c.oferta_proforma} />
-        <Cell s={s} cols={docCols} icon={<Receipt size={14} color={colors.accent} />} label="Nº factura" value={c.numero_factura} />
+        <Cell s={s} cols={docCols} icon={<Receipt size={14} color={colors.accent} />} label="Nº factura" value={c.numero_factura} strong />
         <Cell s={s} cols={docCols} icon={<FileText size={14} color={colors.accent} />} label="Nº recibo / albarán" value={c.numero_recibo} />
-        <Cell s={s} cols={docCols} icon={<CalendarDays size={14} color={colors.accent} />} label="Creado · actualizado" value={`${formatDate(order.created_at)} · ${formatDate(order.updated_at)}`} />
         <Cell s={s} cols={docCols} icon={<Truck size={14} color={colors.accent} />} label="Condiciones de entrega" value={c.condiciones_entrega} />
         <Cell s={s} cols={docCols} icon={<Euro size={14} color={colors.accent} />} label="Condiciones de pago" value={c.condiciones_pago} />
+        <Cell s={s} cols={docCols} icon={<CalendarDays size={14} color={colors.accent} />} label="Creado" value={formatDate(order.created_at)} />
+        <Cell s={s} cols={docCols} icon={<CalendarDays size={14} color={colors.accent} />} label="Actualizado" value={formatDate(order.updated_at)} />
       </View>
-      {/* Editando: una fila normal (no un botón), porque en web un botón desactivado bloqueaba el clic en ✓ y ✗ */}
-      {editingRef ? (
-        <View style={[s.row, s.rowSep]}>
-          <Text style={s.rowLabel}>Ref. manual</Text>
-          <View style={s.refEditRow}>
-            <TextInput
-              value={refValue}
-              onChangeText={setRefValue}
-              placeholder="Referencia manual"
-              placeholderTextColor={colors.textTertiary}
-              style={s.refInput}
-              autoFocus
-              onSubmitEditing={saveRef}
-              returnKeyType="done"
-              accessibilityLabel="Referencia manual"
-              testID="ref-input"
-            />
-            <Pressable onPress={saveRef} disabled={busy} style={[s.iconBtn, { backgroundColor: colors.primaryFill }]} accessibilityRole="button" accessibilityLabel="Guardar referencia manual" testID="ref-save">
-              <Check size={18} color={colors.onPrimary} />
-            </Pressable>
-            <Pressable onPress={() => setEditingRef(false)} style={[s.iconBtn, { backgroundColor: colors.fill }]} accessibilityRole="button" accessibilityLabel="Cancelar" testID="ref-cancel">
-              <X size={18} color={colors.text} />
-            </Pressable>
-          </View>
-        </View>
-      ) : (
-        <Pressable
-          onPress={() => {
-            setRefValue(order.custom_reference || '');
-            setEditingRef(true);
-          }}
-          style={({ hovered }: { pressed: boolean; hovered?: boolean }) => [s.row, s.rowSep, hovered && { backgroundColor: colors.fill }]}
-          accessibilityRole="button"
-          accessibilityLabel="Editar referencia manual"
-          testID="ref-edit"
-        >
-          <Text style={s.rowLabel}>Ref. manual</Text>
-          <View style={s.rowRight}>
-            <Text style={s.rowValue}>{order.custom_reference || '—'}</Text>
-            <Pencil size={14} color={colors.textSecondary} />
-          </View>
-        </Pressable>
-      )}
+      {refRow}
     </>,
-    { flush: true, grow: true },
+    { flush: true, grow: true, tint: '#7B5CC4' },
   );
 
   const followUp = card(
     'Seguimiento',
-    <Clock size={16} color={colors.onPrimary} />,
+    <Clock size={16} color="#FFFFFF" />,
     hasFollowUp ? (
       <>
         <InfoRow s={s} first label="Fecha prevista" value={order.expected_date ? `${formatISODate(order.expected_date)}${late !== null ? (late > 0 ? ` · ${late} día${late === 1 ? '' : 's'} de retraso` : ' · es hoy') : ''}` : ''} tone={lateTone ? colors.error : undefined} />
@@ -453,12 +539,12 @@ export default function OrderDetailScreen() {
     ) : (
       <Text style={[s.muted, s.pad]}>Sin fecha prevista, responsable ni siguiente acción. Puedes añadirlos en «Editar pedido».</Text>
     ),
-    { flush: true },
+    { flush: true, tint: lateTone ? colors.error : '#5B6B73' },
   );
 
   const finance = card(
     'Resumen económico',
-    <Euro size={16} color={colors.onPrimary} />,
+    <Euro size={16} color="#FFFFFF" />,
     <>
       <InfoRow s={s} first label="Productos (sin IVA)" value={formatCurrency(order.total_ex_vat)} num />
       <InfoRow s={s} label="IVA de los productos" value={formatCurrency(order.total_vat)} num />
@@ -472,146 +558,105 @@ export default function OrderDetailScreen() {
     { flush: true, footer: hasCost ? `Beneficio bruto de los productos: ${formatCurrency(profit)} (venta sin IVA − coste).` : undefined },
   );
 
-  // Tabla tipo Excel en ordenador; filas compactas en móvil
+  /** Dato pequeño de un producto en móvil: etiqueta arriba, cifra debajo */
+  const metric = (label: string, value: string, tone?: string) => (
+    <View style={s.metric}>
+      <Text style={s.metricLabel}>{label}</Text>
+      <Text style={[s.metricValue, tone ? { color: tone } : null]} numberOfLines={1}>{value}</Text>
+    </View>
+  );
+
+  // Móvil y tablet: cada producto es un bloque con su color de estado
   const products = card(
     'Productos',
-    <Package size={16} color={colors.onPrimary} />,
-    tableWide ? (
-      <View>
-        <View style={[s.tr, s.th]}>
-          <Text style={[s.thText, s.cQty]}>Cant.</Text>
-          <Text style={[s.thText, s.cName]}>Equipo y referencia</Text>
-          <Text style={[s.thText, s.cNum]}>Neto sin IVA</Text>
-          <Text style={[s.thText, s.cNum]}>Coste ud.</Text>
-          <Text style={[s.thText, s.cNum]}>Beneficio</Text>
-          <Text style={[s.thText, s.cNum]}>Con IVA</Text>
+    <Package size={16} color="#FFFFFF" />,
+    <View>
+      {order.items.map((x, i) => (
+        <View key={i} style={[s.item, i > 0 && s.rowSep, rowTone(x), enter(i, 'slide', { base: 520, step: 80 })]} {...fx('tint')} testID={`item-row-${i}`}>
+          <View style={s.itemTop}>
+            <View style={s.qtyPill}><Text style={s.qtyPillText}>{x.quantity}×</Text></View>
+            <Text style={s.itemName} selectable>{x.product_name || 'Sin nombre'}</Text>
+          </View>
+          <View style={s.itemMid}>
+            {itemChip(i, x)}
+            <Text style={s.itemTotal}>{formatCurrency(x.valor_sin_iva)}</Text>
+          </View>
+          <View style={s.metrics}>
+            {metric('Neto ud.', formatCurrency(x.pvp_neto_sin_iva))}
+            {!!x.descuento_porcentaje && metric('Dto.', `${x.descuento_porcentaje} %`)}
+            {metric('IVA', `${x.vat_percentage} %`)}
+            {metric('Con IVA', formatCurrency(x.valor_con_iva))}
+            {x.costo_unitario > 0 && metric('Coste ud.', formatCurrency(x.costo_unitario))}
+            {x.costo_unitario > 0 && metric('Beneficio', formatCurrency(x.beneficio_bruto), x.beneficio_bruto >= 0 ? colors.success : colors.error)}
+          </View>
         </View>
-        {order.items.map((it, i) => (
-          <View key={i} style={[s.tr, s.rowSep, i % 2 === 1 && { backgroundColor: colors.surfaceAlt }]}>
-            <Text style={[s.td, s.cQty, s.tdStrong]}>{it.quantity}</Text>
-            <View style={s.cName}>
-              <Text style={[s.td, s.tdStrong]} selectable>{it.product_name || 'Sin nombre'}</Text>
-              <Text style={s.tdSub}>
-                {[
-                  it.tpv_unitario > 0 ? `${formatCurrency(it.tpv_unitario)} ud.` : '',
-                  it.total_sin_iva > 0 ? `importe ${formatCurrency(it.total_sin_iva)}` : '',
-                  it.descuento_porcentaje ? `dto. ${it.descuento_porcentaje} %` : '',
-                  `IVA ${it.vat_percentage} %`,
-                ].filter(Boolean).join(' · ')}
-              </Text>
-            </View>
-            <Text style={[s.td, s.cNum, s.noWrap, s.tdStrong]}>{formatCurrency(it.valor_sin_iva)}</Text>
-            <Text style={[s.td, s.cNum, s.noWrap]}>{it.costo_unitario > 0 ? formatCurrency(it.costo_unitario) : '—'}</Text>
-            <Text style={[s.td, s.cNum, s.noWrap, it.costo_unitario > 0 && { color: it.beneficio_bruto >= 0 ? colors.success : colors.error, fontWeight: '600' }]}>
-              {it.costo_unitario > 0 ? formatCurrency(it.beneficio_bruto) : '—'}
-            </Text>
-            <Text style={[s.td, s.cNum, s.noWrap]}>{formatCurrency(it.valor_con_iva)}</Text>
-          </View>
-        ))}
-      </View>
-    ) : (
-      <View>
-        {order.items.map((it, i) => (
-          <View key={i} style={[s.item, i > 0 && s.rowSep]}>
-            <View style={s.itemTop}>
-              <Text style={s.qtyBadge}>{it.quantity}×</Text>
-              <Text style={s.itemName} selectable>{it.product_name || 'Sin nombre'}</Text>
-              <Text style={s.itemTotal}>{formatCurrency(it.valor_sin_iva)}</Text>
-            </View>
-            <Text style={s.muted}>
-              {formatCurrency(it.pvp_neto_sin_iva)} neto ud.{it.descuento_porcentaje ? ` (dto. ${it.descuento_porcentaje} %)` : ''} · IVA {it.vat_percentage} % · con IVA {formatCurrency(it.valor_con_iva)}
-            </Text>
-            {it.costo_unitario > 0 && (
-              <Text style={s.muted}>
-                Coste ud. {formatCurrency(it.costo_unitario)} · beneficio{' '}
-                <Text style={{ color: it.beneficio_bruto >= 0 ? colors.success : colors.error, fontWeight: '600' }}>{formatCurrency(it.beneficio_bruto)}</Text>
-              </Text>
-            )}
-          </View>
-        ))}
-      </View>
-    ),
+      ))}
+    </View>,
     { flush: true, trailing: <Text style={s.cardCount}>{order.items.length}</Text> },
   );
 
   const shipping = shipLines.length > 0 && card(
     'Gastos de envío',
-    <Truck size={16} color={colors.onPrimary} />,
-    tableWide ? (
-      <View>
-        <View style={[s.tr, s.th]}>
-          <Text style={[s.thText, s.cQty]}>Cant.</Text>
-          <Text style={[s.thText, s.cName]}>Concepto</Text>
-          <Text style={[s.thText, s.cNum]}>Coste ud.</Text>
-          <Text style={[s.thText, s.cNum]}>Sin IVA</Text>
-          <Text style={[s.thText, s.cDto]}>IVA</Text>
-          <Text style={[s.thText, s.cNum]}>Con IVA</Text>
+    <Truck size={16} color="#FFFFFF" />,
+    <View>
+      {shipLines.map((x, i) => (
+        <View key={i} style={[s.item, i > 0 && s.rowSep]}>
+          <View style={s.itemMid}>
+            <Text style={[s.itemName, { flex: 1 }]}>{x.description || 'Envío'}</Text>
+            <Text style={s.itemTotal}>{formatCurrency(x.valor_con_iva)}</Text>
+          </View>
+          <View style={s.metrics}>
+            {metric('Cantidad', String(x.quantity))}
+            {metric('Coste ud.', formatCurrency(x.costo_unitario))}
+            {metric('Sin IVA', formatCurrency(x.valor_sin_iva))}
+            {metric('IVA', `${x.vat_percentage} %`)}
+          </View>
         </View>
-        {shipLines.map((x, i) => (
-          <View key={i} style={[s.tr, s.rowSep]}>
-            <Text style={[s.td, s.cQty, s.tdStrong]}>{x.quantity}</Text>
-            <Text style={[s.td, s.cName, s.tdStrong]}>{x.description || 'Envío'}</Text>
-            <Text style={[s.td, s.cNum, s.noWrap]}>{formatCurrency(x.costo_unitario)}</Text>
-            <Text style={[s.td, s.cNum, s.noWrap]}>{formatCurrency(x.valor_sin_iva)}</Text>
-            <Text style={[s.td, s.cDto, s.noWrap]}>{x.vat_percentage} %</Text>
-            <Text style={[s.td, s.cNum, s.noWrap, s.tdStrong]}>{formatCurrency(x.valor_con_iva)}</Text>
-          </View>
-        ))}
-      </View>
-    ) : (
-      <View>
-        {shipLines.map((x, i) => (
-          <View key={i} style={[s.item, i > 0 && s.rowSep]}>
-            <View style={s.itemTop}>
-              <Text style={s.itemName}>{x.description || 'Envío'}</Text>
-              <Text style={s.itemTotal}>{formatCurrency(x.valor_con_iva)}</Text>
-            </View>
-            <Text style={s.muted}>
-              {x.quantity} × {formatCurrency(x.costo_unitario)} · {formatCurrency(x.valor_sin_iva)} sin IVA · IVA {x.vat_percentage} % · total con IVA
-            </Text>
-          </View>
-        ))}
-      </View>
-    ),
-    { flush: true, trailing: <Text style={s.cardCount}>{shipLines.length}</Text> },
+      ))}
+    </View>,
+    { flush: true, trailing: <Text style={s.cardCount}>{shipLines.length}</Text>, tint: '#22A447' },
   );
 
   const hasUnitPrice = order.items.some(i => i.tpv_unitario > 0);
   const hasDiscount = order.items.some(i => !!i.descuento_porcentaje);
-  /** Ordenador: productos a todo el ancho, como una factura (líneas, gastos de envío y totales alineados a la derecha) */
+  /** Ordenador: productos a todo el ancho, como una factura (líneas con su estado, gastos de envío y totales a la derecha) */
   const invoice = card(
     'Productos',
-    <Package size={16} color={colors.onPrimary} />,
+    <Package size={16} color="#FFFFFF" />,
     <View>
       <View style={[s.tr, s.th]}>
         <Text style={[s.thText, s.cQty]}>Cant.</Text>
         <Text style={[s.thText, s.cName]}>Equipo y referencia</Text>
+        <Text style={[s.thText, s.cState]}>Estado</Text>
         {hasUnitPrice && <Text style={[s.thText, s.cNum]}>Precio ud.</Text>}
         {hasDiscount && <Text style={[s.thText, s.cDto]}>Dto.</Text>}
         <Text style={[s.thText, s.cNum]}>Neto sin IVA</Text>
         <Text style={[s.thText, s.cDto]}>IVA</Text>
-        {hasCost && <Text style={[s.thText, s.cNum]}>Coste ud.</Text>}
         {hasCost && <Text style={[s.thText, s.cNum]}>Beneficio</Text>}
         <Text style={[s.thText, s.cNum]}>Con IVA</Text>
       </View>
-      {order.items.map((it, i) => (
-        <View key={i} style={[s.tr, s.rowSep, i % 2 === 1 && { backgroundColor: colors.surfaceAlt }]}>
-          <Text style={[s.td, s.cQty, s.tdStrong]}>{it.quantity}</Text>
+      {order.items.map((x, i) => (
+        <View key={i} style={[s.tr, s.rowSep, rowTone(x), enter(i, 'slide', { base: 520, step: 80 })]} {...fx('tint', 'hl')} testID={`item-row-${i}`}>
+          <Text style={[s.td, s.cQty, s.tdStrong]}>{x.quantity}</Text>
           <View style={s.cName}>
-            <Text style={[s.td, s.tdStrong]} selectable>{it.product_name || 'Sin nombre'}</Text>
-            {it.total_sin_iva > 0 && <Text style={s.tdSub}>Importe de la línea antes de dto.: {formatCurrency(it.total_sin_iva)}</Text>}
+            <Text style={[s.td, s.tdStrong]} selectable>{x.product_name || 'Sin nombre'}</Text>
+            {(x.total_sin_iva > 0 || x.costo_unitario > 0) && (
+              <Text style={s.tdSub}>
+                {[x.total_sin_iva > 0 ? `Importe antes de dto.: ${formatCurrency(x.total_sin_iva)}` : '', x.costo_unitario > 0 ? `coste ud. ${formatCurrency(x.costo_unitario)}` : ''].filter(Boolean).join(' · ')}
+              </Text>
+            )}
           </View>
-          {hasUnitPrice && <Text style={[s.td, s.cNum, s.noWrap, !(it.tpv_unitario > 0) && s.dim]}>{it.tpv_unitario > 0 ? formatCurrency(it.tpv_unitario) : '—'}</Text>}
-          {hasDiscount && <Text style={[s.td, s.cDto, s.noWrap, !it.descuento_porcentaje && s.dim]}>{it.descuento_porcentaje ? `${it.descuento_porcentaje} %` : '—'}</Text>}
-          <Text style={[s.td, s.cNum, s.noWrap, s.tdStrong]}>{formatCurrency(it.valor_sin_iva)}</Text>
-          <Text style={[s.td, s.cDto, s.noWrap]}>{it.vat_percentage} %</Text>
-          {hasCost && <Text style={[s.td, s.cNum, s.noWrap, !(it.costo_unitario > 0) && s.dim]}>{it.costo_unitario > 0 ? formatCurrency(it.costo_unitario) : '—'}</Text>}
+          <View style={s.cState}>{itemChip(i, x)}</View>
+          {hasUnitPrice && <Text style={[s.td, s.cNum, s.noWrap, !(x.tpv_unitario > 0) && s.dim]}>{x.tpv_unitario > 0 ? formatCurrency(x.tpv_unitario) : '—'}</Text>}
+          {hasDiscount && <Text style={[s.td, s.cDto, s.noWrap, !x.descuento_porcentaje && s.dim]}>{x.descuento_porcentaje ? `${x.descuento_porcentaje} %` : '—'}</Text>}
+          <Text style={[s.td, s.cNum, s.noWrap, s.tdStrong]}>{formatCurrency(x.valor_sin_iva)}</Text>
+          <Text style={[s.td, s.cDto, s.noWrap]}>{x.vat_percentage} %</Text>
           {hasCost && (
-            <Text style={[s.td, s.cNum, s.noWrap, it.costo_unitario > 0 ? { color: it.beneficio_bruto >= 0 ? colors.success : colors.error, fontWeight: '600' } : s.dim]}>
-              {it.costo_unitario > 0 ? formatCurrency(it.beneficio_bruto) : '—'}
+            <Text style={[s.td, s.cNum, s.noWrap, x.costo_unitario > 0 ? { color: x.beneficio_bruto >= 0 ? colors.success : colors.error, fontWeight: '600' } : s.dim]}>
+              {x.costo_unitario > 0 ? formatCurrency(x.beneficio_bruto) : '—'}
             </Text>
           )}
-          <Text style={[s.td, s.cNum, s.noWrap]}>{formatCurrency(it.valor_con_iva)}</Text>
+          <Text style={[s.td, s.cNum, s.noWrap]}>{formatCurrency(x.valor_con_iva)}</Text>
         </View>
       ))}
 
@@ -657,6 +702,9 @@ export default function OrderDetailScreen() {
     { flush: true, trailing: <Text style={s.cardCount}>{order.items.length}</Text> },
   );
 
+  const sideBySide = width >= 1280;
+  const sheetItem = itemSheet !== null ? order.items[itemSheet] : undefined;
+
   return (
     <View style={s.root}>
       <Stack.Screen options={{ title: order.reference_number, headerShown: false }} />
@@ -664,42 +712,53 @@ export default function OrderDetailScreen() {
       <ScrollView {...scrollProps} contentContainerStyle={[s.content, content, { paddingBottom: bottomSpace }]}>
         {header}
         {desktop ? (
-          // Como una factura: datos (cliente | pedido y documentos), productos con sus totales a todo el ancho, seguimiento
+          // Ordenador: progreso, productos como una factura, y debajo cliente | pedido y documentos, seguimiento
           <>
+            {progress}
+            {invoice}
             {sideBySide ? (
               <View style={[s.cols, { alignItems: 'stretch' }]}>
                 <View style={s.colMain}>{client}</View>
-                <View style={s.colSide}>{orderInfoGrid}</View>
+                <View style={s.colSide}>{orderInfo}</View>
               </View>
             ) : (
               <>
                 {client}
-                {orderInfoGrid}
+                {orderInfo}
               </>
             )}
-            {invoice}
             {followUp}
           </>
         ) : (
           <>
-            {client}
-            {hasFollowUp && followUp}
+            {progress}
             {products}
             {shipping}
             {finance}
+            {client}
+            {followUp}
             {orderInfo}
-            {!hasFollowUp && followUp}
           </>
         )}
       </ScrollView>
 
       <SelectSheet
         visible={sheet === 'status'}
-        title="Cambiar estado"
-        options={STATUS_ORDER.map(st => ({ value: st, label: statusConfig[st].label }))}
+        title="Cambiar estado del pedido"
+        options={STATUS_ORDER.map(v => ({ value: v, label: statusConfig[v].label }))}
         selected={order.status}
         onSelect={v => void changeStatus(v as OrderStatus)}
         onClose={() => setSheet(null)}
+      />
+      <SelectSheet
+        visible={itemSheet !== null}
+        title={sheetItem ? `Estado de «${sheetItem.product_name || 'producto'}»` : 'Estado del producto'}
+        options={ITEM_STATUS_ORDER.map(v => ({ value: v, label: ITEM_STATUS_LABEL[v], hint: ITEM_STATUS_HINT[v] }))}
+        selected={sheetItem ? itemStatusOf(sheetItem) : undefined}
+        onSelect={v => {
+          if (itemSheet !== null) void changeItemStatus(itemSheet, v as ItemStatus);
+        }}
+        onClose={() => setItemSheet(null)}
       />
       <SelectSheet
         visible={sheet === 'more'}
@@ -722,17 +781,17 @@ export default function OrderDetailScreen() {
   );
 }
 
-/** Celda de la rejilla del cliente: icono + etiqueta pequeña encima y valor (o hijos, p. ej. enlaces) */
-function Cell({ s, cols, icon, label, value, children }: { s: Styles; cols: number; icon: React.ReactNode; label: string; value?: string; children?: React.ReactNode }) {
+/** Celda de una rejilla de datos: icono + etiqueta pequeña encima y valor (o hijos, p. ej. enlaces) */
+function Cell({ s, cols, icon, label, value, children, full, strong }: { s: Styles; cols: number; icon: React.ReactNode; label: string; value?: string; children?: React.ReactNode; full?: boolean; strong?: boolean }) {
   const empty = value !== undefined && !value.trim();
   return (
-    <View style={[s.cell, { flexBasis: cols === 1 ? '100%' : cols === 2 ? '47%' : '30%' }]}>
+    <View style={[s.cell, { flexBasis: full || cols === 1 ? '100%' : cols === 2 ? '44%' : '29%' }]}>
       <View style={s.cellHead}>
         {icon}
         <Text style={s.cellLabel}>{label}</Text>
       </View>
       {value !== undefined ? (
-        <Text style={[s.cellValue, empty && s.empty]} selectable>
+        <Text style={[s.cellValue, strong && !empty && { fontWeight: '700' }, empty && s.empty]} selectable>
           {empty ? '—' : value}
         </Text>
       ) : (
@@ -789,15 +848,46 @@ function makeStyles(c: ThemeColors) {
     heroCaption: { fontSize: 13, fontWeight: '700', color: 'rgba(0, 42, 57, 0.72)' },
     ref: { fontSize: 20, lineHeight: 25, fontWeight: '800', color: c.onPrimary, letterSpacing: 0.2, fontVariant: ['tabular-nums'] },
     // la flecha va dentro de la misma píldora que el estado, sobre un vidrio claro para que se lea encima del naranja
-    statusBtn: { flexDirection: 'row', alignItems: 'center', gap: 0, minHeight: 36, paddingRight: 10, borderRadius: 999, backgroundColor: 'rgba(255,255,255,0.78)' },
+    statusBtn: {
+      flexDirection: 'row', alignItems: 'center', gap: 8, minHeight: 40, paddingLeft: 5, paddingRight: 12, borderRadius: 999,
+      ...(Platform.OS === 'web' ? ({ boxShadow: '0 6px 18px rgba(0,42,57,0.22), inset 0 1px 0 rgba(255,255,255,0.6)', cursor: 'pointer' } as object) : {}),
+    },
+    statusIcon: { width: 30, height: 30, borderRadius: 15, alignItems: 'center', justifyContent: 'center' },
+    statusBtnText: { fontSize: 15, fontWeight: '800', letterSpacing: -0.2 },
+    heroDot: { width: 9, height: 9, borderRadius: 5, borderWidth: 1.5, borderColor: 'rgba(255,255,255,0.9)' },
+    // chapa de estado de un producto
+    chip: { flexDirection: 'row', alignItems: 'center', gap: 6, alignSelf: 'flex-start', minHeight: 32, paddingHorizontal: 11, borderRadius: 999, borderWidth: 1, maxWidth: '100%' },
+    chipDot: { width: 9, height: 9, borderRadius: 5 },
+    chipText: { fontSize: 13.5, fontWeight: '700' },
+    // progreso
+    steps: { flexDirection: 'row', alignItems: 'flex-start', position: 'relative' },
+    track: { position: 'absolute', top: 17, left: '12.5%', right: '12.5%', height: 4, borderRadius: 2, overflow: 'hidden' },
+    trackFill: { height: '100%', borderRadius: 2 },
+    step: { flex: 1, alignItems: 'center', gap: 8, minWidth: 0 },
+    stepDot: { width: 38, height: 38, borderRadius: 19, borderWidth: 2, alignItems: 'center', justifyContent: 'center' },
+    stepLabel: { fontSize: 13, fontWeight: '600', textAlign: 'center' },
+    cancelBox: { flexDirection: 'row', alignItems: 'center', gap: 12, padding: 14, borderRadius: 16, flexWrap: 'wrap' },
+    cancelTitle: { fontSize: 16, fontWeight: '800' },
+    smallBtn: { minHeight: 40, paddingHorizontal: 16, borderRadius: 999, alignItems: 'center', justifyContent: 'center' },
+    smallBtnText: { fontSize: 14, fontWeight: '700' },
+    prodProg: { gap: 10 },
+    prodProgHead: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 8 },
+    prodProgTitle: { fontSize: 14.5, fontWeight: '700', color: c.text },
+    legend: { flexDirection: 'row', flexWrap: 'wrap', columnGap: 14, rowGap: 4 },
+    legendItem: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+    legendText: { fontSize: 13, color: c.textSecondary, fontWeight: '600' },
+    segments: { flexDirection: 'row', gap: 5, height: 10 },
+    segment: { flex: 1, borderRadius: 5, ...(Platform.OS === 'web' ? ({ transformOrigin: 'left center' } as object) : {}) },
+    suggest: { flexDirection: 'row', alignItems: 'center', gap: 10, padding: 12, borderRadius: 14, borderWidth: 1 },
+    suggestText: { flex: 1, fontSize: 14, fontWeight: '700' },
     heroClient: { fontSize: 32, lineHeight: 37, fontWeight: '800', color: c.onPrimary, letterSpacing: -0.9 },
     heroLine: { fontSize: 15, color: 'rgba(0, 42, 57, 0.78)', fontWeight: '600' },
     heroFacts: { flexDirection: 'row', flexWrap: 'wrap', columnGap: 18, rowGap: 6, marginTop: 8 },
     heroFact: { flexDirection: 'row', alignItems: 'center', gap: 6, minWidth: 0, maxWidth: '100%', minHeight: 28 },
     heroFactText: { fontSize: 15, color: c.onPrimary, fontWeight: '500', flexShrink: 1 },
     heroItems: { flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginTop: 12 },
-    heroItem: { backgroundColor: 'rgba(255,255,255,0.42)', borderRadius: 999, paddingHorizontal: 12, paddingVertical: 6, maxWidth: '100%' },
-    heroItemText: { fontSize: 13.5, fontWeight: '600', color: c.onPrimary },
+    heroItem: { flexDirection: 'row', alignItems: 'center', gap: 7, backgroundColor: 'rgba(255,255,255,0.42)', borderRadius: 999, paddingHorizontal: 12, paddingVertical: 6, maxWidth: '100%' },
+    heroItemText: { fontSize: 13.5, fontWeight: '600', color: c.onPrimary, flexShrink: 1 },
     heroSideRow: { flexDirection: 'row', alignItems: 'flex-end', justifyContent: 'space-between', width: '100%', gap: 12 },
     total: { fontSize: 40, fontWeight: '800', color: c.onPrimary, letterSpacing: -1.2, fontVariant: ['tabular-nums'] },
     // cifras clave
@@ -805,7 +895,7 @@ function makeStyles(c: ThemeColors) {
     tile: { flexGrow: 1, flexBasis: 0, minWidth: 180, borderRadius: 20, padding: 16, gap: 4 },
     tileHalf: { flexBasis: '45%' as unknown as number, minWidth: 0 },
     tileHead: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 4 },
-    tileIcon: { width: 30, height: 30, borderRadius: 15, alignItems: 'center', justifyContent: 'center', backgroundColor: c.primarySoft },
+    tileIcon: { width: 28, height: 28, borderRadius: 9, alignItems: 'center', justifyContent: 'center' },
     tileLabel: { fontSize: 13.5, fontWeight: '700', color: c.textSecondary, flexShrink: 1 },
     tileValue: { fontSize: 24, fontWeight: '800', color: c.text, letterSpacing: -0.5, fontVariant: ['tabular-nums'] },
     tileSub: { fontSize: 12.5, color: c.textSecondary },
@@ -867,11 +957,18 @@ function makeStyles(c: ThemeColors) {
     totValue: { fontSize: 15.5, color: c.text, fontVariant: ['tabular-nums'], fontWeight: '600' },
     totGrand: { marginTop: 6, paddingHorizontal: 14, paddingVertical: 10, borderRadius: 12, backgroundColor: c.primarySoft },
     // móvil
-    item: { paddingHorizontal: 16, paddingVertical: 12, gap: 4 },
+    item: { paddingHorizontal: 16, paddingVertical: 14, gap: 10 },
     itemTop: { flexDirection: 'row', gap: 10, alignItems: 'flex-start' },
-    qtyBadge: { fontSize: 14, fontWeight: '800', color: c.reference, minWidth: 28 },
+    itemMid: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 10 },
+    qtyPill: { minWidth: 34, height: 26, paddingHorizontal: 7, borderRadius: 8, alignItems: 'center', justifyContent: 'center', backgroundColor: c.primarySoft },
+    qtyPillText: { fontSize: 13.5, fontWeight: '800', color: c.reference, fontVariant: ['tabular-nums'] },
+    metrics: { flexDirection: 'row', flexWrap: 'wrap', columnGap: 18, rowGap: 8 },
+    metric: { gap: 1, flexBasis: '20%' as unknown as number, flexGrow: 1, minWidth: 70 },
+    metricLabel: { fontSize: 11.5, fontWeight: '600', color: c.textTertiary },
+    metricValue: { fontSize: 14, fontWeight: '700', color: c.text, fontVariant: ['tabular-nums'] },
+    cState: { width: 140, flexShrink: 0 },
     itemName: { flex: 1, minWidth: 0, fontSize: 15.5, fontWeight: '600', color: c.text, lineHeight: 21 },
-    itemTotal: { fontSize: 15.5, fontWeight: '700', color: c.text, fontVariant: ['tabular-nums'] },
+    itemTotal: { fontSize: 17, fontWeight: '800', color: c.text, fontVariant: ['tabular-nums'], letterSpacing: -0.3 },
     muted: { fontSize: 13, color: c.textSecondary, lineHeight: 18 },
     h2: { fontSize: 20, fontWeight: '600', color: c.text, marginBottom: 6 },
   });

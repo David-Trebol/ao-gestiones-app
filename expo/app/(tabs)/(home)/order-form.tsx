@@ -173,6 +173,7 @@ export default function OrderFormScreen() {
         owner: editingOrder.owner ?? '',
         next_action: editingOrder.next_action ?? '',
         items: editingOrder.items.map(item => ({
+          item_status: item.item_status,
           product_name: item.product_name,
           quantity: item.quantity,
           costo_unitario: item.costo_unitario,
