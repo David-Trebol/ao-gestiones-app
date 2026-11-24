@@ -326,7 +326,7 @@ export default function OrderDetailScreen() {
         {hasCost
           ? tile(Receipt, '#22A447', 'Beneficio', formatCurrency(profit), tiny ? 'Venta − coste' : 'Venta sin IVA − coste', profit >= 0 ? colors.success : colors.error)
           : tile(Truck, '#22A447', 'Envío', shipTotal > 0 ? formatCurrency(shipTotal) : 'Sin envío', shipLines.length ? `${shipLines.length} línea${shipLines.length === 1 ? '' : 's'}` : 'Incluido o no aplica')}
-        {tile(Package, '#3F6E92', 'Productos', `${prog.shipped} de ${prog.total}`, prog.total === 0 ? 'Sin productos' : `enviados · ${it.units} ud${it.units === 1 ? '' : 's'}.`)}
+        {tile(Package, '#3F6E92', 'Productos', `${prog.out} de ${prog.total}`, prog.total === 0 ? 'Sin productos' : `${prog.delivered === prog.total ? 'entregados' : 'enviados'} · ${it.units} ud${it.units === 1 ? '' : 's'}.`)}
         {tile(Factory, '#7B5CC4', 'Fabricante', order.manufacturer_name || '—', `${order.manufacturer_code ? order.manufacturer_code + ' · ' : ''}año ${order.year}`)}
       </View>
     </View>
@@ -348,7 +348,10 @@ export default function OrderDetailScreen() {
 
   // ---- Progreso: pasos del pedido + productos enviados
   const stepIdx = STEPS.indexOf(order.status);
-  const allShipped = prog.total > 0 && prog.shipped === prog.total;
+  const allOut = prog.total > 0 && prog.out === prog.total;
+  const allDelivered = prog.total > 0 && prog.delivered === prog.total;
+  // propuesta (no se cambia sola): todos entregados → pedido Entregado; todos enviados o entregados → pedido Enviado
+  const suggestTo: OrderStatus | null = allDelivered && order.status !== 'delivered' && order.status !== 'cancelled' ? 'delivered' : allOut && (order.status === 'pending' || order.status === 'processing') ? 'shipped' : null;
   const progress = card(
     'Progreso del pedido',
     <Route size={16} color="#FFFFFF" />,
@@ -409,10 +412,10 @@ export default function OrderDetailScreen() {
           <View style={s.prodProgHead}>
             <Text style={s.prodProgTitle}>Productos</Text>
             <View style={s.legend}>
-              {(['shipped', 'pending', 'none'] as ItemStatus[]).filter(k => prog[k] > 0).map(k => (
+              {(['delivered', 'shipped', 'pending', 'none'] as ItemStatus[]).filter(k => prog[k] > 0).map(k => (
                 <View key={k} style={s.legendItem}>
                   <View style={[s.chipDot, { backgroundColor: itemTone(k, colors, isDark).dot }]} />
-                  <Text style={s.legendText}>{prog[k]} {k === 'shipped' ? (prog[k] === 1 ? 'enviado' : 'enviados') : k === 'pending' ? (prog[k] === 1 ? 'pendiente' : 'pendientes') : 'sin empezar'}</Text>
+                  <Text style={s.legendText}>{prog[k]} {k === 'delivered' ? (prog[k] === 1 ? 'entregado' : 'entregados') : k === 'shipped' ? (prog[k] === 1 ? 'enviado' : 'enviados') : k === 'pending' ? (prog[k] === 1 ? 'pendiente' : 'pendientes') : 'sin empezar'}</Text>
                 </View>
               ))}
             </View>
@@ -422,10 +425,12 @@ export default function OrderDetailScreen() {
               <View key={k} style={[s.segment, { backgroundColor: itemStatusOf(x) === 'none' ? colors.fill : itemTone(itemStatusOf(x), colors, isDark).dot }, enter(k, 'grow', { base: 600, step: 90, duration: 700 })]} {...fx('tint')} />
             ))}
           </View>
-          {allShipped && (order.status === 'pending' || order.status === 'processing') && (
-            <Pressable onPress={() => void changeStatus('shipped')} style={[s.suggest, { backgroundColor: colors.successBg, borderColor: colors.successBorder }, enter(0, 'pop', { base: 300 })]} accessibilityRole="button" testID="suggest-shipped">
+          {suggestTo && (
+            <Pressable key={suggestTo} onPress={() => void changeStatus(suggestTo)} style={[s.suggest, { backgroundColor: colors.successBg, borderColor: colors.successBorder }, enter(0, 'pop', { base: 300 })]} accessibilityRole="button" testID={`suggest-${suggestTo}`}>
               <Truck size={18} color={colors.success} />
-              <Text style={[s.suggestText, { color: colors.success }]}>Todos los productos están enviados. Marcar el pedido como «Enviado»</Text>
+              <Text style={[s.suggestText, { color: colors.success }]}>
+                {suggestTo === 'delivered' ? 'Todos los productos están entregados. Marcar el pedido como «Entregado»' : 'Todos los productos han salido. Marcar el pedido como «Enviado»'}
+              </Text>
             </Pressable>
           )}
         </View>

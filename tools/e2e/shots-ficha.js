@@ -19,7 +19,7 @@ const sizes = (process.env.SIZES || '1440x900,390x844').split(',').map(s => s.sp
     await p.getByTestId('login-submit').click(); await p.waitForTimeout(2500);
     await p.goto(base + '/order-detail?orderId=' + (process.env.ID || 'o1'), { waitUntil: 'networkidle' }); await p.waitForTimeout(2200);
     if (process.env.ACT) {
-      for (const [i, lab] of [[0, 'Enviado'], [1, 'Pendiente']]) {
+      for (const [i, lab] of [[0, 'Entregado'], [1, 'Pendiente']]) {
         await p.getByTestId('item-status-' + i).first().click(); await p.waitForTimeout(700);
         await p.locator('[role="dialog"], [aria-modal="true"]').last().getByText(lab, { exact: true }).click().catch(async () => { await p.getByText(lab, { exact: true }).last().click(); });
         await p.waitForTimeout(900);

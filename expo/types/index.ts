@@ -22,7 +22,7 @@ export interface Customer {
 }
 
 /** Estado de cada producto dentro del pedido (opcional; sin valor = sin empezar) */
-export type ItemStatus = 'none' | 'pending' | 'shipped';
+export type ItemStatus = 'none' | 'pending' | 'shipped' | 'delivered';
 
 export interface OrderItem {
   product_name: string;

@@ -653,8 +653,8 @@ function makeStyles(c: ThemeColors) {
 function ItemDots({ o }: { o: Order }) {
   const { colors, isDark } = useTheme();
   const p = itemProgress(o.items ?? []);
-  if (p.total === 0 || p.shipped + p.pending === 0) return null;
-  const parts = [p.shipped ? `${p.shipped} enviado${p.shipped === 1 ? '' : 's'}` : '', p.pending ? `${p.pending} pendiente${p.pending === 1 ? '' : 's'}` : ''].filter(Boolean);
+  if (p.total === 0 || p.out + p.pending === 0) return null;
+  const parts = [p.delivered ? `${p.delivered} entregado${p.delivered === 1 ? '' : 's'}` : '', p.shipped ? `${p.shipped} enviado${p.shipped === 1 ? '' : 's'}` : '', p.pending ? `${p.pending} pendiente${p.pending === 1 ? '' : 's'}` : ''].filter(Boolean);
   return (
     <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, flexWrap: 'wrap' }} accessibilityLabel={parts.join(', ')}>
       <View style={{ flexDirection: 'row', gap: 3 }}>

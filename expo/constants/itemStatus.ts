@@ -6,26 +6,33 @@ import type { ThemeColors } from '@/constants/colors';
  * - Sin empezar: el color normal (no se ha hecho nada con él)
  * - Pendiente: amarillo (pedido al fabricante, a la espera)
  * - Enviado: verde
+ * - Entregado: azul petróleo (ya lo tiene el cliente; distinto del verde para que se vean a la vez)
  * El amarillo es propio (no el naranja de la marca) para que no se confunda con los botones.
  */
-export const ITEM_STATUS_ORDER: ItemStatus[] = ['none', 'pending', 'shipped'];
+export const ITEM_STATUS_ORDER: ItemStatus[] = ['none', 'pending', 'shipped', 'delivered'];
 
 export const ITEM_STATUS_LABEL: Record<ItemStatus, string> = {
   none: 'Sin empezar',
   pending: 'Pendiente',
   shipped: 'Enviado',
+  delivered: 'Entregado',
 };
 
 export const ITEM_STATUS_HINT: Record<ItemStatus, string> = {
   none: 'Todavía no se ha hecho nada con este producto',
   pending: 'En marcha, a la espera de enviarse',
   shipped: 'Ya ha salido hacia el cliente',
+  delivered: 'El cliente ya lo tiene',
 };
 
 export interface ItemTone { text: string; bg: string; border: string; dot: string; row: string }
 
 export function itemTone(st: ItemStatus | undefined, c: ThemeColors, isDark: boolean): ItemTone {
   switch (st) {
+    case 'delivered':
+      return isDark
+        ? { text: '#6CC9F0', bg: 'rgba(10,132,190,0.20)', border: 'rgba(80,180,230,0.42)', dot: '#3DB2E8', row: 'rgba(10,132,190,0.09)' }
+        : { text: '#0B5F86', bg: 'rgba(10,126,180,0.13)', border: 'rgba(10,126,180,0.40)', dot: '#0A7EB4', row: 'rgba(10,126,180,0.07)' };
     case 'shipped':
       return { text: c.success, bg: c.successBg, border: c.successBorder, dot: isDark ? '#30D158' : '#22A447', row: isDark ? 'rgba(48,209,88,0.08)' : 'rgba(52,199,89,0.07)' };
     case 'pending':
@@ -40,8 +47,10 @@ export function itemTone(st: ItemStatus | undefined, c: ThemeColors, isDark: boo
 export const itemStatusOf = (it: Pick<OrderItem, 'item_status'>): ItemStatus => it.item_status ?? 'none';
 
 /** Recuento de productos por estado */
-export function itemProgress(items: OrderItem[]): { total: number; shipped: number; pending: number; none: number } {
-  const r = { total: items.length, shipped: 0, pending: 0, none: 0 };
+export function itemProgress(items: OrderItem[]): { total: number; shipped: number; delivered: number; pending: number; none: number; out: number } {
+  const r = { total: items.length, shipped: 0, delivered: 0, pending: 0, none: 0, out: 0 };
   for (const it of items) r[itemStatusOf(it)]++;
+  // «out»: ya han salido (enviados o entregados)
+  r.out = r.shipped + r.delivered;
   return r;
 }

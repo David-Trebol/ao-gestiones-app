@@ -34,7 +34,10 @@ const check = (name, ok, extra = '') => { console.log(`${ok ? 'OK  ' : 'FAIL'} $
     const bg = await p.evaluate(() => [0, 1].map(i => getComputedStyle(document.querySelector(`[data-testid="item-row-${i}"]`)).backgroundColor));
     check(`[${tag}] fila verde (enviado) y amarilla (pendiente)`, /rgba\(52, 199, 89|rgba\(48, 209, 88/.test(bg[0]) && /rgba\(255, 204, 0/.test(bg[1]), bg.join(' | '));
     check(`[${tag}] la chapa muestra el estado`, (await p.getByTestId('item-status-0').first().innerText()).includes('Enviado'));
-    await pick(1, 'Enviado'); await pick(1, 'Sin empezar');
+    await pick(1, 'Entregado');
+    const bgD = await p.evaluate(() => getComputedStyle(document.querySelector('[data-testid="item-row-1"]')).backgroundColor);
+    check(`[${tag}] «Entregado» se guarda y tiene su color (azul)`, o1().items[1].item_status === 'delivered' && /rgba\(10, 126, 180/.test(bgD), bgD);
+    await pick(1, 'Sin empezar');
     check(`[${tag}] «Sin empezar» quita el estado`, o1().items[1].item_status === undefined);
     // el formulario conserva los estados al guardar
     await p.getByTestId('edit-order-btn').click(); await wt(1800);
@@ -45,6 +48,10 @@ const check = (name, ok, extra = '') => { console.log(`${ok ? 'OK  ' : 'FAIL'} $
     await p.goto(base + '/order-detail?orderId=' + target.id, { waitUntil: 'networkidle' }); await wt(2200);
     for (let i = 0; i < target.items.length; i++) await pick(i, 'Enviado');
     const sug = p.getByTestId('suggest-shipped');
+    // todos entregados → propone «Entregado»; luego se vuelven a «Enviado» para seguir
+    for (let i = 0; i < target.items.length; i++) await pick(i, 'Entregado');
+    check(`[${tag}] con todo entregado propone marcar el pedido como Entregado`, await p.getByTestId('suggest-delivered').isVisible());
+    for (let i = 0; i < target.items.length; i++) await pick(i, 'Enviado');
     check(`[${tag}] con todo enviado sugiere marcar el pedido como Enviado`, await sug.isVisible());
     await sug.click(); await wt(1200);
     check(`[${tag}] la sugerencia cambia el estado del pedido`, mock.db.orders.find(o => o.id === target.id).status === 'shipped');
