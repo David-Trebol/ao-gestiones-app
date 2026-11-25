@@ -13,7 +13,7 @@ import { ThemeColors } from '@/constants/colors';
 import { STATUS_ICONS, STATUS_ORDER, statusConfig } from '@/components/StatusBadge';
 import SelectSheet from '@/components/SelectSheet';
 import SupplierLogSheet from '@/components/SupplierLogSheet';
-import { SUPPLIER_EVENT_SHORT, SUPPLIER_EVENT_TINT, SUPPLIER_STEPS, dmy, orderSupplierNames, supplierSteps } from '@/constants/supplierLog';
+import { SUPPLIER_EVENT_SHORT, SUPPLIER_EVENT_TINT, SUPPLIER_PENDING_TINT, SUPPLIER_STEPS, SUPPLIER_TINT, dmy, nextSupplierStep, orderSupplierNames, supplierSteps } from '@/constants/supplierLog';
 import type { ItemStatus, OrderItem, OrderStatus } from '@/types';
 import { formatCurrency, formatDate } from '@/utils/calculations';
 import { addressLine, formatISODate, itemsSummary, overdueDays } from '@/utils/orderFilters';
@@ -40,6 +40,8 @@ export default function OrderDetailScreen() {
   // fabricante de un producto: lista para elegir (supSheet) y ventana del registro (logSheet)
   const [supSheet, setSupSheet] = useState<number | null>(null);
   const [logSheet, setLogSheet] = useState<{ index: number; startNew?: boolean } | null>(null);
+  // nombres largos de producto: se ven en 2 líneas y se despliegan al pulsarlos
+  const [openNames, setOpenNames] = useState<Record<number, boolean>>({});
   /** Producto cuyo estado se está cambiando (índice) */
   const [itemSheet, setItemSheet] = useState<number | 'all' | null>(null);
   const [editingRef, setEditingRef] = useState(false);
@@ -261,43 +263,60 @@ export default function OrderDetailScreen() {
     </Pressable>
   );
   /** Fondo y franja de color de la fila según el estado del producto */
-  /** Desplegable «Seleccionar fabricante» del producto */
-  const supplierChip = (i: number, item: OrderItem) => (
-    <Pressable
-      onPress={() => setSupSheet(i)}
-      style={[s.chip, s.supChip, { borderColor: item.supplier_name ? 'rgba(123,92,196,0.45)' : colors.border, backgroundColor: item.supplier_name ? 'rgba(123,92,196,0.10)' : colors.fill }]}
-      {...fx('tint')}
-      hitSlop={6}
-      accessibilityRole="button"
-      accessibilityLabel={item.supplier_name ? `Fabricante: ${item.supplier_name}. Cambiar` : 'Seleccionar fabricante'}
-      testID={`item-supplier-${i}`}
-    >
-      <Factory size={13} color={item.supplier_name ? '#7B5CC4' : colors.textTertiary} strokeWidth={2.4} />
-      <Text style={[s.chipText, { color: item.supplier_name ? colors.text : colors.textSecondary, flexShrink: 1 }]} numberOfLines={1}>{item.supplier_name || 'Seleccionar fabricante'}</Text>
-      <ChevronDown size={13} color={colors.textSecondary} strokeWidth={2.6} />
-    </Pressable>
-  );
-  /** Botón del registro con el fabricante: tres puntos (pedido, recibido, pagado) que se encienden con su color */
-  const logBtn = (i: number, item: OrderItem) => {
+  /**
+   * Fabricante y registro del producto en un solo bloque: arriba el fabricante (se pulsa para elegirlo)
+   * y debajo los tres trámites con su color: pedido azul, recibido verde, pagado naranja; el que toca, amarillo.
+   */
+  const supplierBlock = (i: number, item: OrderItem) => {
     const st = supplierSteps(item);
+    const next = nextSupplierStep(item);
     const n = item.supplier_log?.length ?? 0;
-    const done = SUPPLIER_STEPS.filter(t => st[t]);
-    const last = done.length > 0 ? done[done.length - 1]! : null;
+    const has = !!item.supplier_name;
+    const lead = !has ? colors.textTertiary : next ? SUPPLIER_PENDING_TINT : SUPPLIER_EVENT_TINT.paid;
+    const lastDone = [...SUPPLIER_STEPS].reverse().find(t => st[t]);
+    const tone = lastDone ? SUPPLIER_EVENT_TINT[lastDone] : has ? SUPPLIER_PENDING_TINT : null;
     return (
-      <Pressable
-        onPress={() => setLogSheet({ index: i })}
-        style={[s.logBtn, { borderColor: colors.border }]}
-        {...fx('tint')}
-        hitSlop={4}
-        accessibilityRole="button"
-        accessibilityLabel={`Registro con el fabricante${n ? `: ${n} apuntes` : ''}. Abrir`}
-        testID={`item-log-${i}`}
+      <View
+        style={[s.supBox, tone ? { borderColor: tone + '59', backgroundColor: tone + (isDark ? '1F' : '12') } : { borderColor: colors.border, backgroundColor: colors.fill }]}
+        testID={`item-supbox-${i}`}
       >
-        {SUPPLIER_STEPS.map(t => (
-          <View key={t} style={[s.logDot, { backgroundColor: st[t] ? SUPPLIER_EVENT_TINT[t] : colors.border }]} />
-        ))}
-        <Text style={s.logBtnText} numberOfLines={1}>{last ? `${SUPPLIER_EVENT_SHORT[last]} ${dmy(st[last]!).slice(0, 5)}` : 'Registro'}</Text>
-      </Pressable>
+        <Pressable
+          onPress={() => setSupSheet(i)}
+          style={s.supHead}
+          {...fx('tint')}
+          hitSlop={4}
+          accessibilityRole="button"
+          accessibilityLabel={has ? `Fabricante: ${item.supplier_name}. Cambiar` : 'Seleccionar fabricante'}
+          testID={`item-supplier-${i}`}
+        >
+          <View style={[s.supIcon, { backgroundColor: has ? SUPPLIER_TINT : colors.border }]}>
+            <Factory size={13} color="#FFFFFF" strokeWidth={2.4} />
+          </View>
+          <Text style={[s.supName, !has && { color: colors.textSecondary, fontWeight: '600' }]} numberOfLines={1}>{item.supplier_name || 'Seleccionar fabricante'}</Text>
+          <ChevronDown size={15} color={lead} strokeWidth={2.6} />
+        </Pressable>
+        <Pressable
+          onPress={() => setLogSheet({ index: i })}
+          style={s.supSteps}
+          {...fx('tint')}
+          hitSlop={4}
+          accessibilityRole="button"
+          accessibilityLabel={`Registro con el fabricante${n ? `: ${n} apuntes` : ''}. Abrir`}
+          testID={`item-log-${i}`}
+        >
+          {SUPPLIER_STEPS.map(t => {
+            const d = st[t];
+            const due = has && !d && t === next;
+            const c = d ? SUPPLIER_EVENT_TINT[t] : due ? SUPPLIER_PENDING_TINT : null;
+            return (
+              <View key={t} style={[s.supStep, d ? { backgroundColor: c! } : due ? { backgroundColor: c + '29', borderColor: c + '99' } : { borderColor: colors.border, borderStyle: 'dashed' }]}>
+                <Text style={[s.supStepLabel, { color: d ? '#FFFFFF' : due ? (isDark ? '#FFD54A' : '#7A5800') : colors.textTertiary }]} numberOfLines={1}>{SUPPLIER_EVENT_SHORT[t]}</Text>
+                <Text style={[s.supStepDate, { color: d ? '#FFFFFF' : due ? (isDark ? '#FFD54A' : '#7A5800') : colors.textTertiary }]} numberOfLines={1}>{d ? dmy(d).slice(0, 5) : due ? 'Falta' : '—'}</Text>
+              </View>
+            );
+          })}
+        </Pressable>
+      </View>
     );
   };
   const rowTone = (item: OrderItem) => {
@@ -663,10 +682,7 @@ export default function OrderDetailScreen() {
             {itemChip(i, x)}
             <Text style={s.itemTotal}>{formatCurrency(x.valor_sin_iva)}</Text>
           </View>
-          <View style={s.supRow}>
-            {supplierChip(i, x)}
-            {logBtn(i, x)}
-          </View>
+          <View style={s.supRow}>{supplierBlock(i, x)}</View>
           <View style={s.metrics}>
             {metric('Neto ud.', formatCurrency(x.pvp_neto_sin_iva))}
             {!!x.descuento_porcentaje && metric('Dto.', `${x.descuento_porcentaje} %`)}
@@ -707,7 +723,7 @@ export default function OrderDetailScreen() {
   const hasDiscount = order.items.some(i => !!i.descuento_porcentaje);
   /** Ordenador: productos a todo el ancho, como una factura (líneas con su estado, gastos de envío y totales a la derecha) */
   // columna propia de «Fabricante» solo si hay sitio; si no, va debajo del estado
-  const supCol = width >= 1280;
+  const supCol = width >= 1240;
   const invoice = card(
     'Productos',
     <Package size={16} color="#FFFFFF" />,
@@ -734,21 +750,21 @@ export default function OrderDetailScreen() {
       {order.items.map((x, i) => (
         <View key={i} style={[s.tr, s.rowSep, rowTone(x), enter(i, 'slide', { base: 520, step: 80 })]} {...fx('tint', 'hl')} testID={`item-row-${i}`}>
           <Text style={[s.td, s.cQty, s.tdStrong]}>{x.quantity}</Text>
-          <View style={s.cName}>
-            <Text style={[s.td, s.tdStrong]} selectable>{x.product_name || 'Sin nombre'}</Text>
+          <Pressable style={s.cName} onPress={() => setOpenNames(m => ({ ...m, [i]: !m[i] }))} accessibilityRole="button" accessibilityLabel={`${x.product_name || 'Sin nombre'}. ${openNames[i] ? 'Recoger' : 'Ver completo'}`} testID={`item-name-${i}`} {...(Platform.OS === 'web' ? ({ title: x.product_name } as object) : {})}>
+            <Text style={[s.td, s.tdStrong, s.nameCompact]} numberOfLines={openNames[i] ? undefined : 2}>{x.product_name || 'Sin nombre'}</Text>
             {(x.total_sin_iva > 0 || x.costo_unitario > 0) && (
-              <Text style={s.tdSub}>
+              <Text style={s.tdSub} numberOfLines={1}>
                 {[x.total_sin_iva > 0 ? `Importe antes de dto.: ${formatCurrency(x.total_sin_iva)}` : '', x.costo_unitario > 0 ? `coste ud. ${formatCurrency(x.costo_unitario)}` : ''].filter(Boolean).join(' · ')}
               </Text>
             )}
-          </View>
+          </Pressable>
           {supCol ? (
             <>
-              <View style={[s.cSup, { gap: 6 }]}>{supplierChip(i, x)}{logBtn(i, x)}</View>
+              <View style={s.cSup}>{supplierBlock(i, x)}</View>
               <View style={s.cState}>{itemChip(i, x)}</View>
             </>
           ) : (
-            <View style={[s.cState, s.cStack, { gap: 6 }]}>{itemChip(i, x)}{supplierChip(i, x)}{logBtn(i, x)}</View>
+            <View style={[s.cState, s.cStack, { gap: 6 }]}>{itemChip(i, x)}{supplierBlock(i, x)}</View>
           )}
           {hasUnitPrice && <Text style={[s.td, s.cNum, s.noWrap, !(x.tpv_unitario > 0) && s.dim]}>{x.tpv_unitario > 0 ? formatCurrency(x.tpv_unitario) : '—'}</Text>}
           {hasDiscount && <Text style={[s.td, s.cDto, s.noWrap, !x.descuento_porcentaje && s.dim]}>{x.descuento_porcentaje ? `${x.descuento_porcentaje} %` : '—'}</Text>}
@@ -1072,13 +1088,18 @@ function makeStyles(c: ThemeColors) {
     tdSub: { fontSize: 12.5, color: c.textSecondary, marginTop: 2 },
     cQty: { width: 44, textAlign: 'center' },
     cName: { flex: 1, minWidth: 170 },
-    cSup: { width: 190, flexShrink: 0, paddingRight: 8 },
-    supChip: { maxWidth: '100%' },
-    cStack: { width: 176, paddingRight: 8 },
-    supRow: { flexDirection: 'row', alignItems: 'center', gap: 8, flexWrap: 'wrap', marginTop: 8 },
-    logBtn: { flexDirection: 'row', alignItems: 'center', gap: 4, alignSelf: 'flex-start', minHeight: 28, paddingHorizontal: 9, borderRadius: 999, borderWidth: 1, ...(Platform.OS === 'web' ? ({ cursor: 'pointer' } as object) : {}) },
-    logDot: { width: 8, height: 8, borderRadius: 4 },
-    logBtnText: { fontSize: 12.5, fontWeight: '700', color: c.textSecondary, marginLeft: 3 },
+    cSup: { width: 262, flexShrink: 0, paddingRight: 10 },
+    cStack: { width: 206, paddingRight: 8 },
+    supRow: { marginTop: 10 },
+    nameCompact: { fontSize: 14, lineHeight: 19 },
+    supBox: { borderWidth: 1, borderRadius: 14, padding: 6, gap: 6, alignSelf: 'stretch' },
+    supHead: { flexDirection: 'row', alignItems: 'center', gap: 7, minHeight: 30, paddingHorizontal: 2, borderRadius: 9, ...(Platform.OS === 'web' ? ({ cursor: 'pointer' } as object) : {}) },
+    supIcon: { width: 24, height: 24, borderRadius: 8, alignItems: 'center', justifyContent: 'center' },
+    supName: { flex: 1, minWidth: 0, fontSize: 14, fontWeight: '800', letterSpacing: -0.2, color: c.text },
+    supSteps: { flexDirection: 'row', gap: 4, borderRadius: 9, ...(Platform.OS === 'web' ? ({ cursor: 'pointer' } as object) : {}) },
+    supStep: { flex: 1, minWidth: 0, minHeight: 36, paddingHorizontal: 4, paddingVertical: 3, borderRadius: 8, borderWidth: 1, borderColor: 'transparent', alignItems: 'center', justifyContent: 'center' },
+    supStepLabel: { fontSize: 11.5, fontWeight: '800', letterSpacing: -0.1 },
+    supStepDate: { fontSize: 11.5, fontWeight: '600', fontVariant: ['tabular-nums'], opacity: 0.92 },
     // Importes: ancho fijo y sin partir («912,00 €» no debe quedar en dos líneas); el concepto se estrecha
     cNum: { width: 100, flexShrink: 0, textAlign: 'right', paddingLeft: 6 },
     noWrap: (Platform.OS === 'web' ? { whiteSpace: 'nowrap' } : {}) as object,

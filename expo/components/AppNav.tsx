@@ -29,7 +29,7 @@ const ITEMS = [
   // Colores de la marca Alpha Omega: naranja, azul acero y gris pizarra
   { name: '(home)', label: 'Pedidos', Icon: FolderOpen, tint: '#FF8718' },
   { name: 'manufacturers', label: 'Referencias', Icon: Tags, tint: '#3F6E92' },
-  { name: 'suppliers', label: 'Fabricantes', Icon: Factory, tint: '#7B5CC4' },
+  { name: 'suppliers', label: 'Fabricantes', Icon: Factory, tint: '#0F8B8D' },
   { name: 'settings', label: 'Ajustes', Icon: Settings, tint: '#5B6B73' },
 ] as const;
 

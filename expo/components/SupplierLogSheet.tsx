@@ -1,11 +1,12 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { Modal, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View, useWindowDimensions } from 'react-native';
-import { ChevronDown, Factory, Plus, Trash2, X } from 'lucide-react-native';
+import { Check, ChevronDown, Factory, Plus, Trash2, X } from 'lucide-react-native';
 import DateField from '@/components/DateField';
 import SelectSheet from '@/components/SelectSheet';
 import { webInputReset } from '@/constants/theme';
+import { enter } from '@/constants/motion';
 import {
-  SUPPLIER_EVENT_ICON, SUPPLIER_EVENT_LABEL, SUPPLIER_EVENT_ORDER, SUPPLIER_EVENT_SHORT, SUPPLIER_EVENT_TINT, SUPPLIER_STEPS,
+  SUPPLIER_EVENT_ICON, SUPPLIER_EVENT_LABEL, SUPPLIER_EVENT_ORDER, SUPPLIER_EVENT_SHORT, SUPPLIER_EVENT_TINT, SUPPLIER_PENDING_TINT, SUPPLIER_STEPS, SUPPLIER_TINT,
   dmy, sortedLog, supplierSteps, todayISO,
 } from '@/constants/supplierLog';
 import { useTheme } from '@/contexts/ThemeContext';
@@ -28,7 +29,7 @@ interface Props {
  * (pedido, recibido, pagado u otra cosa). Cada apunte se queda guardado; no se sobrescribe.
  */
 export default function SupplierLogSheet({ order, index, startNew, onClose }: Props) {
-  const { colors } = useTheme();
+  const { colors, isDark } = useTheme();
   const { width } = useWindowDimensions();
   const s = useMemo(() => makeStyles(colors), [colors]);
   const { suppliers, addSupplier, updateItemSupplier } = useData();
@@ -91,114 +92,170 @@ export default function SupplierLogSheet({ order, index, startNew, onClose }: Pr
     }, 'No se pudo borrar');
 
   const wide = width >= 640;
+  const twoCol = width >= 900;
+  const next = SUPPLIER_STEPS.find(t => !steps[t]) ?? null;
+  const lastDone = [...SUPPLIER_STEPS].reverse().find(t => steps[t]);
+  const tone = lastDone ? SUPPLIER_EVENT_TINT[lastDone] : SUPPLIER_PENDING_TINT;
+  const status = !item.supplier_name && !lastDone
+    ? 'Sin fabricante'
+    : next === null ? 'Pedido, recibido y pagado'
+    : next === 'ordered' ? 'Falta pedirlo al fabricante'
+    : next === 'received' ? 'Pedido · falta recibirlo'
+    : 'Recibido · falta pagarlo';
+
+  const supplierField = (
+    <View style={{ gap: 8 }}>
+      <Text style={s.label}>Fabricante</Text>
+      {newName !== null ? (
+        <View style={s.newRow}>
+          <TextInput style={[s.input, { flex: 1, minWidth: 180 }]} value={newName} onChangeText={setNewName} placeholder="Nombre del fabricante nuevo" placeholderTextColor={colors.textTertiary} autoFocus onSubmitEditing={() => void createSupplier()} testID="new-supplier-input" />
+          <Pressable style={[s.smallBtn, { backgroundColor: colors.primaryFill }]} onPress={() => void createSupplier()} disabled={busy} accessibilityRole="button" testID="new-supplier-save">
+            <Text style={[s.smallBtnText, { color: colors.onPrimary }]}>Añadir</Text>
+          </Pressable>
+          <Pressable style={[s.smallBtn, { backgroundColor: colors.fill }]} onPress={() => setNewName(null)} accessibilityRole="button">
+            <Text style={[s.smallBtnText, { color: colors.text }]}>Cancelar</Text>
+          </Pressable>
+        </View>
+      ) : (
+        <Pressable onPress={() => setPicker(true)} style={({ pressed, hovered }: { pressed: boolean; hovered?: boolean }) => [s.select, { borderColor: hovered || pressed ? SUPPLIER_TINT : colors.border, backgroundColor: colors.fill }]} accessibilityRole="button" testID="supplier-picker">
+          <View style={[s.selIcon, { backgroundColor: item.supplier_name ? SUPPLIER_TINT : colors.border }]}><Factory size={15} color="#FFFFFF" /></View>
+          <Text style={[s.selectText, { color: item.supplier_name ? colors.text : colors.textTertiary }]} numberOfLines={1}>{item.supplier_name || 'Seleccionar fabricante'}</Text>
+          <ChevronDown size={18} color={colors.textSecondary} />
+        </Pressable>
+      )}
+    </View>
+  );
+
+  const stepBoxes = (
+    <View style={s.steps}>
+      {SUPPLIER_STEPS.map((t, k) => {
+        const Icon = SUPPLIER_EVENT_ICON[t];
+        const d = steps[t];
+        const due = !d && t === next;
+        const c = d ? SUPPLIER_EVENT_TINT[t] : due ? SUPPLIER_PENDING_TINT : null;
+        return (
+          <View
+            key={`${t}-${d ?? ''}`}
+            style={[s.stepBox, c ? { backgroundColor: c + (d ? (isDark ? '33' : '1F') : '17'), borderColor: c + (d ? '8C' : '80') } : { borderColor: colors.border, borderStyle: 'dashed' }, enter(k, 'pop', { base: 120, step: 70, duration: 520 })]}
+            testID={`supplier-step-${t}`}
+          >
+            <View style={s.stepTop}>
+              <View style={[s.stepIcon, { backgroundColor: c ?? colors.fill }]}><Icon size={15} color={c ? '#FFFFFF' : colors.textTertiary} /></View>
+              {d ? <Check size={16} color={c!} strokeWidth={3} /> : null}
+            </View>
+            <Text style={[s.stepLabel, { color: c ? colors.text : colors.textSecondary }]} numberOfLines={1}>{SUPPLIER_EVENT_SHORT[t]}</Text>
+            <Text style={[s.stepDate, { color: d ? colors.text : due ? (isDark ? '#FFD54A' : '#7A5800') : colors.textTertiary }]} numberOfLines={1}>{d ? dmy(d) : due ? 'Toca ahora' : 'Pendiente'}</Text>
+          </View>
+        );
+      })}
+    </View>
+  );
+
+  const addForm = (
+    <View style={[s.addBox, { borderColor: colors.border, backgroundColor: colors.fill }]}>
+      <Text style={s.label}>Añadir al registro</Text>
+      <View style={s.types}>
+        {SUPPLIER_EVENT_ORDER.map(t => {
+          const on = type === t;
+          const Icon = SUPPLIER_EVENT_ICON[t];
+          return (
+            <Pressable key={t} onPress={() => setType(t)} style={[s.typeChip, on ? { backgroundColor: SUPPLIER_EVENT_TINT[t], borderColor: SUPPLIER_EVENT_TINT[t] } : { borderColor: colors.border, backgroundColor: colors.surface }]} accessibilityRole="radio" accessibilityState={{ selected: on }} testID={`supplier-type-${t}`}>
+              <Icon size={14} color={on ? '#FFFFFF' : SUPPLIER_EVENT_TINT[t]} />
+              <Text style={[s.typeText, { color: on ? '#FFFFFF' : colors.text }]}>{SUPPLIER_EVENT_LABEL[t]}</Text>
+            </Pressable>
+          );
+        })}
+      </View>
+      <View style={s.formRow}>
+        <View style={{ flex: 1, minWidth: 210 }}><DateField label="Fecha" value={date} onChange={setDate} /></View>
+        <TextInput style={[s.input, { flex: 2, minWidth: 180, alignSelf: 'flex-end', backgroundColor: colors.surface }]} value={note} onChangeText={setNote} placeholder={type === 'other' ? 'Qué se ha hecho' : 'Nota (opcional): nº de pedido, importe…'} placeholderTextColor={colors.textTertiary} testID="supplier-note-input" />
+      </View>
+      {!!msg && <Text style={[s.msg, { color: colors.error }]} accessibilityRole="alert" testID="supplier-log-msg">{msg}</Text>}
+      <Pressable style={[s.addBtn, { backgroundColor: SUPPLIER_EVENT_TINT[type], opacity: busy ? 0.6 : 1 }]} onPress={addEntry} disabled={busy} accessibilityRole="button" testID="supplier-add-entry">
+        <Plus size={17} color="#FFFFFF" />
+        <Text style={[s.smallBtnText, { color: '#FFFFFF' }]}>{`Apuntar «${SUPPLIER_EVENT_LABEL[type]}»`}</Text>
+      </Pressable>
+    </View>
+  );
+
+  const history = (
+    <View style={{ gap: 8, flex: twoCol ? 1 : undefined }}>
+      <Text style={s.label}>{log.length > 0 ? `Registro (${log.length})` : 'Registro'}</Text>
+      {log.length === 0 ? (
+        <View style={[s.empty, { borderColor: colors.border }]}>
+          <Text style={s.muted}>Aún no hay apuntes. Apunta cuándo se pidió al fabricante, cuándo llegó y cuándo se le pagó.</Text>
+        </View>
+      ) : (
+        <View style={s.timeline}>
+          {log.map((e, k) => {
+            const Icon = SUPPLIER_EVENT_ICON[e.type];
+            return (
+              <View key={e.id} style={[s.logRow, enter(k, 'slide', { base: 160, step: 50, duration: 480 })]} testID={`supplier-entry-${k}`}>
+                <View style={s.rail}>
+                  <View style={[s.stepIcon, { backgroundColor: SUPPLIER_EVENT_TINT[e.type] }]}><Icon size={14} color="#FFFFFF" /></View>
+                  {k < log.length - 1 && <View style={[s.railLine, { backgroundColor: colors.border }]} />}
+                </View>
+                <View style={[s.logCard, { borderColor: SUPPLIER_EVENT_TINT[e.type] + '4D', backgroundColor: SUPPLIER_EVENT_TINT[e.type] + (isDark ? '1A' : '0D') }]}>
+                  <View style={{ flex: 1, minWidth: 0 }}>
+                    <Text style={s.logTitle} numberOfLines={1}>{SUPPLIER_EVENT_LABEL[e.type]}</Text>
+                    <Text style={[s.logDate, { color: SUPPLIER_EVENT_TINT[e.type] }]}>{dmy(e.date)}</Text>
+                    {!!e.note && <Text style={s.muted}>{e.note}</Text>}
+                  </View>
+                  {confirmDel === e.id ? (
+                    <View style={s.confirm}>
+                      <Pressable onPress={() => removeEntry(e.id)} style={[s.confirmBtn, { backgroundColor: colors.error }]} accessibilityRole="button" testID={`supplier-entry-confirm-${k}`}>
+                        <Text style={[s.confirmText, { color: '#FFFFFF' }]}>Borrar</Text>
+                      </Pressable>
+                      <Pressable onPress={() => setConfirmDel(null)} style={[s.confirmBtn, { backgroundColor: colors.fill }]} accessibilityRole="button">
+                        <Text style={[s.confirmText, { color: colors.text }]}>No</Text>
+                      </Pressable>
+                    </View>
+                  ) : (
+                    <Pressable onPress={() => setConfirmDel(e.id)} style={s.close} accessibilityRole="button" accessibilityLabel="Borrar apunte" testID={`supplier-entry-del-${k}`}>
+                      <Trash2 size={16} color={colors.textTertiary} />
+                    </Pressable>
+                  )}
+                </View>
+              </View>
+            );
+          })}
+        </View>
+      )}
+    </View>
+  );
+
   return (
     <Modal visible transparent animationType="fade" onRequestClose={onClose}>
-      <View style={[s.overlay, { backgroundColor: colors.overlay }, !wide && { justifyContent: 'flex-end', padding: 0 }]}>
-        <View style={[s.sheet, { backgroundColor: colors.surface }, !wide && s.sheetMobile]} accessibilityViewIsModal testID="supplier-log-sheet">
-          <View style={s.head}>
-            <View style={[s.icon, { backgroundColor: '#7B5CC4' }]}><Factory size={18} color="#FFFFFF" /></View>
+      <View style={[s.overlay, s.blur, { backgroundColor: colors.overlay }, !wide && { justifyContent: 'flex-end', padding: 0 }]}>
+        <View style={[s.sheet, { backgroundColor: colors.surface, borderColor: colors.border }, twoCol && s.sheetWide, !wide && s.sheetMobile, s.shadow, enter(0, wide ? 'pop' : 'rise', { duration: 460 })]} accessibilityViewIsModal testID="supplier-log-sheet">
+          <View style={[s.head, { backgroundColor: tone + (isDark ? '26' : '14'), borderColor: tone + '40' }]}>
+            <View style={[s.icon, { backgroundColor: SUPPLIER_TINT }]}><Factory size={18} color="#FFFFFF" /></View>
             <View style={{ flex: 1, minWidth: 0 }}>
               <Text style={s.title} accessibilityRole="header" numberOfLines={1}>Fabricante y registro</Text>
-              <Text style={s.subtitle} numberOfLines={1}>{`${item.quantity}× ${item.product_name || 'Sin nombre'}`}</Text>
+              <Text style={s.subtitle} numberOfLines={2}>{`${item.quantity}× ${item.product_name || 'Sin nombre'}`}</Text>
             </View>
+            {wide && (
+              <View style={[s.statusPill, { backgroundColor: tone }]}>
+                <Text style={s.statusText} numberOfLines={1}>{status}</Text>
+              </View>
+            )}
             <Pressable onPress={onClose} style={s.close} accessibilityRole="button" accessibilityLabel="Cerrar" testID="supplier-log-close"><X size={20} color={colors.textSecondary} /></Pressable>
           </View>
-
-          <ScrollView style={{ flexGrow: 0 }} contentContainerStyle={{ gap: 18, paddingBottom: 4 }} keyboardShouldPersistTaps="handled">
-            {/* Fabricante */}
-            <View style={{ gap: 8 }}>
-              <Text style={s.label}>Fabricante</Text>
-              {newName !== null ? (
-                <View style={s.newRow}>
-                  <TextInput style={[s.input, { flex: 1 }]} value={newName} onChangeText={setNewName} placeholder="Nombre del fabricante nuevo" placeholderTextColor={colors.textTertiary} autoFocus onSubmitEditing={() => void createSupplier()} testID="new-supplier-input" />
-                  <Pressable style={[s.smallBtn, { backgroundColor: colors.primaryFill }]} onPress={() => void createSupplier()} disabled={busy} accessibilityRole="button" testID="new-supplier-save">
-                    <Text style={[s.smallBtnText, { color: colors.onPrimary }]}>Añadir</Text>
-                  </Pressable>
-                  <Pressable style={[s.smallBtn, { backgroundColor: colors.fill }]} onPress={() => setNewName(null)} accessibilityRole="button">
-                    <Text style={[s.smallBtnText, { color: colors.text }]}>Cancelar</Text>
-                  </Pressable>
-                </View>
-              ) : (
-                <Pressable onPress={() => setPicker(true)} style={[s.select, { borderColor: colors.border, backgroundColor: colors.fill }]} accessibilityRole="button" testID="supplier-picker">
-                  <Text style={[s.selectText, { color: item.supplier_name ? colors.text : colors.textTertiary }]} numberOfLines={1}>{item.supplier_name || 'Seleccionar fabricante'}</Text>
-                  <ChevronDown size={18} color={colors.textSecondary} />
-                </Pressable>
-              )}
+          {!wide && (
+            <View style={[s.statusPill, { backgroundColor: tone, alignSelf: 'flex-start' }]}>
+              <Text style={s.statusText} numberOfLines={1}>{status}</Text>
             </View>
+          )}
 
-            {/* Trámites */}
-            <View style={s.steps}>
-              {SUPPLIER_STEPS.map(t => {
-                const Icon = SUPPLIER_EVENT_ICON[t];
-                const d = steps[t];
-                return (
-                  <View key={t} style={[s.stepBox, d ? { backgroundColor: SUPPLIER_EVENT_TINT[t] + '1F', borderColor: SUPPLIER_EVENT_TINT[t] + '66' } : { borderColor: colors.border }]} testID={`supplier-step-${t}`}>
-                    <View style={[s.stepIcon, { backgroundColor: d ? SUPPLIER_EVENT_TINT[t] : colors.fill }]}><Icon size={15} color={d ? '#FFFFFF' : colors.textTertiary} /></View>
-                    <Text style={[s.stepLabel, { color: d ? colors.text : colors.textSecondary }]} numberOfLines={1}>{SUPPLIER_EVENT_SHORT[t]}</Text>
-                    <Text style={[s.stepDate, { color: d ? colors.text : colors.textTertiary }]} numberOfLines={1}>{d ? dmy(d) : 'Pendiente'}</Text>
-                  </View>
-                );
-              })}
-            </View>
-
-            {/* Nuevo apunte */}
-            <View style={[s.addBox, { borderColor: colors.border }]}>
-              <Text style={s.label}>Añadir al registro</Text>
-              <View style={s.types}>
-                {SUPPLIER_EVENT_ORDER.map(t => {
-                  const on = type === t;
-                  return (
-                    <Pressable key={t} onPress={() => setType(t)} style={[s.typeChip, on ? { backgroundColor: SUPPLIER_EVENT_TINT[t], borderColor: SUPPLIER_EVENT_TINT[t] } : { borderColor: colors.border }]} accessibilityRole="radio" accessibilityState={{ selected: on }} testID={`supplier-type-${t}`}>
-                      <Text style={[s.typeText, { color: on ? '#FFFFFF' : colors.text }]}>{SUPPLIER_EVENT_LABEL[t]}</Text>
-                    </Pressable>
-                  );
-                })}
+          <ScrollView style={{ flexGrow: 0 }} contentContainerStyle={{ paddingBottom: 4 }} keyboardShouldPersistTaps="handled">
+            {twoCol ? (
+              <View style={s.cols}>
+                <View style={s.colMain}>{supplierField}{stepBoxes}{addForm}</View>
+                <View style={[s.colSide, { borderColor: colors.border }]}>{history}</View>
               </View>
-              <DateField label="Fecha" value={date} onChange={setDate} />
-              <TextInput style={s.input} value={note} onChangeText={setNote} placeholder={type === 'other' ? 'Qué se ha hecho' : 'Nota (opcional): nº de pedido, importe, transportista…'} placeholderTextColor={colors.textTertiary} testID="supplier-note-input" />
-              {!!msg && <Text style={[s.msg, { color: colors.error }]} accessibilityRole="alert" testID="supplier-log-msg">{msg}</Text>}
-              <Pressable style={[s.addBtn, { backgroundColor: colors.primaryFill, opacity: busy ? 0.6 : 1 }]} onPress={addEntry} disabled={busy} accessibilityRole="button" testID="supplier-add-entry">
-                <Plus size={17} color={colors.onPrimary} />
-                <Text style={[s.smallBtnText, { color: colors.onPrimary }]}>Añadir apunte</Text>
-              </Pressable>
-            </View>
-
-            {/* Registro */}
-            <View style={{ gap: 8 }}>
-              <Text style={s.label}>{log.length > 0 ? `Registro (${log.length})` : 'Registro'}</Text>
-              {log.length === 0 ? (
-                <Text style={s.muted}>Aún no hay apuntes. Apunta cuándo se pidió al fabricante, cuándo llegó y cuándo se le pagó.</Text>
-              ) : (
-                <View style={[s.log, { borderColor: colors.border }]}>
-                  {log.map((e, k) => {
-                    const Icon = SUPPLIER_EVENT_ICON[e.type];
-                    return (
-                      <View key={e.id} style={[s.logRow, k > 0 && { borderTopWidth: StyleSheet.hairlineWidth, borderColor: colors.border }]} testID={`supplier-entry-${k}`}>
-                        <View style={[s.stepIcon, { backgroundColor: SUPPLIER_EVENT_TINT[e.type] }]}><Icon size={14} color="#FFFFFF" /></View>
-                        <View style={{ flex: 1, minWidth: 0 }}>
-                          <Text style={s.logTitle} numberOfLines={1}>{`${SUPPLIER_EVENT_LABEL[e.type]} · ${dmy(e.date)}`}</Text>
-                          {!!e.note && <Text style={s.muted}>{e.note}</Text>}
-                        </View>
-                        {confirmDel === e.id ? (
-                          <View style={s.confirm}>
-                            <Pressable onPress={() => removeEntry(e.id)} style={[s.confirmBtn, { backgroundColor: colors.error }]} accessibilityRole="button" testID={`supplier-entry-confirm-${k}`}>
-                              <Text style={[s.confirmText, { color: '#FFFFFF' }]}>Borrar</Text>
-                            </Pressable>
-                            <Pressable onPress={() => setConfirmDel(null)} style={[s.confirmBtn, { backgroundColor: colors.fill }]} accessibilityRole="button">
-                              <Text style={[s.confirmText, { color: colors.text }]}>No</Text>
-                            </Pressable>
-                          </View>
-                        ) : (
-                          <Pressable onPress={() => setConfirmDel(e.id)} style={s.close} accessibilityRole="button" accessibilityLabel="Borrar apunte" testID={`supplier-entry-del-${k}`}>
-                            <Trash2 size={16} color={colors.textTertiary} />
-                          </Pressable>
-                        )}
-                      </View>
-                    );
-                  })}
-                </View>
-              )}
-            </View>
+            ) : (
+              <View style={{ gap: 18 }}>{supplierField}{stepBoxes}{addForm}{history}</View>
+            )}
           </ScrollView>
         </View>
       </View>
@@ -228,33 +285,49 @@ export default function SupplierLogSheet({ order, index, startNew, onClose }: Pr
 const makeStyles = (c: ThemeColors) =>
   StyleSheet.create({
     overlay: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 16 },
-    sheet: { width: '100%', maxWidth: 560, maxHeight: '92%', borderRadius: 20, padding: 18, gap: 14 },
+    blur: Platform.OS === 'web' ? ({ backdropFilter: 'blur(6px) saturate(140%)', WebkitBackdropFilter: 'blur(6px) saturate(140%)' } as object) : {},
+    sheet: { width: '100%', maxWidth: 580, maxHeight: '92%', borderRadius: 22, padding: 16, gap: 14, borderWidth: StyleSheet.hairlineWidth },
+    sheetWide: { maxWidth: 980 },
     sheetMobile: { borderBottomLeftRadius: 0, borderBottomRightRadius: 0, paddingBottom: 28 },
-    head: { flexDirection: 'row', alignItems: 'center', gap: 12 },
-    icon: { width: 36, height: 36, borderRadius: 11, alignItems: 'center', justifyContent: 'center' },
+    shadow: Platform.OS === 'web' ? ({ boxShadow: '0 30px 80px rgba(0,0,0,0.28), 0 8px 24px rgba(0,0,0,0.12)' } as object) : {},
+    head: { flexDirection: 'row', alignItems: 'center', gap: 12, padding: 10, borderRadius: 16, borderWidth: 1 },
+    icon: { width: 40, height: 40, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
     title: { fontSize: 19, fontWeight: '800', letterSpacing: -0.3, color: c.text },
     subtitle: { fontSize: 14, color: c.textSecondary },
+    statusPill: { minHeight: 30, paddingHorizontal: 12, borderRadius: 999, alignItems: 'center', justifyContent: 'center', maxWidth: 260 },
+    statusText: { fontSize: 13.5, fontWeight: '800', color: '#FFFFFF' },
     close: { width: 40, height: 40, borderRadius: 20, alignItems: 'center', justifyContent: 'center' },
+    cols: { flexDirection: 'row', gap: 20, alignItems: 'stretch' },
+    colMain: { flex: 1.25, minWidth: 0, gap: 16 },
+    colSide: { flex: 1, minWidth: 0, borderLeftWidth: StyleSheet.hairlineWidth, paddingLeft: 20 },
     label: { fontSize: 13, fontWeight: '700', color: c.textSecondary },
-    select: { flexDirection: 'row', alignItems: 'center', gap: 8, minHeight: 46, paddingHorizontal: 14, borderRadius: 12, borderWidth: 1, ...(Platform.OS === 'web' ? ({ cursor: 'pointer' } as object) : {}) },
-    selectText: { flex: 1, minWidth: 0, fontSize: 16, fontWeight: '600' },
+    select: { flexDirection: 'row', alignItems: 'center', gap: 10, minHeight: 50, paddingHorizontal: 10, borderRadius: 14, borderWidth: 1, ...(Platform.OS === 'web' ? ({ cursor: 'pointer', transitionProperty: 'border-color', transitionDuration: '160ms' } as object) : {}) },
+    selIcon: { width: 30, height: 30, borderRadius: 9, alignItems: 'center', justifyContent: 'center' },
+    selectText: { flex: 1, minWidth: 0, fontSize: 16, fontWeight: '700' },
     newRow: { flexDirection: 'row', alignItems: 'center', gap: 8, flexWrap: 'wrap' },
     input: { borderRadius: 12, backgroundColor: c.fill, color: c.text, paddingHorizontal: 14, height: 46, fontSize: 16, minWidth: 0, ...webInputReset },
     smallBtn: { minHeight: 44, paddingHorizontal: 16, borderRadius: 999, alignItems: 'center', justifyContent: 'center' },
     smallBtnText: { fontSize: 15, fontWeight: '700' },
     steps: { flexDirection: 'row', gap: 8 },
-    stepBox: { flex: 1, minWidth: 0, borderRadius: 14, borderWidth: 1, padding: 10, gap: 4 },
-    stepIcon: { width: 28, height: 28, borderRadius: 14, alignItems: 'center', justifyContent: 'center' },
-    stepLabel: { fontSize: 13, fontWeight: '700' },
-    stepDate: { fontSize: 13.5, fontWeight: '600', fontVariant: ['tabular-nums'] },
+    stepBox: { flex: 1, minWidth: 0, borderRadius: 16, borderWidth: 1.5, padding: 10, gap: 3 },
+    stepTop: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 3 },
+    stepIcon: { width: 30, height: 30, borderRadius: 15, alignItems: 'center', justifyContent: 'center' },
+    stepLabel: { fontSize: 14, fontWeight: '800' },
+    stepDate: { fontSize: 13.5, fontWeight: '700', fontVariant: ['tabular-nums'] },
     addBox: { borderWidth: 1, borderRadius: 16, padding: 12, gap: 10 },
     types: { flexDirection: 'row', flexWrap: 'wrap', gap: 6 },
-    typeChip: { minHeight: 36, paddingHorizontal: 12, borderRadius: 999, borderWidth: 1, alignItems: 'center', justifyContent: 'center' },
+    typeChip: { flexDirection: 'row', alignItems: 'center', gap: 6, minHeight: 36, paddingHorizontal: 12, borderRadius: 999, borderWidth: 1, ...(Platform.OS === 'web' ? ({ cursor: 'pointer', transitionProperty: 'background-color, border-color', transitionDuration: '180ms' } as object) : {}) },
     typeText: { fontSize: 14, fontWeight: '700' },
+    formRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
     addBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, minHeight: 46, borderRadius: 999 },
-    log: { borderWidth: 1, borderRadius: 14, overflow: 'hidden' },
-    logRow: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 12, paddingVertical: 10 },
-    logTitle: { fontSize: 14.5, fontWeight: '700', color: c.text },
+    empty: { borderWidth: 1, borderStyle: 'dashed', borderRadius: 14, padding: 14 },
+    timeline: { gap: 0 },
+    logRow: { flexDirection: 'row', gap: 10 },
+    rail: { alignItems: 'center', width: 30 },
+    railLine: { width: 2, flex: 1, marginVertical: 3, borderRadius: 1 },
+    logCard: { flex: 1, minWidth: 0, flexDirection: 'row', alignItems: 'center', gap: 8, borderWidth: 1, borderRadius: 14, paddingHorizontal: 12, paddingVertical: 9, marginBottom: 8 },
+    logTitle: { fontSize: 14.5, fontWeight: '800', color: c.text },
+    logDate: { fontSize: 13, fontWeight: '700', fontVariant: ['tabular-nums'] },
     muted: { fontSize: 13.5, color: c.textSecondary },
     msg: { fontSize: 14, fontWeight: '600' },
     confirm: { flexDirection: 'row', gap: 6 },

@@ -8,14 +8,14 @@ import SearchField from '@/components/SearchField';
 import SelectSheet from '@/components/SelectSheet';
 import { canvas, panel, webInputReset } from '@/constants/theme';
 import { enter, fx } from '@/constants/motion';
-import { SUPPLIER_EVENT_SHORT, SUPPLIER_EVENT_TINT, SUPPLIER_STEPS, dmy, supplierSteps } from '@/constants/supplierLog';
+import { SUPPLIER_EVENT_SHORT, SUPPLIER_EVENT_TINT, SUPPLIER_STEPS, SUPPLIER_TINT, dmy, supplierSteps } from '@/constants/supplierLog';
 import { useTheme } from '@/contexts/ThemeContext';
 import { useData } from '@/contexts/DataContext';
 import type { ThemeColors } from '@/constants/colors';
 import type { OrderItem, Supplier } from '@/types';
 
 const fold = (t: string) => t.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
-const TINT = '#7B5CC4';
+const TINT = SUPPLIER_TINT;
 
 type Form = { name: string; contact: string; phone: string; email: string; notes: string };
 const EMPTY: Form = { name: '', contact: '', phone: '', email: '', notes: '' };

@@ -22,12 +22,17 @@ export const SUPPLIER_EVENT_SHORT: Record<SupplierEventType, string> = {
   other: 'Nota',
 };
 
+/** Colores de los trámites: pedido azul, recibido verde, pagado naranja; lo que falta, amarillo */
 export const SUPPLIER_EVENT_TINT: Record<SupplierEventType, string> = {
-  ordered: '#0EA5E9',
+  ordered: '#2F6FED',
   received: '#22A447',
-  paid: '#7B5CC4',
+  paid: '#F27A0F',
   other: '#8E8E93',
 };
+/** Trámite pendiente (el siguiente que toca hacer) */
+export const SUPPLIER_PENDING_TINT = '#E0A800';
+/** Color de la sección «Fabricantes» */
+export const SUPPLIER_TINT = '#0F8B8D';
 
 export const SUPPLIER_EVENT_ICON = {
   ordered: ShoppingCart,
@@ -52,6 +57,12 @@ export function supplierSteps(item: Pick<OrderItem, 'supplier_log'>): Record<'or
     if (!r[e.type] || e.date > r[e.type]!) r[e.type] = e.date;
   }
   return r;
+}
+
+/** Siguiente trámite que falta (pedido → recibido → pagado), o null si están todos */
+export function nextSupplierStep(item: Pick<OrderItem, 'supplier_log'>): 'ordered' | 'received' | 'paid' | null {
+  const st = supplierSteps(item);
+  return SUPPLIER_STEPS.find(t => !st[t]) ?? null;
 }
 
 /** Fabricantes distintos de los productos de un pedido, en orden de aparición */

@@ -404,7 +404,7 @@ function SupplierLine({ o }: { o: Order }) {
   if (names.length === 0) return null;
   return (
     <View style={s.iconLine} testID={`order-suppliers-${o.id}`}>
-      <Factory size={13} color="#7B5CC4" />
+      <Factory size={13} color="#0F8B8D" />
       <Text style={[s.tdSub, { flexShrink: 1, color: colors.text }]} numberOfLines={1}>{names.join(', ')}</Text>
     </View>
   );

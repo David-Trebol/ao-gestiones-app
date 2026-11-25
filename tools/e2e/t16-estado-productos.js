@@ -31,6 +31,7 @@ const check = (name, ok, extra = '') => { console.log(`${ok ? 'OK  ' : 'FAIL'} $
     await pick(0, 'Enviado'); await pick(1, 'Pendiente');
     check(`[${tag}] se guarda el estado de cada producto`, o1().items[0].item_status === 'shipped' && o1().items[1].item_status === 'pending', JSON.stringify(o1().items.map(x => x.item_status)));
     check(`[${tag}] no cambia importes ni el resto del producto`, o1().total_with_vat === total0 && JSON.stringify(o1().items.map(({ item_status, ...x }) => x)) === items0);
+    await p.mouse.move(2, 2); await wt(600);
     const bg = await p.evaluate(() => [0, 1].map(i => getComputedStyle(document.querySelector(`[data-testid="item-row-${i}"]`)).backgroundColor));
     check(`[${tag}] fila azul cielo (enviado) y amarilla (pendiente)`, /rgba\(14, 165, 233|rgba\(56, 189, 248/.test(bg[0]) && /rgba\(255, 204, 0/.test(bg[1]), bg.join(' | '));
     check(`[${tag}] la chapa muestra el estado`, (await p.getByTestId('item-status-0').first().innerText()).includes('Enviado'));

@@ -88,7 +88,7 @@ const check = (name, ok, extra = '') => { console.log(`${ok ? 'OK  ' : 'FAIL'} $
     await shot('registro');
     await p.getByTestId('supplier-log-close').click(); await wt(500);
     const logTxt = await p.getByTestId('item-log-0').first().innerText();
-    check(`[${tag}] el botón del registro resume el último trámite`, /Recibido 06\/11/.test(logTxt), logTxt);
+    check(`[${tag}] el botón del registro resume el último trámite`, /Recibido\s*06\/11/.test(logTxt), logTxt);
 
     // Producto 1: fabricante nuevo desde la ficha
     await p.getByTestId('item-supplier-1').first().click(); await wt(500);
