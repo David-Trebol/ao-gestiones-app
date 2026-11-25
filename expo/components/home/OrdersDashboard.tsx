@@ -1,7 +1,7 @@
 import React, { useMemo, useState } from 'react';
 import { Alert, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { useRouter } from 'expo-router';
-import { AlertTriangle, ChevronDown, Download, Factory, Mail, MapPin, Package, Phone, Search, SlidersHorizontal, X } from 'lucide-react-native';
+import { AlertTriangle, ChevronDown, Download, Factory, FileText, Mail, Package, Phone, Search, SlidersHorizontal, X } from 'lucide-react-native';
 import { useTheme } from '@/contexts/ThemeContext';
 import { useData } from '@/contexts/DataContext';
 import { ThemeColors , SystemTint } from '@/constants/colors';
@@ -28,7 +28,6 @@ import {
   formatISODate,
   overdueDays,
   itemsSummary,
-  addressLine,
 } from '@/utils/orderFilters';
 
 // Se conservan al volver de un pedido o al cambiar de vista
@@ -374,6 +373,28 @@ export function ExpectedText({ o, prefix = '' }: { o: Order; prefix?: string }) 
 }
 
 /** Una sola línea corta bajo el estado: «47 d de retraso», «Previsto hoy» o «Previsto 15/01» (la fila no crece) */
+/** Referencia interna, nº de factura y nº de proforma, juntos en una línea (solo los que tenga el pedido) */
+function DocRefs({ o }: { o: Order }) {
+  const { colors } = useTheme();
+  const s = useMemo(() => makeStyles(colors), [colors]);
+  const c = o.customer;
+  const refs = ([['Ref.', o.custom_reference], ['Fra.', c?.numero_factura], ['Prof.', c?.oferta_proforma]] as const)
+    .map(([k, v]) => [k, (v ?? '').trim()] as const)
+    .filter(([, v]) => !!v);
+  if (refs.length === 0) return null;
+  return (
+    <View style={s.docRefs} testID={`doc-refs-${o.id}`}>
+      <FileText size={13} color={colors.accent} />
+      {refs.map(([k, v]) => (
+        <Text key={k} style={[s.tdSub, { flexShrink: 1 }]} numberOfLines={1}>
+          <Text style={{ color: colors.textTertiary }}>{k} </Text>
+          <Text style={{ color: colors.text, fontWeight: '600' }}>{v}</Text>
+        </Text>
+      ))}
+    </View>
+  );
+}
+
 function LateLine({ o }: { o: Order }) {
   const { colors } = useTheme();
   const s = useMemo(() => makeStyles(colors), [colors]);
@@ -394,7 +415,7 @@ export function OrderTable({ orders, onOpen, showReasons }: { orders: Order[]; o
   return (
     <View style={[s.card, panel(colors, isDark)]}>
       <View style={[s.tr, s.th]}>
-        <Text style={[s.thText, s.cClient]}>Cliente y dirección</Text>
+        <Text style={[s.thText, s.cClient]}>Cliente y referencias</Text>
         <Text style={[s.thText, s.cRef]}>Pedido</Text>
         <Text style={[s.thText, s.cItems]}>Productos</Text>
         <Text style={[s.thText, s.cTotal]}>Total y estado</Text>
@@ -403,7 +424,6 @@ export function OrderTable({ orders, onOpen, showReasons }: { orders: Order[]; o
         const reasons = showReasons ? attentionReasons(o) : [];
         const c = o.customer;
         const person = [c?.contacto, c?.departamento].filter(x => x?.trim()).join(' · ');
-        const addr = addressLine(c);
         const it = itemsSummary(o);
         return (
           <Pressable
@@ -421,12 +441,7 @@ export function OrderTable({ orders, onOpen, showReasons }: { orders: Order[]; o
               ) : person ? (
                 <Text style={s.tdSub} numberOfLines={1}>{person}</Text>
               ) : null}
-              {!!addr && (
-                <View style={s.iconLine}>
-                  <MapPin size={13} color={colors.accent} />
-                  <Text style={[s.td, { flexShrink: 1 }]} numberOfLines={1}>{addr}</Text>
-                </View>
-              )}
+              <DocRefs o={o} />
               {(!!c?.telefono_1 || !!c?.email) && (
                 <View style={s.contactRow}>
                   {!!c?.telefono_1 && (
@@ -448,7 +463,6 @@ export function OrderTable({ orders, onOpen, showReasons }: { orders: Order[]; o
               <Text style={s.refText} numberOfLines={1}>{o.reference_number}</Text>
               <Text style={s.tdSub} numberOfLines={1}>
                 {formatDate(o.created_at)}
-                {o.custom_reference ? ` · ${o.custom_reference}` : ''}
               </Text>
               <View style={s.iconLine}>
                 <Factory size={13} color={colors.accent} />
@@ -468,7 +482,7 @@ export function OrderTable({ orders, onOpen, showReasons }: { orders: Order[]; o
             </View>
             <View style={[s.cTotal, { gap: 4, alignItems: 'flex-end' }]}>
               <Text style={s.totalText}>{formatCurrency(o.total_with_vat)}</Text>
-              <StatusBadge status={o.status} size="sm" />
+              <View style={{ alignSelf: 'flex-end' }}><StatusBadge status={o.status} size="sm" /></View>
               <LateLine o={o} />
             </View>
           </Pressable>
@@ -488,7 +502,6 @@ export function OrderCardItem({ order: o, onOpen, twoCols, showReasons, grouped,
   const reasons = showReasons ? attentionReasons(o) : [];
   const c = o.customer;
   const person = [c?.contacto, c?.departamento].filter(x => x?.trim()).join(' · ');
-  const addr = addressLine(c);
   const it = itemsSummary(o);
   return (
     <Pressable
@@ -513,12 +526,7 @@ export function OrderCardItem({ order: o, onOpen, twoCols, showReasons, grouped,
       <Text style={s.oClient} numberOfLines={2}>{c?.nombre_empresa || 'Sin cliente'}</Text>
       <View style={s.oInfo}>
         {!!person && <Text style={s.tdSub} numberOfLines={1}>{person}</Text>}
-        {!!addr && (
-          <View style={s.iconLine}>
-            <MapPin size={13} color={colors.accent} />
-            <Text style={[s.tdSub, { flexShrink: 1 }]} numberOfLines={1}>{addr}</Text>
-          </View>
-        )}
+        <DocRefs o={o} />
         {!!c?.telefono_1 && (
           <View style={s.iconLine}>
             <Phone size={13} color={colors.accent} />
@@ -625,6 +633,7 @@ function makeStyles(c: ThemeColors) {
     clientText: { fontSize: 16.5, fontWeight: '800', color: c.text, letterSpacing: -0.1 },
     totalText: { fontSize: 18, letterSpacing: -0.3, fontWeight: '800', color: c.text, fontVariant: ['tabular-nums'], ...(Platform.OS === 'web' ? ({ whiteSpace: 'nowrap' } as object) : {}) },
     iconLine: { flexDirection: 'row', alignItems: 'center', gap: 6, minWidth: 0 },
+    docRefs: { flexDirection: 'row', alignItems: 'center', columnGap: 10, minWidth: 0, flexWrap: 'wrap' },
     oInfo: { gap: 3, marginTop: 4 },
     cDate: { flex: 1, minWidth: 0 },
     cTotal: { width: 156, flexShrink: 0, textAlign: 'right' },
