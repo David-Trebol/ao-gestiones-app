@@ -179,6 +179,33 @@ export default function OrderDetailScreen() {
   // icono encima del amarillo: oscuro para que se lea
   const onDot = order.status === 'processing' ? '#3D2C00' : '#FFFFFF';
 
+  // Botón de estado: una sola píldora sólida (color del estado + flecha), que se lee bien encima del naranja.
+  // En ordenador va arriba a la derecha, encima del total; en móvil, junto a la referencia.
+  const statusPill = (
+      <Pressable
+        key={`st-${order.status}`}
+        onPress={() => setSheet('status')}
+        disabled={busy}
+        style={({ hovered }: { pressed: boolean; hovered?: boolean }) => [
+          s.statusBtn,
+          { backgroundColor: isDark ? '#0B2733' : '#FFFFFF' },
+          hovered && { transform: [{ translateY: -1 }] },
+          enter(0, 'bump', { base: 380 }),
+        ]}
+        {...fx('tint')}
+        hitSlop={6}
+        accessibilityRole="button"
+        accessibilityLabel={`Estado: ${st.label}. Cambiar estado`}
+        testID="change-status"
+      >
+        <View style={[s.statusIcon, { backgroundColor: stDot }]}>
+          <StIcon size={17} color={onDot} strokeWidth={2.6} />
+        </View>
+        <Text style={[s.statusBtnText, { color: stColor }]}>{st.label}</Text>
+        <ChevronDown size={18} color={stColor} strokeWidth={2.6} />
+      </Pressable>
+  );
+
   let tileN = 0;
   const tile = (Icon: typeof Euro, tint: string, label: string, value: string, sub: string, valueColor?: string) => (
     <View style={[s.tile, panel(colors, isDark), mobileTiles && s.tileHalf, enter(++tileN, 'pop', { base: 120, step: 70 })]} {...fx('lift')}>
@@ -262,29 +289,7 @@ export default function OrderDetailScreen() {
                 {order.reference_number}
               </Text>
             </View>
-            {/* Botón de estado: una sola píldora sólida (color del estado + flecha), que se lee bien encima del naranja */}
-            <Pressable
-              key={`st-${order.status}`}
-              onPress={() => setSheet('status')}
-              disabled={busy}
-              style={({ hovered }: { pressed: boolean; hovered?: boolean }) => [
-                s.statusBtn,
-                { backgroundColor: isDark ? '#0B2733' : '#FFFFFF' },
-                hovered && { transform: [{ translateY: -1 }] },
-                enter(0, 'bump', { base: 380 }),
-              ]}
-              {...fx('tint')}
-              hitSlop={6}
-              accessibilityRole="button"
-              accessibilityLabel={`Estado: ${st.label}. Cambiar estado`}
-              testID="change-status"
-            >
-              <View style={[s.statusIcon, { backgroundColor: stDot }]}>
-                <StIcon size={22} color={onDot} strokeWidth={2.6} />
-              </View>
-              <Text style={[s.statusBtnText, { color: stColor }]}>{st.label}</Text>
-              <ChevronDown size={24} color={stColor} strokeWidth={2.6} />
-            </Pressable>
+            {!desktop && statusPill}
           </View>
           <Text style={[s.heroClient, narrow && { fontSize: 24, lineHeight: 29 }]} numberOfLines={2} selectable>
             {c.nombre_empresa || 'Sin nombre de empresa'}
@@ -327,6 +332,7 @@ export default function OrderDetailScreen() {
           )}
         </View>
         <View style={[s.heroSide, desktop ? { alignItems: 'flex-end' } : s.heroSideRow]}>
+          {desktop && <View style={{ marginBottom: 6 }}>{statusPill}</View>}
           <View style={{ flexShrink: 1, minWidth: 0 }}>
             <Text style={[s.heroCaption, desktop && { textAlign: 'right' }]}>Total con IVA</Text>
             <Text style={[s.total, desktop && { textAlign: 'right' }, narrow && { fontSize: 30 }]} numberOfLines={1} adjustsFontSizeToFit accessibilityLabel={`Total ${formatCurrency(order.total_with_vat)}`}>
@@ -889,11 +895,11 @@ function makeStyles(c: ThemeColors) {
     ref: { fontSize: 20, lineHeight: 25, fontWeight: '800', color: c.onPrimary, letterSpacing: 0.2, fontVariant: ['tabular-nums'] },
     // la flecha va dentro de la misma píldora que el estado, sobre un vidrio claro para que se lea encima del naranja
     statusBtn: {
-      flexDirection: 'row', alignItems: 'center', gap: 12, minHeight: 64, paddingLeft: 8, paddingRight: 18, borderRadius: 999,
+      flexDirection: 'row', alignItems: 'center', gap: 9, minHeight: 48, paddingLeft: 6, paddingRight: 14, borderRadius: 999,
       ...(Platform.OS === 'web' ? ({ boxShadow: '0 6px 18px rgba(0,42,57,0.22), inset 0 1px 0 rgba(255,255,255,0.6)', cursor: 'pointer' } as object) : {}),
     },
-    statusIcon: { width: 48, height: 48, borderRadius: 24, alignItems: 'center', justifyContent: 'center' },
-    statusBtnText: { fontSize: 24, fontWeight: '800', letterSpacing: -0.4 },
+    statusIcon: { width: 36, height: 36, borderRadius: 18, alignItems: 'center', justifyContent: 'center' },
+    statusBtnText: { fontSize: 18, fontWeight: '800', letterSpacing: -0.3 },
     heroDot: { width: 9, height: 9, borderRadius: 5, borderWidth: 1.5, borderColor: 'rgba(255,255,255,0.9)' },
     // chapa de estado de un producto
     chip: { flexDirection: 'row', alignItems: 'center', gap: 6, alignSelf: 'flex-start', minHeight: 32, paddingHorizontal: 11, borderRadius: 999, borderWidth: 1, maxWidth: '100%' },

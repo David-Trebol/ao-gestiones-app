@@ -38,7 +38,7 @@ const check = (name, ok, extra = '') => { console.log(`${ok ? 'OK  ' : 'FAIL'} $
     const bgD = await p.evaluate(() => getComputedStyle(document.querySelector('[data-testid="item-row-1"]')).backgroundColor);
     check(`[${tag}] «Entregado» se guarda y tiene su color (verde)`, o1().items[1].item_status === 'delivered' && /rgba\(52, 199, 89|rgba\(48, 209, 88/.test(bgD), bgD);
     const pillH = await p.getByTestId('change-status').evaluate(e => e.getBoundingClientRect().height);
-    check(`[${tag}] botón de estado de arriba más grande`, pillH >= 62, String(pillH));
+    check(`[${tag}] botón de estado de arriba con tamaño ajustado`, pillH >= 46 && pillH <= 52, String(pillH));
     await pick(1, 'Sin empezar');
     check(`[${tag}] «Sin empezar» quita el estado`, o1().items[1].item_status === undefined);
     // «Estado de todos» (o1 tiene 2 productos): los marca todos de una vez
