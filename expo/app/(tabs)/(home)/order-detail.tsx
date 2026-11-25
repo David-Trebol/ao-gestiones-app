@@ -13,7 +13,7 @@ import { ThemeColors } from '@/constants/colors';
 import { STATUS_ICONS, STATUS_ORDER, statusConfig } from '@/components/StatusBadge';
 import SelectSheet from '@/components/SelectSheet';
 import SupplierLogSheet from '@/components/SupplierLogSheet';
-import { SUPPLIER_EVENT_SHORT, SUPPLIER_EVENT_TINT, SUPPLIER_PENDING_TINT, SUPPLIER_STEPS, SUPPLIER_TINT, dmy, nextSupplierStep, orderSupplierNames, supplierSteps } from '@/constants/supplierLog';
+import { SUPPLIER_EVENT_SHORT, SUPPLIER_EVENT_TINT, SUPPLIER_PENDING_TINT, SUPPLIER_STEPS, SUPPLIER_TINT, dmy, isPaymentPending, nextSupplierStep, orderSupplierNames, supplierSteps } from '@/constants/supplierLog';
 import type { ItemStatus, OrderItem, OrderStatus } from '@/types';
 import { formatCurrency, formatDate } from '@/utils/calculations';
 import { addressLine, formatISODate, itemsSummary, overdueDays } from '@/utils/orderFilters';
@@ -26,7 +26,7 @@ type Sheet = 'more' | 'status' | null;
 export default function OrderDetailScreen() {
   const { orderId } = useLocalSearchParams<{ orderId: string }>();
   const router = useRouter();
-  const { orders, suppliers, deleteOrder, updateOrderField, updateItemStatus, updateItemSupplier, duplicateOrder } = useData();
+  const { orders, deleteOrder, updateOrderField, updateItemStatus, duplicateOrder } = useData();
   const { colors, isDark } = useTheme();
   const { width, content, bottomSpace } = usePageLayout();
   const { shown: compactShown, scrollProps } = useCollapsingTitle(90);
@@ -37,9 +37,8 @@ export default function OrderDetailScreen() {
   const totalShown = useCountUp(order?.total_with_vat ?? 0);
 
   const [sheet, setSheet] = useState<Sheet>(null);
-  // fabricante de un producto: lista para elegir (supSheet) y ventana del registro (logSheet)
-  const [supSheet, setSupSheet] = useState<number | null>(null);
-  const [logSheet, setLogSheet] = useState<{ index: number; startNew?: boolean } | null>(null);
+  // fabricante de un producto y su registro: todo en la misma ventana
+  const [logSheet, setLogSheet] = useState<{ index: number; pickSupplier?: boolean } | null>(null);
   // nombres largos de producto: se ven en 2 líneas y se despliegan al pulsarlos
   const [openNames, setOpenNames] = useState<Record<number, boolean>>({});
   /** Producto cuyo estado se está cambiando (índice) */
@@ -270,18 +269,19 @@ export default function OrderDetailScreen() {
   const supplierBlock = (i: number, item: OrderItem) => {
     const st = supplierSteps(item);
     const next = nextSupplierStep(item);
+    const payPend = isPaymentPending(item);
     const n = item.supplier_log?.length ?? 0;
     const has = !!item.supplier_name;
     const lead = !has ? colors.textTertiary : next ? SUPPLIER_PENDING_TINT : SUPPLIER_EVENT_TINT.paid;
     const lastDone = [...SUPPLIER_STEPS].reverse().find(t => st[t]);
-    const tone = lastDone ? SUPPLIER_EVENT_TINT[lastDone] : has ? SUPPLIER_PENDING_TINT : null;
+    const tone = payPend ? SUPPLIER_EVENT_TINT.payment_pending : lastDone ? SUPPLIER_EVENT_TINT[lastDone] : has ? SUPPLIER_PENDING_TINT : null;
     return (
       <View
         style={[s.supBox, tone ? { borderColor: tone + '59', backgroundColor: tone + (isDark ? '1F' : '12') } : { borderColor: colors.border, backgroundColor: colors.fill }]}
         testID={`item-supbox-${i}`}
       >
         <Pressable
-          onPress={() => setSupSheet(i)}
+          onPress={() => setLogSheet({ index: i, pickSupplier: true })}
           style={s.supHead}
           {...fx('tint')}
           hitSlop={4}
@@ -306,12 +306,13 @@ export default function OrderDetailScreen() {
         >
           {SUPPLIER_STEPS.map(t => {
             const d = st[t];
+            const pp = t === 'paid' && payPend;
             const due = has && !d && t === next;
-            const c = d ? SUPPLIER_EVENT_TINT[t] : due ? SUPPLIER_PENDING_TINT : null;
+            const c = pp ? SUPPLIER_EVENT_TINT.payment_pending : d ? SUPPLIER_EVENT_TINT[t] : due ? SUPPLIER_PENDING_TINT : null;
             return (
-              <View key={t} style={[s.supStep, d ? { backgroundColor: c! } : due ? { backgroundColor: c + '29', borderColor: c + '99' } : { borderColor: colors.border, borderStyle: 'dashed' }]}>
-                <Text style={[s.supStepLabel, { color: d ? '#FFFFFF' : due ? (isDark ? '#FFD54A' : '#7A5800') : colors.textTertiary }]} numberOfLines={1}>{SUPPLIER_EVENT_SHORT[t]}</Text>
-                <Text style={[s.supStepDate, { color: d ? '#FFFFFF' : due ? (isDark ? '#FFD54A' : '#7A5800') : colors.textTertiary }]} numberOfLines={1}>{d ? dmy(d).slice(0, 5) : due ? 'Falta' : '—'}</Text>
+              <View key={t} style={[s.supStep, pp ? { backgroundColor: c + '2E', borderColor: c! } : d ? { backgroundColor: c! } : due ? { backgroundColor: c + '29', borderColor: c + '99' } : { borderColor: colors.border, borderStyle: 'dashed' }]} testID={pp ? `item-paypend-${i}` : undefined}>
+                <Text style={[s.supStepLabel, { color: pp ? (isDark ? '#FF8E9C' : '#C2283E') : d ? '#FFFFFF' : due ? (isDark ? '#FFD54A' : '#7A5800') : colors.textTertiary }]} numberOfLines={1}>{pp ? 'Pago' : SUPPLIER_EVENT_SHORT[t]}</Text>
+                <Text style={[s.supStepDate, { color: pp ? (isDark ? '#FF8E9C' : '#C2283E') : d ? '#FFFFFF' : due ? (isDark ? '#FFD54A' : '#7A5800') : colors.textTertiary }]} numberOfLines={1}>{pp ? 'Pendiente' : d ? dmy(d).slice(0, 5) : due ? 'Falta' : '—'}</Text>
               </View>
             );
           })}
@@ -863,27 +864,7 @@ export default function OrderDetailScreen() {
         )}
       </ScrollView>
 
-      <SelectSheet
-        visible={supSheet !== null}
-        title={supSheet !== null ? `Fabricante de «${order.items[supSheet]?.product_name || 'producto'}»` : 'Fabricante'}
-        searchable={suppliers.length > 6}
-        searchPlaceholder="Buscar fabricante"
-        options={[
-          ...suppliers.map(x => ({ value: x.id, label: x.name, hint: x.contact ?? undefined })),
-          { value: '__new', label: '+ Añadir fabricante nuevo' },
-          ...(supSheet !== null && order.items[supSheet]?.supplier_id ? [{ value: '__none', label: 'Quitar fabricante', destructive: true }] : []),
-        ]}
-        selected={supSheet !== null ? order.items[supSheet]?.supplier_id : undefined}
-        onSelect={v => {
-          const i = supSheet;
-          if (i === null) return;
-          if (v === '__new') setLogSheet({ index: i, startNew: true });
-          else void updateItemSupplier(order.id, i, v === '__none' ? { supplier_id: undefined, supplier_name: undefined } : { supplier_id: v, supplier_name: suppliers.find(x => x.id === v)?.name ?? '' })
-            .catch(e => Alert.alert('No se pudo cambiar el fabricante', (e as Error).message));
-        }}
-        onClose={() => setSupSheet(null)}
-      />
-      <SupplierLogSheet order={order} index={logSheet?.index ?? null} startNew={logSheet?.startNew} onClose={() => setLogSheet(null)} />
+      <SupplierLogSheet order={order} index={logSheet?.index ?? null} pickSupplier={logSheet?.pickSupplier} onClose={() => setLogSheet(null)} />
       <SelectSheet
         visible={sheet === 'status'}
         title="Cambiar estado del pedido"

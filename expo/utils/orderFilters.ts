@@ -1,11 +1,12 @@
 import type { Order, OrderStatus } from '@/types';
+import { orderIncidents } from '@/constants/supplierLog';
 
 export type SortKey = 'created_desc' | 'created_asc' | 'updated_desc' | 'expected_asc' | 'amount_desc' | 'amount_asc';
 export type PeriodKey = 'all' | '7' | '30' | '90' | 'year';
 
 export interface OrderFilters {
   query: string;
-  status: OrderStatus | 'all' | 'attention' | 'overdue';
+  status: OrderStatus | 'all' | 'attention' | 'overdue' | 'incidents';
   manufacturerId: string; // '' = todos
   owner: string; // '' = todos
   year: string; // '' = todos
@@ -134,7 +135,9 @@ export function filterOrders(orders: Order[], f: OrderFilters, now = Date.now())
   const minDate =
     f.period === 'all' ? 0 : f.period === 'year' ? new Date(new Date(now).getFullYear(), 0, 1).getTime() : now - Number(f.period) * DAY;
   const out = orders.filter(o => {
-    if (f.status === 'attention') {
+    if (f.status === 'incidents') {
+      if (!orderIncidents(o).length) return false;
+    } else if (f.status === 'attention') {
       if (!attentionReasons(o, now).length) return false;
     } else if (f.status === 'overdue') {
       const late = overdueDays(o, now);

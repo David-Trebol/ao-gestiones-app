@@ -2,12 +2,11 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { Modal, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View, useWindowDimensions } from 'react-native';
 import { Check, ChevronDown, Factory, Plus, Trash2, X } from 'lucide-react-native';
 import DateField from '@/components/DateField';
-import SelectSheet from '@/components/SelectSheet';
 import { webInputReset } from '@/constants/theme';
 import { enter } from '@/constants/motion';
 import {
   SUPPLIER_EVENT_ICON, SUPPLIER_EVENT_LABEL, SUPPLIER_EVENT_ORDER, SUPPLIER_EVENT_SHORT, SUPPLIER_EVENT_TINT, SUPPLIER_PENDING_TINT, SUPPLIER_STEPS, SUPPLIER_TINT,
-  dmy, sortedLog, supplierSteps, todayISO,
+  dmy, isPaymentPending, sortedLog, supplierSteps, todayISO,
 } from '@/constants/supplierLog';
 import { useTheme } from '@/contexts/ThemeContext';
 import { useData } from '@/contexts/DataContext';
@@ -19,8 +18,8 @@ interface Props {
   order: Order;
   /** índice del producto, o null si está cerrado */
   index: number | null;
-  /** abre directamente el alta de un fabricante nuevo */
-  startNew?: boolean;
+  /** abre con la lista de fabricantes desplegada para elegir */
+  pickSupplier?: boolean;
   onClose: () => void;
 }
 
@@ -28,7 +27,7 @@ interface Props {
  * Fabricante de un producto y su registro: qué se ha hecho con el fabricante y cuándo
  * (pedido, recibido, pagado u otra cosa). Cada apunte se queda guardado; no se sobrescribe.
  */
-export default function SupplierLogSheet({ order, index, startNew, onClose }: Props) {
+export default function SupplierLogSheet({ order, index, pickSupplier, onClose }: Props) {
   const { colors, isDark } = useTheme();
   const { width } = useWindowDimensions();
   const s = useMemo(() => makeStyles(colors), [colors]);
@@ -37,7 +36,9 @@ export default function SupplierLogSheet({ order, index, startNew, onClose }: Pr
   const [type, setType] = useState<SupplierEventType>('ordered');
   const [date, setDate] = useState<string | null>(todayISO());
   const [note, setNote] = useState('');
+  // lista de fabricantes desplegada dentro de la propia ventana
   const [picker, setPicker] = useState(false);
+  const [q, setQ] = useState('');
   const [newName, setNewName] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   // avisos dentro de la propia ventana (una alerta normal quedaría detrás)
@@ -51,11 +52,13 @@ export default function SupplierLogSheet({ order, index, startNew, onClose }: Pr
     setType(SUPPLIER_STEPS.find(t => !st[t]) ?? 'other');
     setDate(todayISO());
     setNote('');
-    setNewName(startNew ? '' : null);
+    setNewName(null);
+    setPicker(!!pickSupplier || !item.supplier_name);
+    setQ('');
     setMsg(null);
     setConfirmDel(null);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [index, startNew]);
+  }, [index, pickSupplier]);
 
   if (index === null || !item) return null;
   const steps = supplierSteps(item);
@@ -66,13 +69,16 @@ export default function SupplierLogSheet({ order, index, startNew, onClose }: Pr
     setMsg(null);
     try { await fn(); } catch (e) { setMsg(`${errTitle}: ${(e as Error).message}`); } finally { setBusy(false); }
   };
-  const setSupplier = (id: string | null, name?: string) =>
-    run(() => updateItemSupplier(order.id, index, { supplier_id: id ?? undefined, supplier_name: id ? name ?? suppliers.find(x => x.id === id)?.name ?? '' : undefined }), 'No se pudo cambiar el fabricante');
+  const setSupplier = (id: string | null, name?: string) => {
+    setPicker(false);
+    return run(() => updateItemSupplier(order.id, index, { supplier_id: id ?? undefined, supplier_name: id ? name ?? suppliers.find(x => x.id === id)?.name ?? '' : undefined }), 'No se pudo cambiar el fabricante');
+  };
   const createSupplier = () =>
     run(async () => {
       const created = await addSupplier({ name: newName ?? '', contact: null, phone: null, email: null, notes: null });
       await updateItemSupplier(order.id, index, { supplier_id: created.id, supplier_name: created.name });
       setNewName(null);
+      setPicker(false);
     }, 'No se pudo añadir el fabricante');
   const addEntry = () => {
     if (!date) { setMsg('Elige la fecha del apunte.'); return; }
@@ -95,8 +101,11 @@ export default function SupplierLogSheet({ order, index, startNew, onClose }: Pr
   const twoCol = width >= 900;
   const next = SUPPLIER_STEPS.find(t => !steps[t]) ?? null;
   const lastDone = [...SUPPLIER_STEPS].reverse().find(t => steps[t]);
-  const tone = lastDone ? SUPPLIER_EVENT_TINT[lastDone] : SUPPLIER_PENDING_TINT;
-  const status = !item.supplier_name && !lastDone
+  const payPend = isPaymentPending(item);
+  const tone = payPend ? SUPPLIER_EVENT_TINT.payment_pending : lastDone ? SUPPLIER_EVENT_TINT[lastDone] : SUPPLIER_PENDING_TINT;
+  const status = payPend
+    ? 'Pendiente de pago'
+    : !item.supplier_name && !lastDone
     ? 'Sin fabricante'
     : next === null ? 'Pedido, recibido y pagado'
     : next === 'ordered' ? 'Falta pedirlo al fabricante'
@@ -117,11 +126,42 @@ export default function SupplierLogSheet({ order, index, startNew, onClose }: Pr
           </Pressable>
         </View>
       ) : (
-        <Pressable onPress={() => setPicker(true)} style={({ pressed, hovered }: { pressed: boolean; hovered?: boolean }) => [s.select, { borderColor: hovered || pressed ? SUPPLIER_TINT : colors.border, backgroundColor: colors.fill }]} accessibilityRole="button" testID="supplier-picker">
-          <View style={[s.selIcon, { backgroundColor: item.supplier_name ? SUPPLIER_TINT : colors.border }]}><Factory size={15} color="#FFFFFF" /></View>
-          <Text style={[s.selectText, { color: item.supplier_name ? colors.text : colors.textTertiary }]} numberOfLines={1}>{item.supplier_name || 'Seleccionar fabricante'}</Text>
-          <ChevronDown size={18} color={colors.textSecondary} />
-        </Pressable>
+        <>
+          <Pressable onPress={() => setPicker(v => !v)} style={({ pressed, hovered }: { pressed: boolean; hovered?: boolean }) => [s.select, { borderColor: picker || hovered || pressed ? SUPPLIER_TINT : colors.border, backgroundColor: colors.fill }]} accessibilityRole="button" accessibilityState={{ expanded: picker }} testID="supplier-picker">
+            <View style={[s.selIcon, { backgroundColor: item.supplier_name ? SUPPLIER_TINT : colors.border }]}><Factory size={15} color="#FFFFFF" /></View>
+            <Text style={[s.selectText, { color: item.supplier_name ? colors.text : colors.textTertiary }]} numberOfLines={1}>{item.supplier_name || 'Seleccionar fabricante'}</Text>
+            <View style={{ transform: [{ rotate: picker ? '180deg' : '0deg' }] }}><ChevronDown size={18} color={colors.textSecondary} /></View>
+          </Pressable>
+          {picker && (
+            <View style={[s.pickBox, { borderColor: SUPPLIER_TINT + '55', backgroundColor: SUPPLIER_TINT + (isDark ? '14' : '0A') }, enter(0, 'rise', { duration: 360 })]} testID="supplier-inline-list">
+              {suppliers.length > 6 && (
+                <TextInput style={[s.input, { height: 40, backgroundColor: colors.surface }]} value={q} onChangeText={setQ} placeholder="Buscar fabricante" placeholderTextColor={colors.textTertiary} testID="supplier-search" />
+              )}
+              <View style={s.pickWrap}>
+                {suppliers.filter(x => !q.trim() || fold(x.name).includes(fold(q.trim()))).map((x, k) => {
+                  const on = x.id === item.supplier_id;
+                  return (
+                    <Pressable key={x.id} onPress={() => void setSupplier(x.id)} disabled={busy} style={({ pressed, hovered }: { pressed: boolean; hovered?: boolean }) => [s.pickChip, on ? { backgroundColor: SUPPLIER_TINT, borderColor: SUPPLIER_TINT } : { backgroundColor: hovered || pressed ? colors.fill : colors.surface, borderColor: colors.border }, enter(k, 'pop', { base: 60, step: 25, duration: 380 })]} accessibilityRole="radio" accessibilityState={{ selected: on }} testID={`supplier-option-${x.id}`}>
+                      {on && <Check size={14} color="#FFFFFF" strokeWidth={3} />}
+                      <Text style={[s.pickText, { color: on ? '#FFFFFF' : colors.text }]} numberOfLines={1}>{x.name}</Text>
+                    </Pressable>
+                  );
+                })}
+                <Pressable onPress={() => setNewName('')} style={[s.pickChip, { borderColor: SUPPLIER_TINT, borderStyle: 'dashed', backgroundColor: 'transparent' }]} accessibilityRole="button" testID="supplier-new">
+                  <Plus size={14} color={SUPPLIER_TINT} />
+                  <Text style={[s.pickText, { color: SUPPLIER_TINT }]}>Nuevo fabricante</Text>
+                </Pressable>
+                {!!item.supplier_id && (
+                  <Pressable onPress={() => void setSupplier(null)} style={[s.pickChip, { borderColor: colors.border, backgroundColor: 'transparent' }]} accessibilityRole="button" testID="supplier-remove">
+                    <X size={14} color={colors.error} />
+                    <Text style={[s.pickText, { color: colors.error }]}>Quitar</Text>
+                  </Pressable>
+                )}
+              </View>
+              {suppliers.length === 0 && <Text style={s.muted}>Aún no hay fabricantes. Añade el primero con «Nuevo fabricante».</Text>}
+            </View>
+          )}
+        </>
       )}
     </View>
   );
@@ -131,8 +171,9 @@ export default function SupplierLogSheet({ order, index, startNew, onClose }: Pr
       {SUPPLIER_STEPS.map((t, k) => {
         const Icon = SUPPLIER_EVENT_ICON[t];
         const d = steps[t];
+        const pp = t === 'paid' && payPend;
         const due = !d && t === next;
-        const c = d ? SUPPLIER_EVENT_TINT[t] : due ? SUPPLIER_PENDING_TINT : null;
+        const c = pp ? SUPPLIER_EVENT_TINT.payment_pending : d ? SUPPLIER_EVENT_TINT[t] : due ? SUPPLIER_PENDING_TINT : null;
         return (
           <View
             key={`${t}-${d ?? ''}`}
@@ -141,10 +182,10 @@ export default function SupplierLogSheet({ order, index, startNew, onClose }: Pr
           >
             <View style={s.stepTop}>
               <View style={[s.stepIcon, { backgroundColor: c ?? colors.fill }]}><Icon size={15} color={c ? '#FFFFFF' : colors.textTertiary} /></View>
-              {d ? <Check size={16} color={c!} strokeWidth={3} /> : null}
+              {d && !pp ? <Check size={16} color={c!} strokeWidth={3} /> : null}
             </View>
             <Text style={[s.stepLabel, { color: c ? colors.text : colors.textSecondary }]} numberOfLines={1}>{SUPPLIER_EVENT_SHORT[t]}</Text>
-            <Text style={[s.stepDate, { color: d ? colors.text : due ? (isDark ? '#FFD54A' : '#7A5800') : colors.textTertiary }]} numberOfLines={1}>{d ? dmy(d) : due ? 'Toca ahora' : 'Pendiente'}</Text>
+            <Text style={[s.stepDate, { color: pp ? (isDark ? '#FF8E9C' : '#C2283E') : d ? colors.text : due ? (isDark ? '#FFD54A' : '#7A5800') : colors.textTertiary }]} numberOfLines={1}>{pp ? 'Pendiente de pago' : d ? dmy(d) : due ? 'Toca ahora' : 'Pendiente'}</Text>
           </View>
         );
       })}
@@ -260,27 +301,11 @@ export default function SupplierLogSheet({ order, index, startNew, onClose }: Pr
         </View>
       </View>
 
-      <SelectSheet
-        visible={picker}
-        title="Seleccionar fabricante"
-        searchable={suppliers.length > 6}
-        searchPlaceholder="Buscar fabricante"
-        options={[
-          ...suppliers.map(x => ({ value: x.id, label: x.name, hint: x.contact ?? undefined })),
-          { value: '__new', label: '+ Añadir fabricante nuevo' },
-          ...(item.supplier_id ? [{ value: '__none', label: 'Quitar fabricante', destructive: true }] : []),
-        ]}
-        selected={item.supplier_id}
-        onSelect={v => {
-          if (v === '__new') setNewName('');
-          else if (v === '__none') void setSupplier(null);
-          else void setSupplier(v);
-        }}
-        onClose={() => setPicker(false)}
-      />
     </Modal>
   );
 }
+
+const fold = (x: string) => x.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
 
 const makeStyles = (c: ThemeColors) =>
   StyleSheet.create({
@@ -304,6 +329,10 @@ const makeStyles = (c: ThemeColors) =>
     select: { flexDirection: 'row', alignItems: 'center', gap: 10, minHeight: 50, paddingHorizontal: 10, borderRadius: 14, borderWidth: 1, ...(Platform.OS === 'web' ? ({ cursor: 'pointer', transitionProperty: 'border-color', transitionDuration: '160ms' } as object) : {}) },
     selIcon: { width: 30, height: 30, borderRadius: 9, alignItems: 'center', justifyContent: 'center' },
     selectText: { flex: 1, minWidth: 0, fontSize: 16, fontWeight: '700' },
+    pickBox: { borderWidth: 1, borderRadius: 14, padding: 10, gap: 8 },
+    pickWrap: { flexDirection: 'row', flexWrap: 'wrap', gap: 6 },
+    pickChip: { flexDirection: 'row', alignItems: 'center', gap: 6, minHeight: 38, maxWidth: '100%', paddingHorizontal: 13, borderRadius: 999, borderWidth: 1, ...(Platform.OS === 'web' ? ({ cursor: 'pointer', transitionProperty: 'background-color, border-color', transitionDuration: '160ms' } as object) : {}) },
+    pickText: { fontSize: 14.5, fontWeight: '700', flexShrink: 1 },
     newRow: { flexDirection: 'row', alignItems: 'center', gap: 8, flexWrap: 'wrap' },
     input: { borderRadius: 12, backgroundColor: c.fill, color: c.text, paddingHorizontal: 14, height: 46, fontSize: 16, minWidth: 0, ...webInputReset },
     smallBtn: { minHeight: 44, paddingHorizontal: 16, borderRadius: 999, alignItems: 'center', justifyContent: 'center' },

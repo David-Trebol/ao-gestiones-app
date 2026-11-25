@@ -25,7 +25,7 @@ export interface Customer {
 export type ItemStatus = 'none' | 'pending' | 'shipped' | 'delivered';
 
 /** Apunte del registro con el fabricante de un producto: qué se hizo y cuándo */
-export type SupplierEventType = 'ordered' | 'received' | 'paid' | 'other';
+export type SupplierEventType = 'ordered' | 'received' | 'payment_pending' | 'paid' | 'other';
 export interface SupplierEvent {
   id: string;
   type: SupplierEventType;

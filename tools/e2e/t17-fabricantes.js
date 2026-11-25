@@ -57,9 +57,11 @@ const check = (name, ok, extra = '') => { console.log(`${ok ? 'OK  ' : 'FAIL'} $
     await p.goto(base + '/order-detail?orderId=o1', { waitUntil: 'networkidle' }); await wt(2500);
     const o1 = () => mock.db.orders.find(o => o.id === 'o1');
     const total0 = o1().total_with_vat;
-    await p.getByTestId('item-supplier-0').first().click(); await wt(500);
-    await p.getByText('Suministros Pepito', { exact: true }).last().click(); await wt(1200);
+    await p.getByTestId('item-supplier-0').first().click(); await wt(700);
+    check(`[${tag}] al pulsar el fabricante se abre la ventana con la lista dentro`, await p.getByTestId('supplier-log-sheet').isVisible() && await p.getByTestId('supplier-inline-list').isVisible());
+    await p.getByTestId('supplier-option-' + sup.id).click(); await wt(1200);
     check(`[${tag}] se elige el fabricante del producto`, o1().items[0].supplier_id === sup.id && o1().items[0].supplier_name === 'Suministros Pepito');
+    await p.getByTestId('supplier-log-close').click(); await wt(500);
     check(`[${tag}] no cambia importes`, o1().total_with_vat === total0);
 
     // Registro: pedido → recibido → pagado
@@ -85,14 +87,17 @@ const check = (name, ok, extra = '') => { console.log(`${ok ? 'OK  ' : 'FAIL'} $
     await p.getByTestId('supplier-entry-del-0').click(); await wt(400);
     await p.getByTestId('supplier-entry-confirm-0').click(); await wt(1000);
     check(`[${tag}] se puede borrar un apunte`, (o1().items[0].supplier_log || []).length === 2 && !(o1().items[0].supplier_log || []).some(e => e.type === 'paid'));
+    await add('payment_pending', '2026-11-07');
+    check(`[${tag}] se apunta «Pendiente de pago»`, (o1().items[0].supplier_log || []).some(e => e.type === 'payment_pending' && e.date === '2026-11-07'));
+    check(`[${tag}] la ventana marca pendiente de pago`, /Pendiente de pago/.test(await p.getByTestId('supplier-step-paid').innerText()));
     await shot('registro');
     await p.getByTestId('supplier-log-close').click(); await wt(500);
     const logTxt = await p.getByTestId('item-log-0').first().innerText();
-    check(`[${tag}] el botón del registro resume el último trámite`, /Recibido\s*06\/11/.test(logTxt), logTxt);
+    check(`[${tag}] el bloque muestra recibido y el pago pendiente`, /Recibido\s*06\/11/.test(logTxt) && await p.getByTestId('item-paypend-0').first().isVisible(), logTxt.replace(/\n/g, ' '));
 
     // Producto 1: fabricante nuevo desde la ficha
-    await p.getByTestId('item-supplier-1').first().click(); await wt(500);
-    await p.getByText('+ Añadir fabricante nuevo', { exact: true }).last().click(); await wt(700);
+    await p.getByTestId('item-supplier-1').first().click(); await wt(700);
+    await p.getByTestId('supplier-new').click(); await wt(500);
     await p.getByTestId('new-supplier-input').fill('Importaciones Lola');
     await p.getByTestId('new-supplier-save').click(); await wt(1500);
     check(`[${tag}] se crea un fabricante desde el producto`, mock.db.suppliers.some(x => x.name === 'Importaciones Lola') && o1().items[1].supplier_name === 'Importaciones Lola');
@@ -103,13 +108,20 @@ const check = (name, ok, extra = '') => { console.log(`${ok ? 'OK  ' : 'FAIL'} $
     // El formulario conserva fabricante y registro
     await p.getByTestId('edit-order-btn').click(); await wt(1800);
     await p.getByTestId('submit-order-btn').click(); await wt(2200);
-    check(`[${tag}] editar y guardar conserva fabricante y registro`, o1().items[0].supplier_id === sup.id && (o1().items[0].supplier_log || []).length === 2);
+    check(`[${tag}] editar y guardar conserva fabricante y registro`, o1().items[0].supplier_id === sup.id && (o1().items[0].supplier_log || []).length === 3);
 
     // Lista: fabricantes reales del pedido
     await p.goto(base + '/', { waitUntil: 'networkidle' }); await wt(2500);
     const line = await p.getByTestId('order-suppliers-o1').first().innerText().catch(() => '');
     check(`[${tag}] la lista muestra los fabricantes del pedido`, /Suministros Pepito/.test(line) && /Importaciones Lola/.test(line), line);
+    const panel = await p.getByTestId('incidents-panel').innerText();
+    check(`[${tag}] el inicio muestra 1 incidencia por resolver`, /Incidencias por resolver/.test(panel) && /1 producto pendiente de pago/.test(panel), panel.replace(/\n/g, ' | '));
+    check(`[${tag}] el pedido lleva la marca de pago pendiente`, await p.getByTestId('order-incidents-o1').first().isVisible());
+    await p.getByTestId('filter-incidents').click(); await wt(1200);
+    const rows = await p.locator('[data-testid^="order-row-"], [data-testid^="order-card-"]').count();
+    check(`[${tag}] el filtro deja solo los pedidos con incidencias`, rows === 1 && /Incidencias por resolver/.test(await body()), String(rows));
     await shot('pedidos');
+    await p.getByTestId('filter-incidents').click(); await wt(600);
 
     // Fabricantes: recuentos
     await p.goto(base + '/suppliers', { waitUntil: 'networkidle' }); await wt(1500);

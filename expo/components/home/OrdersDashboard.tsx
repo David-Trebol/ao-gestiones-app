@@ -1,14 +1,14 @@
 import React, { useMemo, useState } from 'react';
 import { Alert, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { useRouter } from 'expo-router';
-import { AlertTriangle, ChevronDown, Download, Factory, FileText, Mail, Tags, Package, Phone, Search, SlidersHorizontal, X } from 'lucide-react-native';
+import { AlertTriangle, ChevronDown, ChevronRight, Hourglass, Download, Factory, FileText, Mail, Tags, Package, Phone, Search, SlidersHorizontal, X } from 'lucide-react-native';
 import { useTheme } from '@/contexts/ThemeContext';
 import { useData } from '@/contexts/DataContext';
 import { ThemeColors , SystemTint } from '@/constants/colors';
 import { cardShadow, panel, radius, webInputReset } from '@/constants/theme';
 import { fx, enter, useCountUp } from '@/constants/motion';
 import { itemProgress, itemStatusOf, itemTone } from '@/constants/itemStatus';
-import { orderSupplierNames } from '@/constants/supplierLog';
+import { SUPPLIER_EVENT_TINT, orderIncidents, orderSupplierNames } from '@/constants/supplierLog';
 import StatusBadge, { STATUS_ICONS, STATUS_ORDER, statusConfig } from '@/components/StatusBadge';
 import SelectSheet, { SheetOption } from '@/components/SelectSheet';
 import { usePageLayout } from '@/components/Page';
@@ -30,6 +30,9 @@ import {
   overdueDays,
   itemsSummary,
 } from '@/utils/orderFilters';
+
+/** Rojo claro de las incidencias (pendiente de pago) */
+const INC = SUPPLIER_EVENT_TINT.payment_pending;
 
 // Se conservan al volver de un pedido o al cambiar de vista
 let savedFilters: OrderFilters = { ...DEFAULT_FILTERS };
@@ -92,6 +95,9 @@ export default function OrdersDashboard() {
   const attentionCount = useMemo(() => orders.filter(o => attentionReasons(o, now).length).length, [orders]);
   // eslint-disable-next-line react-hooks/exhaustive-deps
   const lateCount = useMemo(() => orders.filter(o => (overdueDays(o, now) ?? 0) > 0).length, [orders]);
+  // incidencias por resolver (de momento: productos pendientes de pago al fabricante)
+  const incidents = useMemo(() => orders.flatMap(o => orderIncidents(o).map(x => ({ ...x, order: o }))), [orders]);
+  const incidentOrders = useMemo(() => new Set(incidents.map(x => x.order.id)).size, [incidents]);
   // eslint-disable-next-line react-hooks/exhaustive-deps
   const list = useMemo(() => filterOrders(orders, filters, now), [orders, filters]);
   const shown = list.slice(0, visible);
@@ -176,7 +182,7 @@ export default function OrdersDashboard() {
   );
 
   const listTitle =
-    filters.status === 'attention' ? 'Requieren atención' : filters.status === 'overdue' ? 'Con retraso' : filters.status !== 'all' ? statusConfig[filters.status].label : 'Todos los pedidos';
+    filters.status === 'incidents' ? 'Incidencias por resolver' : filters.status === 'attention' ? 'Requieren atención' : filters.status === 'overdue' ? 'Con retraso' : filters.status !== 'all' ? statusConfig[filters.status].label : 'Todos los pedidos';
 
   return (
     <View style={{ gap: 16 }}>
@@ -246,6 +252,62 @@ export default function OrdersDashboard() {
           </ScrollView>
         ) : (
           <View style={s.counters}>{tiles}</View>
+        );
+      })()}
+
+      {/* Incidencias por resolver: resumen y filtro */}
+      {(() => {
+        const sel = filters.status === 'incidents';
+        const n = incidents.length;
+        return (
+          <View style={[s.inc, panel(colors, isDark), { borderColor: n ? INC + '66' : colors.border }, n > 0 && { backgroundColor: INC + (isDark ? '1F' : '10') }, enter(4, 'pop', { step: 55 })]} testID="incidents-panel">
+            <View style={s.incHead}>
+              <View style={[s.incIcon, { backgroundColor: n ? INC : colors.success }]}><Hourglass size={17} color="#FFFFFF" strokeWidth={2.4} /></View>
+              <View style={{ flex: 1, minWidth: 0 }}>
+                <Text style={s.incTitle} numberOfLines={1}>Incidencias por resolver</Text>
+                <Text style={s.tdSub} numberOfLines={2}>
+                  {n ? `${n} producto${n === 1 ? '' : 's'} pendiente${n === 1 ? '' : 's'} de pago · ${incidentOrders} pedido${incidentOrders === 1 ? '' : 's'}` : 'Todo al día: no hay pagos pendientes con fabricantes'}
+                </Text>
+              </View>
+              {width >= 520 && <CountText style={[s.incCount, { color: n ? (isDark ? '#FF8E9C' : '#C2283E') : colors.success }]} value={n} />}
+              {n > 0 && (
+                <Pressable
+                  onPress={() => setFilters({ status: sel ? 'all' : 'incidents' })}
+                  style={({ hovered, pressed }: { pressed: boolean; hovered?: boolean }) => [s.incBtn, { backgroundColor: sel ? INC : hovered || pressed ? INC + '33' : INC + '1F', borderColor: INC }]}
+                  accessibilityRole="button"
+                  accessibilityState={{ selected: sel }}
+                  testID="filter-incidents"
+                >
+                  <Text style={[s.incBtnText, { color: sel ? '#FFFFFF' : isDark ? '#FF8E9C' : '#C2283E' }]}>{sel ? 'Ver todos' : 'Filtrar'}</Text>
+                </Pressable>
+              )}
+            </View>
+            {n > 0 && (
+              <View style={s.incList}>
+                {incidents.slice(0, width >= 900 ? 6 : 3).map((x, k) => (
+                  <Pressable
+                    key={`${x.order.id}-${x.index}`}
+                    onPress={() => open(x.order)}
+                    style={({ hovered, pressed }: { pressed: boolean; hovered?: boolean }) => [s.incItem, { backgroundColor: hovered || pressed ? INC + '24' : colors.surface, borderColor: INC + '40' }, width >= 900 && s.incItemWide, enter(k, 'rise', { base: 200, step: 45 })]}
+                    accessibilityRole="link"
+                    testID={`incident-${x.order.id}-${x.index}`}
+                  >
+                    <View style={[s.incDot, { backgroundColor: INC }]} />
+                    <View style={{ flex: 1, minWidth: 0 }}>
+                      <Text style={s.incItemTitle} numberOfLines={1}>{x.product}</Text>
+                      <Text style={s.tdSub} numberOfLines={1}>{`${x.order.reference_number} · ${x.text}`}</Text>
+                    </View>
+                    <ChevronRight size={16} color={colors.textTertiary} />
+                  </Pressable>
+                ))}
+                {n > (width >= 900 ? 6 : 3) && !sel && (
+                  <Pressable onPress={() => setFilters({ status: 'incidents' })} style={s.textBtn} accessibilityRole="button">
+                    <Text style={[s.link, { color: isDark ? '#FF8E9C' : '#C2283E' }]}>{`Ver las ${n}`}</Text>
+                  </Pressable>
+                )}
+              </View>
+            )}
+          </View>
         );
       })()}
 
@@ -396,6 +458,23 @@ function DocRefs({ o }: { o: Order }) {
   );
 }
 
+/** Incidencias del pedido (productos pendientes de pago al fabricante), en rojo claro */
+function IncidentLine({ o }: { o: Order }) {
+  const { colors, isDark } = useTheme();
+  const s = useMemo(() => makeStyles(colors), [colors]);
+  const inc = orderIncidents(o);
+  if (inc.length === 0) return null;
+  const tc = isDark ? '#FF8E9C' : '#C2283E';
+  return (
+    <View style={[s.incLine, { backgroundColor: INC + (isDark ? '26' : '17'), borderColor: INC + '59' }]} testID={`order-incidents-${o.id}`}>
+      <Hourglass size={12} color={tc} strokeWidth={2.5} />
+      <Text style={[s.tdSub, { color: tc, fontWeight: '700', flexShrink: 1, marginTop: 0 }]} numberOfLines={1}>
+        {inc.length === 1 ? `Pendiente de pago: ${inc[0]!.product}` : `${inc.length} productos pendientes de pago`}
+      </Text>
+    </View>
+  );
+}
+
 /** Fabricantes reales de los productos del pedido (si se han elegido) */
 function SupplierLine({ o }: { o: Order }) {
   const { colors } = useTheme();
@@ -457,6 +536,7 @@ export function OrderTable({ orders, onOpen, showReasons }: { orders: Order[]; o
                 <Text style={s.tdSub} numberOfLines={1}>{person}</Text>
               ) : null}
               <DocRefs o={o} />
+              <IncidentLine o={o} />
               {(!!c?.telefono_1 || !!c?.email) && (
                 <View style={s.contactRow}>
                   {!!c?.telefono_1 && (
@@ -543,6 +623,7 @@ export function OrderCardItem({ order: o, onOpen, twoCols, showReasons, grouped,
       <View style={s.oInfo}>
         {!!person && <Text style={s.tdSub} numberOfLines={1}>{person}</Text>}
         <DocRefs o={o} />
+        <IncidentLine o={o} />
         {!!c?.telefono_1 && (
           <View style={s.iconLine}>
             <Phone size={13} color={colors.accent} />
@@ -608,6 +689,19 @@ function makeStyles(c: ThemeColors) {
     counterLabel: { fontSize: 15, color: c.textSecondary, fontWeight: '600', letterSpacing: -0.2, marginTop: 2 },
     counterValue: { fontSize: 28, fontWeight: '700', color: c.text, letterSpacing: -0.6, fontVariant: ['tabular-nums'] },
     counterSub: { fontSize: 12.5, color: c.textSecondary, fontVariant: ['tabular-nums'], marginTop: -4 },
+    inc: { borderRadius: 18, borderWidth: 1, padding: 12, gap: 10 },
+    incHead: { flexDirection: 'row', alignItems: 'center', gap: 12 },
+    incIcon: { width: 34, height: 34, borderRadius: 11, alignItems: 'center', justifyContent: 'center' },
+    incTitle: { fontSize: 16, fontWeight: '800', letterSpacing: -0.2, color: c.text },
+    incCount: { fontSize: 26, fontWeight: '800', letterSpacing: -0.5, fontVariant: ['tabular-nums'] },
+    incBtn: { minHeight: 38, paddingHorizontal: 14, borderRadius: 999, borderWidth: 1, alignItems: 'center', justifyContent: 'center', ...(Platform.OS === 'web' ? ({ cursor: 'pointer', transitionProperty: 'background-color', transitionDuration: '160ms' } as object) : {}) },
+    incBtnText: { fontSize: 14, fontWeight: '800' },
+    incList: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
+    incItem: { flexDirection: 'row', alignItems: 'center', gap: 10, minHeight: 50, paddingHorizontal: 12, paddingVertical: 7, borderRadius: 13, borderWidth: 1, width: '100%', ...(Platform.OS === 'web' ? ({ cursor: 'pointer' } as object) : {}) },
+    incItemWide: { width: 'auto', flexBasis: 280, flexGrow: 1, maxWidth: '50%' } as object,
+    incDot: { width: 8, height: 8, borderRadius: 4 },
+    incItemTitle: { fontSize: 14.5, fontWeight: '700', color: c.text },
+    incLine: { flexDirection: 'row', alignItems: 'center', gap: 5, alignSelf: 'flex-start', maxWidth: '100%', paddingHorizontal: 8, paddingVertical: 3, borderRadius: 999, borderWidth: 1 },
     attention: { flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', gap: 10, paddingLeft: 14, paddingRight: 6, paddingVertical: 4, borderRadius: 14, borderWidth: 0, minHeight: 52 },
     attentionText: { flex: 1, minWidth: 180, fontSize: 15 },
     attentionActions: { flexDirection: 'row', alignItems: 'center' },
