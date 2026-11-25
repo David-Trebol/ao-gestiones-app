@@ -172,7 +172,7 @@ export default function OrderDetailScreen() {
   const stepTint = (k: OrderStatus): string =>
     k === 'pending' ? (isDark ? '#FF9F0A' : '#FF9500')
     : k === 'processing' ? (isDark ? '#FFCC00' : '#F2B705')
-    : k === 'shipped' ? (isDark ? '#BF5AF2' : '#9B45D0')
+    : k === 'shipped' ? (isDark ? '#38BDF8' : '#0EA5E9')
     : k === 'delivered' ? (isDark ? '#30D158' : '#22A447')
     : colors.statusCancelledText;
   const stDot = stepTint(order.status);

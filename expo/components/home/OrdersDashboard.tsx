@@ -39,7 +39,7 @@ let savedVisible = 50;
 export const STATUS_TINT: Record<OrderStatus, string> = {
   pending: SystemTint.orange,
   processing: SystemTint.yellow,
-  shipped: SystemTint.purple,
+  shipped: '#0EA5E9', // azul cielo
   delivered: SystemTint.green,
   cancelled: SystemTint.red,
 };

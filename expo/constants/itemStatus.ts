@@ -5,7 +5,7 @@ import type { ThemeColors } from '@/constants/colors';
  * Estado de cada producto de un pedido. Usa los MISMOS colores que el progreso del pedido:
  * - Sin empezar: el color normal (no se ha hecho nada con él)
  * - Pendiente: amarillo, como «Procesando» (en marcha, a la espera de enviarse)
- * - Enviado: morado, como «Enviado»
+ * - Enviado: azul cielo, como «Enviado»
  * - Entregado: verde, como «Entregado»
  */
 export const ITEM_STATUS_ORDER: ItemStatus[] = ['none', 'pending', 'shipped', 'delivered'];
@@ -31,7 +31,7 @@ export function itemTone(st: ItemStatus | undefined, c: ThemeColors, isDark: boo
     case 'delivered':
       return { text: c.statusDeliveredText, bg: c.statusDeliveredBg, border: isDark ? 'rgba(48,209,88,0.40)' : 'rgba(52,199,89,0.45)', dot: isDark ? '#30D158' : '#22A447', row: isDark ? 'rgba(48,209,88,0.08)' : 'rgba(52,199,89,0.07)' };
     case 'shipped':
-      return { text: c.statusShippedText, bg: c.statusShippedBg, border: isDark ? 'rgba(191,90,242,0.45)' : 'rgba(175,82,222,0.42)', dot: isDark ? '#BF5AF2' : '#9B45D0', row: isDark ? 'rgba(191,90,242,0.09)' : 'rgba(175,82,222,0.07)' };
+      return { text: c.statusShippedText, bg: c.statusShippedBg, border: isDark ? 'rgba(56,189,248,0.45)' : 'rgba(14,165,233,0.42)', dot: isDark ? '#38BDF8' : '#0EA5E9', row: isDark ? 'rgba(56,189,248,0.09)' : 'rgba(14,165,233,0.07)' };
     case 'pending':
       return { text: c.statusProcessingText, bg: c.statusProcessingBg, border: isDark ? 'rgba(255,204,0,0.38)' : 'rgba(230,180,0,0.55)', dot: isDark ? '#FFCC00' : '#F2B705', row: isDark ? 'rgba(255,204,0,0.07)' : 'rgba(255,204,0,0.09)' };
     default:
