@@ -247,11 +247,12 @@ export const [DataProvider, useData] = createContextHook(() => {
   }, [setOrders]);
 
   /** Cambia solo el estado de un producto del pedido (no toca importes ni el estado del pedido) */
-  const updateItemStatus = useCallback(async (orderId: string, index: number, status: ItemStatus) => {
+  /** Cambia el estado de un producto (índice) o de todos ('all') */
+  const updateItemStatus = useCallback(async (orderId: string, index: number | 'all', status: ItemStatus) => {
     const order = orders.find(o => o.id === orderId);
-    if (!order || !order.items[index]) throw new Error('No se encontró el producto');
+    if (!order || (index !== 'all' && !order.items[index])) throw new Error('No se encontró el producto');
     const items = order.items.map((it, k) => {
-      if (k !== index) return it;
+      if (index !== 'all' && k !== index) return it;
       const { item_status: _old, ...rest } = it;
       return status === 'none' ? rest : { ...rest, item_status: status };
     });

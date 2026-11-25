@@ -36,7 +36,7 @@ export default function OrderDetailScreen() {
 
   const [sheet, setSheet] = useState<Sheet>(null);
   /** Producto cuyo estado se está cambiando (índice) */
-  const [itemSheet, setItemSheet] = useState<number | null>(null);
+  const [itemSheet, setItemSheet] = useState<number | 'all' | null>(null);
   const [editingRef, setEditingRef] = useState(false);
   const [refValue, setRefValue] = useState('');
   const [busy, setBusy] = useState(false);
@@ -106,13 +106,14 @@ export default function OrderDetailScreen() {
   );
 
   const changeItemStatus = useCallback(
-    async (index: number, st: ItemStatus) => {
-      if (!order || itemStatusOf(order.items[index] ?? {}) === st) return;
+    async (index: number | 'all', st: ItemStatus) => {
+      if (!order) return;
+      if (index === 'all' ? order.items.every(x => itemStatusOf(x) === st) : itemStatusOf(order.items[index] ?? {}) === st) return;
       try {
         await updateItemStatus(order.id, index, st);
         void Haptics.selectionAsync();
       } catch (e) {
-        Alert.alert('No se pudo cambiar el estado del producto', (e as Error).message);
+        Alert.alert(index === 'all' ? 'No se pudo cambiar el estado de los productos' : 'No se pudo cambiar el estado del producto', (e as Error).message);
       }
     },
     [order, updateItemStatus],
@@ -167,6 +168,16 @@ export default function OrderDetailScreen() {
   const st = statusConfig[order.status];
   const StIcon = STATUS_ICONS[order.status];
   const stColor = colors[st.textKey];
+  // color vivo de cada paso (punto y barra): el mismo que los puntos de los productos
+  const stepTint = (k: OrderStatus): string =>
+    k === 'pending' ? (isDark ? '#FF9F0A' : '#FF9500')
+    : k === 'processing' ? (isDark ? '#FFCC00' : '#F2B705')
+    : k === 'shipped' ? (isDark ? '#BF5AF2' : '#9B45D0')
+    : k === 'delivered' ? (isDark ? '#30D158' : '#22A447')
+    : colors.statusCancelledText;
+  const stDot = stepTint(order.status);
+  // icono encima del amarillo: oscuro para que se lea
+  const onDot = order.status === 'processing' ? '#3D2C00' : '#FFFFFF';
 
   let tileN = 0;
   const tile = (Icon: typeof Euro, tint: string, label: string, value: string, sub: string, valueColor?: string) => (
@@ -201,6 +212,21 @@ export default function OrderDetailScreen() {
       </Pressable>
     );
   };
+  /** Botón «Estado de todos»: cambia el estado de todos los productos a la vez */
+  const allBtn = (
+    <Pressable
+      onPress={() => setItemSheet('all')}
+      style={[s.allBtn, { borderColor: colors.border, backgroundColor: colors.fill }]}
+      {...fx('tint')}
+      hitSlop={6}
+      accessibilityRole="button"
+      accessibilityLabel="Cambiar el estado de todos los productos"
+      testID="item-status-all"
+    >
+      <Text style={s.allBtnText} numberOfLines={1}>{tiny ? 'Todos' : 'Estado de todos'}</Text>
+      <ChevronDown size={14} color={colors.text} strokeWidth={2.6} />
+    </Pressable>
+  );
   /** Fondo y franja de color de la fila según el estado del producto */
   const rowTone = (item: OrderItem) => {
     const tone = itemTone(itemStatusOf(item), colors, isDark);
@@ -253,11 +279,11 @@ export default function OrderDetailScreen() {
               accessibilityLabel={`Estado: ${st.label}. Cambiar estado`}
               testID="change-status"
             >
-              <View style={[s.statusIcon, { backgroundColor: colors[st.bgKey] }]}>
-                <StIcon size={14} color={stColor} strokeWidth={2.6} />
+              <View style={[s.statusIcon, { backgroundColor: stDot }]}>
+                <StIcon size={22} color={onDot} strokeWidth={2.6} />
               </View>
               <Text style={[s.statusBtnText, { color: stColor }]}>{st.label}</Text>
-              <ChevronDown size={16} color={stColor} strokeWidth={2.6} />
+              <ChevronDown size={24} color={stColor} strokeWidth={2.6} />
             </Pressable>
           </View>
           <Text style={[s.heroClient, narrow && { fontSize: 24, lineHeight: 29 }]} numberOfLines={2} selectable>
@@ -370,7 +396,7 @@ export default function OrderDetailScreen() {
       ) : (
         <View style={s.steps} accessibilityRole={'list' as never}>
           <View style={[s.track, { backgroundColor: colors.fill }]}>
-            <View style={[s.trackFill, { width: `${(Math.max(stepIdx, 0) / (STEPS.length - 1)) * 100}%`, backgroundColor: stColor }, enter(0, 'grow', { base: 500 })]} />
+            <View style={[s.trackFill, { width: `${(Math.max(stepIdx, 0) / (STEPS.length - 1)) * 100}%`, backgroundColor: stDot }, enter(0, 'grow', { base: 500 })]} />
           </View>
           {STEPS.map((step, k) => {
             const cfg = statusConfig[step];
@@ -393,12 +419,12 @@ export default function OrderDetailScreen() {
                   key={`${step}-${order.status}`}
                   style={[
                     s.stepDot,
-                    current || done ? { backgroundColor: stColor, borderColor: stColor } : { backgroundColor: colors.surface, borderColor: colors.border },
+                    current || done ? { backgroundColor: stDot, borderColor: stDot } : { backgroundColor: colors.surface, borderColor: colors.border },
                     enter(k, 'bump', { base: 420, step: 110 }),
-                    current && pulse(stColor + '88'),
+                    current && pulse(stDot + '88'),
                   ]}
                 >
-                  {done ? <Check size={16} color="#FFFFFF" strokeWidth={3} /> : <Icon size={15} color={current ? '#FFFFFF' : colors.textTertiary} strokeWidth={2.4} />}
+                  {done ? <Check size={16} color={onDot} strokeWidth={3} /> : <Icon size={15} color={current ? onDot : colors.textTertiary} strokeWidth={2.4} />}
                 </View>
                 <Text style={[s.stepLabel, tiny && { fontSize: 11, letterSpacing: -0.2 }, { color: current ? col : done ? colors.text : colors.textSecondary }, current && { fontWeight: '800' }]} numberOfLines={1}>{cfg.label}</Text>
               </Pressable>
@@ -597,7 +623,7 @@ export default function OrderDetailScreen() {
         </View>
       ))}
     </View>,
-    { flush: true, trailing: <Text style={s.cardCount}>{order.items.length}</Text> },
+    { flush: true, trailing: <View style={s.trailRow}>{order.items.length > 1 && allBtn}<Text style={s.cardCount}>{order.items.length}</Text></View> },
   );
 
   const shipping = shipLines.length > 0 && card(
@@ -632,7 +658,14 @@ export default function OrderDetailScreen() {
       <View style={[s.tr, s.th]}>
         <Text style={[s.thText, s.cQty]}>Cant.</Text>
         <Text style={[s.thText, s.cName]}>Equipo y referencia</Text>
-        <Text style={[s.thText, s.cState]}>Estado</Text>
+        {order.items.length > 1 ? (
+          <Pressable onPress={() => setItemSheet('all')} style={[s.cState, s.thBtn]} accessibilityRole="button" accessibilityLabel="Cambiar el estado de todos los productos" testID="item-status-all-head">
+            <Text style={[s.thText, { color: colors.primary }]}>Estado</Text>
+            <ChevronDown size={13} color={colors.primary} strokeWidth={2.6} />
+          </Pressable>
+        ) : (
+          <Text style={[s.thText, s.cState]}>Estado</Text>
+        )}
         {hasUnitPrice && <Text style={[s.thText, s.cNum]}>Precio ud.</Text>}
         {hasDiscount && <Text style={[s.thText, s.cDto]}>Dto.</Text>}
         <Text style={[s.thText, s.cNum]}>Neto sin IVA</Text>
@@ -704,11 +737,13 @@ export default function OrderDetailScreen() {
         </View>
       </View>
     </View>,
-    { flush: true, trailing: <Text style={s.cardCount}>{order.items.length}</Text> },
+    { flush: true, trailing: <View style={s.trailRow}>{order.items.length > 1 && allBtn}<Text style={s.cardCount}>{order.items.length}</Text></View> },
   );
 
   const sideBySide = width >= 1280;
-  const sheetItem = itemSheet !== null ? order.items[itemSheet] : undefined;
+  const sheetItem = typeof itemSheet === 'number' ? order.items[itemSheet] : undefined;
+  // en «todos», se marca la opción solo si todos los productos ya tienen el mismo estado
+  const allSame = order.items.length > 0 && order.items.every(x => itemStatusOf(x) === itemStatusOf(order.items[0]!)) ? itemStatusOf(order.items[0]!) : undefined;
 
   return (
     <View style={s.root}>
@@ -757,9 +792,9 @@ export default function OrderDetailScreen() {
       />
       <SelectSheet
         visible={itemSheet !== null}
-        title={sheetItem ? `Estado de «${sheetItem.product_name || 'producto'}»` : 'Estado del producto'}
+        title={itemSheet === 'all' ? `Estado de los ${order.items.length} productos` : sheetItem ? `Estado de «${sheetItem.product_name || 'producto'}»` : 'Estado del producto'}
         options={ITEM_STATUS_ORDER.map(v => ({ value: v, label: ITEM_STATUS_LABEL[v], hint: ITEM_STATUS_HINT[v] }))}
-        selected={sheetItem ? itemStatusOf(sheetItem) : undefined}
+        selected={itemSheet === 'all' ? allSame : sheetItem ? itemStatusOf(sheetItem) : undefined}
         onSelect={v => {
           if (itemSheet !== null) void changeItemStatus(itemSheet, v as ItemStatus);
         }}
@@ -854,11 +889,11 @@ function makeStyles(c: ThemeColors) {
     ref: { fontSize: 20, lineHeight: 25, fontWeight: '800', color: c.onPrimary, letterSpacing: 0.2, fontVariant: ['tabular-nums'] },
     // la flecha va dentro de la misma píldora que el estado, sobre un vidrio claro para que se lea encima del naranja
     statusBtn: {
-      flexDirection: 'row', alignItems: 'center', gap: 8, minHeight: 40, paddingLeft: 5, paddingRight: 12, borderRadius: 999,
+      flexDirection: 'row', alignItems: 'center', gap: 12, minHeight: 64, paddingLeft: 8, paddingRight: 18, borderRadius: 999,
       ...(Platform.OS === 'web' ? ({ boxShadow: '0 6px 18px rgba(0,42,57,0.22), inset 0 1px 0 rgba(255,255,255,0.6)', cursor: 'pointer' } as object) : {}),
     },
-    statusIcon: { width: 30, height: 30, borderRadius: 15, alignItems: 'center', justifyContent: 'center' },
-    statusBtnText: { fontSize: 15, fontWeight: '800', letterSpacing: -0.2 },
+    statusIcon: { width: 48, height: 48, borderRadius: 24, alignItems: 'center', justifyContent: 'center' },
+    statusBtnText: { fontSize: 24, fontWeight: '800', letterSpacing: -0.4 },
     heroDot: { width: 9, height: 9, borderRadius: 5, borderWidth: 1.5, borderColor: 'rgba(255,255,255,0.9)' },
     // chapa de estado de un producto
     chip: { flexDirection: 'row', alignItems: 'center', gap: 6, alignSelf: 'flex-start', minHeight: 32, paddingHorizontal: 11, borderRadius: 999, borderWidth: 1, maxWidth: '100%' },
@@ -913,6 +948,10 @@ function makeStyles(c: ThemeColors) {
     cardIcon: { width: 28, height: 28, borderRadius: 8, alignItems: 'center', justifyContent: 'center', backgroundColor: c.brand },
     cardTitle: { flex: 1, fontSize: 18, fontWeight: '800', color: c.text, letterSpacing: -0.3 },
     cardCount: { fontSize: 15, fontWeight: '700', color: c.textSecondary },
+    trailRow: { flexDirection: 'row', alignItems: 'center', gap: 10, flexShrink: 1, minWidth: 0 },
+    allBtn: { flexDirection: 'row', alignItems: 'center', gap: 5, minHeight: 32, paddingHorizontal: 11, borderRadius: 999, borderWidth: 1, flexShrink: 1, minWidth: 0 },
+    allBtnText: { fontSize: 13.5, fontWeight: '700', color: c.text, flexShrink: 1 },
+    thBtn: { flexDirection: 'row', alignItems: 'center', gap: 4, ...(Platform.OS === 'web' ? ({ cursor: 'pointer' } as object) : {}) },
     cardBody: { paddingHorizontal: 16, paddingBottom: 16 },
     footer: { fontSize: 13, color: c.textSecondary, lineHeight: 18, paddingHorizontal: 16, paddingBottom: 14 },
     pad: { padding: 16, paddingTop: 4 },
