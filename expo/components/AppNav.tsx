@@ -4,7 +4,7 @@ import type { BottomTabBarProps } from '@react-navigation/bottom-tabs';
 import { useRouter, usePathname } from 'expo-router';
 import { StackActions } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { Building2, FolderOpen, Plus, Settings } from 'lucide-react-native';
+import { Factory, FolderOpen, Plus, Settings, Tags } from 'lucide-react-native';
 import { useTheme } from '@/contexts/ThemeContext';
 import { useAuth } from '@/contexts/AuthContext';
 import { liquidGlass } from '@/constants/theme';
@@ -28,7 +28,8 @@ export const TAB_BAR_SPACE = 96;
 const ITEMS = [
   // Colores de la marca Alpha Omega: naranja, azul acero y gris pizarra
   { name: '(home)', label: 'Pedidos', Icon: FolderOpen, tint: '#FF8718' },
-  { name: 'manufacturers', label: 'Fabricantes', Icon: Building2, tint: '#3F6E92' },
+  { name: 'manufacturers', label: 'Referencias', Icon: Tags, tint: '#3F6E92' },
+  { name: 'suppliers', label: 'Fabricantes', Icon: Factory, tint: '#7B5CC4' },
   { name: 'settings', label: 'Ajustes', Icon: Settings, tint: '#5B6B73' },
 ] as const;
 
@@ -117,7 +118,7 @@ export default function AppNav({ state, navigation }: BottomTabBarProps) {
           {activeIdx >= 0 && barW > 0 && (
             <View
               pointerEvents="none"
-              style={[styles.bottomPill, { backgroundColor: colors.primarySoftAlt, width: (barW - 12 - 8) / 3, transform: [{ translateX: activeIdx * ((barW - 12 - 8) / 3 + 4) }] }, slide]}
+              style={[styles.bottomPill, { backgroundColor: colors.primarySoftAlt, width: (barW - 12 - 4 * (ITEMS.length - 1)) / ITEMS.length, transform: [{ translateX: activeIdx * ((barW - 12 - 4 * (ITEMS.length - 1)) / ITEMS.length + 4) }] }, slide]}
             />
           )}
           {ITEMS.map(({ name, label, Icon }) => {
@@ -275,7 +276,7 @@ const styles = StyleSheet.create({
   activeBar: { position: 'absolute', left: 0, top: 10, bottom: 10, width: 3, borderRadius: 2 },
   itemCompact: { flexDirection: 'column', gap: 4, paddingHorizontal: 0, paddingVertical: 8, minHeight: 64, justifyContent: 'center' },
   itemText: { fontSize: 15, letterSpacing: -0.2 },
-  itemTextCompact: { fontSize: 11, fontWeight: '500' },
+  itemTextCompact: { fontSize: 10, fontWeight: '500', letterSpacing: -0.2 },
   user: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingTop: 12, paddingHorizontal: 6, borderTopWidth: StyleSheet.hairlineWidth },
   avatar: { width: 32, height: 32, borderRadius: 16, alignItems: 'center', justifyContent: 'center' },
   avatarText: { fontSize: 14, fontWeight: '600' },

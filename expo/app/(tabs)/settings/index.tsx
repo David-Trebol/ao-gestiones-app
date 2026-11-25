@@ -324,7 +324,7 @@ export default function SettingsScreen() {
       <Text style={[styles.groupTitle, { color: colors.text }]} accessibilityRole="header">Resumen</Text>
       <View style={styles.statGrid}>
         {stat('Pedidos', String(totalOrders), FileText, '#FF8718')}
-        {stat('Fabricantes', String(totalManufacturers), Building2, '#3F6E92')}
+        {stat('Referencias', String(totalManufacturers), Building2, '#3F6E92')}
         {stat('Años', String(totalYears), FolderOpen, '#5B6B73')}
         {stat('Facturación total', formatCurrency(totalAmount), Euro, SystemTint.green, true)}
       </View>
@@ -416,7 +416,7 @@ export default function SettingsScreen() {
     'Datos',
     <>
       {Platform.OS === 'web' && row({ icon: Download, tint: SystemTint.green, title: 'Descargar copia completa', detail: 'Excel con pedidos, líneas, envíos y fabricantes', onPress: () => void handleExportAll(), testID: 'export-all-btn', first: true, disabled: exporting || orders.length === 0 })}
-      {isAdmin && row({ icon: Trash2, tint: SystemTint.red, title: 'Eliminar todos los datos', detail: 'Borra pedidos, fabricantes y años para todos los usuarios', onPress: openDeleteAll, destructive: true, testID: 'delete-all-btn', first: Platform.OS !== 'web', disabled: deleting })}
+      {isAdmin && row({ icon: Trash2, tint: SystemTint.red, title: 'Eliminar todos los datos', detail: 'Borra pedidos, referencias de pedido y años para todos los usuarios', onPress: openDeleteAll, destructive: true, testID: 'delete-all-btn', first: Platform.OS !== 'web', disabled: deleting })}
       {!isAdmin && Platform.OS !== 'web' && <Text style={[styles.rowDetail, { color: colors.textSecondary, padding: 16 }]}>Solo los administradores pueden borrar datos.</Text>}
     </>,
     isAdmin ? undefined : 'Solo los administradores pueden borrar datos o gestionar usuarios.',

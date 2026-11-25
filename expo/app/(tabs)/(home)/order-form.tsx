@@ -174,6 +174,9 @@ export default function OrderFormScreen() {
         next_action: editingOrder.next_action ?? '',
         items: editingOrder.items.map(item => ({
           item_status: item.item_status,
+          supplier_id: item.supplier_id,
+          supplier_name: item.supplier_name,
+          supplier_log: item.supplier_log,
           product_name: item.product_name,
           quantity: item.quantity,
           costo_unitario: item.costo_unitario,
@@ -362,7 +365,7 @@ export default function OrderFormScreen() {
   const [showErrors, setShowErrors] = useState(false);
   const errors = useMemo(() => {
     const e: Record<string, string> = {};
-    if (!formData.manufacturer_id) e.manufacturer = 'Elige el fabricante del pedido.';
+    if (!formData.manufacturer_id) e.manufacturer = 'Elige la referencia de pedido.';
     if (!Number.isInteger(formData.year) || formData.year < 2000 || formData.year > 2100) e.year = 'Escribe un año entre 2000 y 2100.';
     formData.items.forEach((it, i) => {
       if (!it.product_name.trim()) e[`item_name_${i}`] = 'Escribe el nombre del producto.';
@@ -605,12 +608,12 @@ export default function OrderFormScreen() {
           {(() => {
             // ---------- Pedido: fabricante, año, ref. manual y estado
             const pedidoSection = (
-              <FormSection title="Pedido" subtitle="Fabricante, año y estado" icon={ClipboardList}>
+              <FormSection title="Pedido" subtitle="Referencia, año y estado" icon={ClipboardList}>
                 <Text style={[styles.fieldLabel, { color: colors.textSecondary }]}>
-                  Fabricante <Text style={{ color: colors.error }}>*</Text>
+                  Referencia de pedido <Text style={{ color: colors.error }}>*</Text>
                 </Text>
                 {manufacturers.length === 0 ? (
-                  <Text style={[styles.help, { color: colors.textSecondary, marginBottom: 14 }]}>No hay fabricantes: créalos en la pestaña Fabricantes.</Text>
+                  <Text style={[styles.help, { color: colors.textSecondary, marginBottom: 14 }]}>No hay referencias de pedido: créalas en «Referencias de pedido».</Text>
                 ) : (
                   <Pressable
                     onPress={() => setMfSheetOpen(true)}
@@ -620,11 +623,11 @@ export default function OrderFormScreen() {
                       hovered && { opacity: 0.85 },
                     ]}
                     accessibilityRole="button"
-                    accessibilityLabel={`Fabricante: ${manufacturers[selectedManufacturerIndex] ? manufacturers[selectedManufacturerIndex].name : 'sin elegir'}. Cambiar`}
+                    accessibilityLabel={`Referencia de pedido: ${manufacturers[selectedManufacturerIndex] ? manufacturers[selectedManufacturerIndex].name : 'sin elegir'}. Cambiar`}
                     testID="manufacturer-select"
                   >
                     <Text style={[styles.selectText, { color: manufacturers[selectedManufacturerIndex] ? colors.text : colors.textTertiary }]} numberOfLines={1}>
-                      {manufacturers[selectedManufacturerIndex] ? `${manufacturers[selectedManufacturerIndex].name} (${manufacturers[selectedManufacturerIndex].code})` : 'Elige el fabricante'}
+                      {manufacturers[selectedManufacturerIndex] ? `${manufacturers[selectedManufacturerIndex].name} (${manufacturers[selectedManufacturerIndex].code})` : 'Elige la referencia'}
                     </Text>
                     <ChevronDown size={18} color={colors.textSecondary} />
                   </Pressable>
@@ -1068,7 +1071,7 @@ export default function OrderFormScreen() {
       </KeyboardAvoidingView>
       <SelectSheet
         visible={mfSheetOpen}
-        title="Fabricante"
+        title="Referencia de pedido"
         options={manufacturers.map(m => ({ value: m.id, label: `${m.name} (${m.code})` }))}
         selected={manufacturers[selectedManufacturerIndex]?.id}
         onSelect={id => {

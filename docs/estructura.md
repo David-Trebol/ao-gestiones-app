@@ -11,7 +11,8 @@ expo/
     login.tsx              pantalla de entrada (también alta del primer administrador)
     (tabs)/_layout.tsx     navegación principal (ver docs/PLAN.md, fase 1)
     (tabs)/(home)/         Pedidos: index (resumen + lista o carpetas año→fabricante), order-detail, order-form*
-    (tabs)/manufacturers/  Fabricantes
+    (tabs)/manufacturers/  Referencias de pedido (tabla manufacturers)
+    (tabs)/suppliers/      Fabricantes reales (tabla suppliers); su registro por producto está en components/SupplierLogSheet.tsx
     (tabs)/settings/       Ajustes: perfil, tema, resumen, usuarios (admin), cambiar contraseña, borrar todo
   components/              StatusBadge, SelectSheet, DocumentReview, DateField, WebAlertHost (Alert en web), home/OrdersDashboard…
   contexts/                AuthContext (sesión, perfil, usuarios), DataContext (todas las lecturas y escrituras), ThemeContext

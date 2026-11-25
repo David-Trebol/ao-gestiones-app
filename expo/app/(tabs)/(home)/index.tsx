@@ -313,7 +313,7 @@ export default function HomeScreen() {
         <Animated.View style={{ transform: [{ scale: titleScale }] }}>
           <SectionHeader
             title="Años"
-            subtitle="Elige un año para ver sus fabricantes y pedidos"
+            subtitle="Elige un año para ver sus referencias y pedidos"
             actionLabel="Añadir año"
             onAction={handleAddYear}
           />
@@ -331,7 +331,7 @@ export default function HomeScreen() {
                   kind="year"
                   title={String(year)}
                   orders={yearOrders}
-                  extraLabel="Fabricantes"
+                  extraLabel="Referencias"
                   extraValue={String(manufacturersForYear.length)}
                   onPress={() => navigateToYear(year)}
                   onDuplicate={() => handleDuplicateYear(year)}
@@ -358,8 +358,8 @@ export default function HomeScreen() {
           {yearOrders.length > 0 && search}
           {scopeQuery.trim() ? renderResults(yearOrders) : (
             <EmptyState
-              title={`No hay fabricantes en ${selectedYear}`}
-              description="Añade un fabricante a este año desde la Gestión de Fabricantes"
+              title={`No hay referencias de pedido en ${selectedYear}`}
+              description="Añade una referencia a este año desde «Referencias de pedido»"
             />
           )}
         </>
@@ -370,7 +370,7 @@ export default function HomeScreen() {
       <>
         <SectionHeader
           title={String(selectedYear)}
-          subtitle="Elige un fabricante para ver sus pedidos"
+          subtitle="Elige una referencia para ver sus pedidos"
         />
         {search}
         {scopeQuery.trim() ? renderResults(yearOrders) : (
@@ -405,7 +405,7 @@ export default function HomeScreen() {
       return (
         <EmptyState
           title="No hay pedidos"
-          description="No se encontraron pedidos para este fabricante"
+          description="No se encontraron pedidos con esta referencia"
           actionLabel="Nuevo Pedido"
           onAction={() => router.push(`/order-form?manufacturerId=${selectedManufacturer.id}&year=${selectedYear}` as any)}
         />
@@ -475,7 +475,7 @@ export default function HomeScreen() {
                 accessibilityState={{ selected: mode === m }}
                 testID={`home-mode-${m}`}
               >
-                <Text style={[styles.segText, { color: mode === m ? colors.text : colors.textSecondary }]}>{m === 'lista' ? 'Resumen y lista' : 'Por año y fabricante'}</Text>
+                <Text style={[styles.segText, { color: mode === m ? colors.text : colors.textSecondary }]}>{m === 'lista' ? 'Resumen y lista' : 'Por año y referencia'}</Text>
               </Pressable>
             ))}
           </View>

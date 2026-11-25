@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import createContextHook from '@nkzw/create-context-hook';
-import { Order, Manufacturer, OrderFormData, ItemStatus } from '@/types';
+import { Order, Manufacturer, OrderFormData, ItemStatus, OrderItem, Supplier } from '@/types';
 import { calculateItemTotals, calculateShippingTotals, generateReferenceNumber, generateId } from '@/utils/calculations';
 import { supabase, describeError } from '@/lib/supabase';
 import { useAuth } from '@/contexts/AuthContext';
@@ -52,6 +52,12 @@ async function fetchManufacturers(): Promise<Manufacturer[]> {
   const { data, error } = await supabase.from('manufacturers').select('*').order('name', { ascending: true });
   if (error) fail(error);
   return (data ?? []).map(normalizeManufacturer);
+}
+
+async function fetchSuppliers(): Promise<Supplier[]> {
+  const { data, error } = await supabase.from('suppliers').select('*').order('name', { ascending: true });
+  if (error) fail(error);
+  return (data ?? []) as Supplier[];
 }
 
 async function fetchYears(): Promise<number[]> {
@@ -114,6 +120,8 @@ export const [DataProvider, useData] = createContextHook(() => {
   const ordersQuery = useQuery({ queryKey: ['orders'], queryFn: fetchOrders, enabled: isAuthenticated, staleTime: 30_000 });
   const manufacturersQuery = useQuery({ queryKey: ['manufacturers'], queryFn: fetchManufacturers, enabled: isAuthenticated, staleTime: 30_000 });
   const yearsQuery = useQuery({ queryKey: ['years'], queryFn: fetchYears, enabled: isAuthenticated, staleTime: 30_000 });
+  const suppliersQuery = useQuery({ queryKey: ['suppliers'], queryFn: fetchSuppliers, enabled: isAuthenticated, staleTime: 30_000 });
+  const suppliers = useMemo(() => suppliersQuery.data ?? [], [suppliersQuery.data]);
 
   const orders = useMemo(() => ordersQuery.data ?? [], [ordersQuery.data]);
   const manufacturers = useMemo(() => manufacturersQuery.data ?? [], [manufacturersQuery.data]);
@@ -125,6 +133,7 @@ export const [DataProvider, useData] = createContextHook(() => {
       queryClient.removeQueries({ queryKey: ['orders'] });
       queryClient.removeQueries({ queryKey: ['manufacturers'] });
       queryClient.removeQueries({ queryKey: ['years'] });
+      queryClient.removeQueries({ queryKey: ['suppliers'] });
     }
   }, [isAuthenticated, queryClient]);
 
@@ -138,6 +147,9 @@ export const [DataProvider, useData] = createContextHook(() => {
       })
       .on('postgres_changes', { event: '*', schema: 'public', table: 'manufacturers' }, () => {
         void queryClient.invalidateQueries({ queryKey: ['manufacturers'] });
+      })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'suppliers' }, () => {
+        void queryClient.invalidateQueries({ queryKey: ['suppliers'] });
       })
       .on('postgres_changes', { event: '*', schema: 'public', table: 'years' }, () => {
         void queryClient.invalidateQueries({ queryKey: ['years'] });
@@ -154,6 +166,9 @@ export const [DataProvider, useData] = createContextHook(() => {
   const setManufacturers = useCallback((fn: (prev: Manufacturer[]) => Manufacturer[]) => {
     queryClient.setQueryData<Manufacturer[]>(['manufacturers'], prev => fn(prev ?? []));
   }, [queryClient]);
+  const setSuppliers = useCallback((fn: (prev: Supplier[]) => Supplier[]) => {
+    queryClient.setQueryData<Supplier[]>(['suppliers'], prev => fn(prev ?? []));
+  }, [queryClient]);
   const setYears = useCallback((fn: (prev: number[]) => number[]) => {
     queryClient.setQueryData<number[]>(['years'], prev => fn(prev ?? []));
   }, [queryClient]);
@@ -166,7 +181,7 @@ export const [DataProvider, useData] = createContextHook(() => {
 
   const addOrder = useCallback(async (formData: OrderFormData): Promise<Order> => {
     const manufacturer = manufacturers.find(m => m.id === formData.manufacturer_id);
-    if (!manufacturer) throw new Error('Selecciona un fabricante válido');
+    if (!manufacturer) throw new Error('Selecciona una referencia de pedido válida');
     await ensureYear(formData.year);
     const now = new Date().toISOString();
     const created = await insertOrderWithReference({
@@ -192,7 +207,7 @@ export const [DataProvider, useData] = createContextHook(() => {
 
   const updateOrder = useCallback(async (orderId: string, formData: OrderFormData): Promise<Order> => {
     const manufacturer = manufacturers.find(m => m.id === formData.manufacturer_id);
-    if (!manufacturer) throw new Error('Selecciona un fabricante válido');
+    if (!manufacturer) throw new Error('Selecciona una referencia de pedido válida');
     const existing = orders.find(o => o.id === orderId);
     await ensureYear(formData.year);
 
@@ -262,6 +277,51 @@ export const [DataProvider, useData] = createContextHook(() => {
     setOrders(prev => prev.map(o => (o.id === orderId ? updated : o)));
   }, [orders, setOrders]);
 
+  /** Cambia datos del fabricante de un producto (fabricante y registro); no toca importes */
+  const updateItemSupplier = useCallback(async (orderId: string, index: number, patch: Pick<OrderItem, 'supplier_id' | 'supplier_name' | 'supplier_log'>) => {
+    const order = orders.find(o => o.id === orderId);
+    if (!order || !order.items[index]) throw new Error('No se encontró el producto');
+    const items = order.items.map((it, k) => {
+      if (k !== index) return it;
+      const next: OrderItem = { ...it, ...patch };
+      if (!next.supplier_id) { delete next.supplier_id; delete next.supplier_name; }
+      if (!next.supplier_log || next.supplier_log.length === 0) delete next.supplier_log;
+      return next;
+    });
+    const { data, error } = await supabase.from('orders').update({ items }).eq('id', orderId).select().single();
+    if (error) fail(error);
+    const updated = normalizeOrder(data);
+    setOrders(prev => prev.map(o => (o.id === orderId ? updated : o)));
+  }, [orders, setOrders]);
+
+  const addSupplier = useCallback(async (fields: Omit<Supplier, 'id' | 'created_at'>): Promise<Supplier> => {
+    const name = fields.name.trim();
+    if (!name) throw new Error('Escribe el nombre del fabricante');
+    if (suppliers.some(s => s.name.trim().toLowerCase() === name.toLowerCase())) throw new Error(`Ya existe un fabricante llamado «${name}»`);
+    const { data, error } = await supabase.from('suppliers').insert({ ...fields, name, id: generateId() }).select().single();
+    if (error) fail(error);
+    const created = data as Supplier;
+    setSuppliers(prev => [...prev, created].sort((a, b) => a.name.localeCompare(b.name, 'es')));
+    return created;
+  }, [suppliers, setSuppliers]);
+
+  const updateSupplier = useCallback(async (id: string, fields: Omit<Supplier, 'id' | 'created_at'>) => {
+    const name = fields.name.trim();
+    if (!name) throw new Error('Escribe el nombre del fabricante');
+    if (suppliers.some(s => s.id !== id && s.name.trim().toLowerCase() === name.toLowerCase())) throw new Error(`Ya existe un fabricante llamado «${name}»`);
+    const { data, error } = await supabase.from('suppliers').update({ ...fields, name }).eq('id', id).select().single();
+    if (error) fail(error);
+    const updated = data as Supplier;
+    setSuppliers(prev => prev.map(s => (s.id === id ? updated : s)).sort((a, b) => a.name.localeCompare(b.name, 'es')));
+  }, [suppliers, setSuppliers]);
+
+  /** Borra un fabricante; los productos que lo tenían conservan su nombre escrito */
+  const deleteSupplier = useCallback(async (id: string) => {
+    const { error } = await supabase.from('suppliers').delete().eq('id', id);
+    if (error) fail(error);
+    setSuppliers(prev => prev.filter(s => s.id !== id));
+  }, [setSuppliers]);
+
   const deleteOrder = useCallback(async (orderId: string) => {
     const { error } = await supabase.from('orders').delete().eq('id', orderId);
     if (error) fail(error);
@@ -286,7 +346,8 @@ export const [DataProvider, useData] = createContextHook(() => {
       status: 'pending',
       customer: { ...original.customer, numero_factura: '', numero_recibo: '' },
       // los productos de la copia empiezan sin enviar
-      items: original.items.map(({ item_status: _s, ...it }) => it),
+      // (se mantiene el fabricante de cada producto, pero no su registro)
+      items: original.items.map(({ item_status: _s, supplier_log: _l, ...it }) => it),
       // Se mantiene el responsable; la fecha prevista y la siguiente acción son del pedido original
       expected_date: null,
       next_action: '',
@@ -313,7 +374,7 @@ export const [DataProvider, useData] = createContextHook(() => {
   const addManufacturer = useCallback(async (name: string, code: string, activeYears: number[] = []): Promise<Manufacturer> => {
     const cleanCode = code.trim().toUpperCase();
     if (manufacturers.some(m => m.code.toUpperCase() === cleanCode)) {
-      throw new Error(`Ya existe un fabricante con el código "${cleanCode}"`);
+      throw new Error(`Ya existe una referencia con el código "${cleanCode}"`);
     }
     const { data, error } = await supabase
       .from('manufacturers')
@@ -331,7 +392,7 @@ export const [DataProvider, useData] = createContextHook(() => {
     if (typeof updates.code === 'string') {
       const code = updates.code.trim().toUpperCase();
       if (manufacturers.some(m => m.id !== id && m.code.toUpperCase() === code)) {
-        throw new Error(`Ya existe un fabricante con el código "${code}"`);
+        throw new Error(`Ya existe una referencia con el código "${code}"`);
       }
       clean.code = code;
     }
@@ -418,6 +479,7 @@ export const [DataProvider, useData] = createContextHook(() => {
   const refresh = useCallback(async () => {
     await Promise.all([
       queryClient.invalidateQueries({ queryKey: ['orders'] }),
+      queryClient.invalidateQueries({ queryKey: ['suppliers'] }),
       queryClient.invalidateQueries({ queryKey: ['manufacturers'] }),
       queryClient.invalidateQueries({ queryKey: ['years'] }),
     ]);
@@ -454,6 +516,11 @@ export const [DataProvider, useData] = createContextHook(() => {
     updateOrder,
     updateOrderField,
     updateItemStatus,
+    updateItemSupplier,
+    suppliers,
+    addSupplier,
+    updateSupplier,
+    deleteSupplier,
     deleteOrder,
     duplicateOrder,
     duplicateOrders,

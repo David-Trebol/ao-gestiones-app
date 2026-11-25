@@ -1,7 +1,7 @@
 import React, { useCallback, useMemo, useState } from 'react';
 import { Alert, Platform, Linking, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
-import { Briefcase, CalendarDays, Check, ChevronDown, ChevronLeft, Clock, Copy, Euro, Factory, FileText, IdCard, Mail, MapPin, MoreHorizontal, Package, Pencil, Phone, Receipt, Route, Truck, User, UserRound, X, XCircle } from 'lucide-react-native';
+import { Briefcase, CalendarDays, Check, ChevronDown, ChevronLeft, Clock, Copy, Euro, Factory, FileText, IdCard, Mail, MapPin, MoreHorizontal, Package, Pencil, Phone, Receipt, Route, Tags, Truck, User, UserRound, X, XCircle } from 'lucide-react-native';
 import * as Haptics from 'expo-haptics';
 import { CompactTitleBar, useCollapsingTitle, usePageLayout } from '@/components/Page';
 import { canvas, heroFill, panel, webInputReset } from '@/constants/theme';
@@ -12,6 +12,8 @@ import { useData } from '@/contexts/DataContext';
 import { ThemeColors } from '@/constants/colors';
 import { STATUS_ICONS, STATUS_ORDER, statusConfig } from '@/components/StatusBadge';
 import SelectSheet from '@/components/SelectSheet';
+import SupplierLogSheet from '@/components/SupplierLogSheet';
+import { SUPPLIER_EVENT_SHORT, SUPPLIER_EVENT_TINT, SUPPLIER_STEPS, dmy, orderSupplierNames, supplierSteps } from '@/constants/supplierLog';
 import type { ItemStatus, OrderItem, OrderStatus } from '@/types';
 import { formatCurrency, formatDate } from '@/utils/calculations';
 import { addressLine, formatISODate, itemsSummary, overdueDays } from '@/utils/orderFilters';
@@ -24,7 +26,7 @@ type Sheet = 'more' | 'status' | null;
 export default function OrderDetailScreen() {
   const { orderId } = useLocalSearchParams<{ orderId: string }>();
   const router = useRouter();
-  const { orders, deleteOrder, updateOrderField, updateItemStatus, duplicateOrder } = useData();
+  const { orders, suppliers, deleteOrder, updateOrderField, updateItemStatus, updateItemSupplier, duplicateOrder } = useData();
   const { colors, isDark } = useTheme();
   const { width, content, bottomSpace } = usePageLayout();
   const { shown: compactShown, scrollProps } = useCollapsingTitle(90);
@@ -35,6 +37,9 @@ export default function OrderDetailScreen() {
   const totalShown = useCountUp(order?.total_with_vat ?? 0);
 
   const [sheet, setSheet] = useState<Sheet>(null);
+  // fabricante de un producto: lista para elegir (supSheet) y ventana del registro (logSheet)
+  const [supSheet, setSupSheet] = useState<number | null>(null);
+  const [logSheet, setLogSheet] = useState<{ index: number; startNew?: boolean } | null>(null);
   /** Producto cuyo estado se está cambiando (índice) */
   const [itemSheet, setItemSheet] = useState<number | 'all' | null>(null);
   const [editingRef, setEditingRef] = useState(false);
@@ -165,6 +170,7 @@ export default function OrderDetailScreen() {
   const addr = addressLine(c);
   const it = itemsSummary(order);
   const prog = itemProgress(order.items);
+  const supNames = orderSupplierNames(order.items);
   const st = statusConfig[order.status];
   const StIcon = STATUS_ICONS[order.status];
   const stColor = colors[st.textKey];
@@ -255,6 +261,45 @@ export default function OrderDetailScreen() {
     </Pressable>
   );
   /** Fondo y franja de color de la fila según el estado del producto */
+  /** Desplegable «Seleccionar fabricante» del producto */
+  const supplierChip = (i: number, item: OrderItem) => (
+    <Pressable
+      onPress={() => setSupSheet(i)}
+      style={[s.chip, s.supChip, { borderColor: item.supplier_name ? 'rgba(123,92,196,0.45)' : colors.border, backgroundColor: item.supplier_name ? 'rgba(123,92,196,0.10)' : colors.fill }]}
+      {...fx('tint')}
+      hitSlop={6}
+      accessibilityRole="button"
+      accessibilityLabel={item.supplier_name ? `Fabricante: ${item.supplier_name}. Cambiar` : 'Seleccionar fabricante'}
+      testID={`item-supplier-${i}`}
+    >
+      <Factory size={13} color={item.supplier_name ? '#7B5CC4' : colors.textTertiary} strokeWidth={2.4} />
+      <Text style={[s.chipText, { color: item.supplier_name ? colors.text : colors.textSecondary, flexShrink: 1 }]} numberOfLines={1}>{item.supplier_name || 'Seleccionar fabricante'}</Text>
+      <ChevronDown size={13} color={colors.textSecondary} strokeWidth={2.6} />
+    </Pressable>
+  );
+  /** Botón del registro con el fabricante: tres puntos (pedido, recibido, pagado) que se encienden con su color */
+  const logBtn = (i: number, item: OrderItem) => {
+    const st = supplierSteps(item);
+    const n = item.supplier_log?.length ?? 0;
+    const done = SUPPLIER_STEPS.filter(t => st[t]);
+    const last = done.length > 0 ? done[done.length - 1]! : null;
+    return (
+      <Pressable
+        onPress={() => setLogSheet({ index: i })}
+        style={[s.logBtn, { borderColor: colors.border }]}
+        {...fx('tint')}
+        hitSlop={4}
+        accessibilityRole="button"
+        accessibilityLabel={`Registro con el fabricante${n ? `: ${n} apuntes` : ''}. Abrir`}
+        testID={`item-log-${i}`}
+      >
+        {SUPPLIER_STEPS.map(t => (
+          <View key={t} style={[s.logDot, { backgroundColor: st[t] ? SUPPLIER_EVENT_TINT[t] : colors.border }]} />
+        ))}
+        <Text style={s.logBtnText} numberOfLines={1}>{last ? `${SUPPLIER_EVENT_SHORT[last]} ${dmy(st[last]!).slice(0, 5)}` : 'Registro'}</Text>
+      </Pressable>
+    );
+  };
   const rowTone = (item: OrderItem) => {
     const tone = itemTone(itemStatusOf(item), colors, isDark);
     return { backgroundColor: tone.row, borderLeftWidth: 4, borderLeftColor: itemStatusOf(item) === 'none' ? 'transparent' : tone.dot };
@@ -359,7 +404,7 @@ export default function OrderDetailScreen() {
           ? tile(Receipt, '#22A447', 'Beneficio', formatCurrency(profit), tiny ? 'Venta − coste' : 'Venta sin IVA − coste', profit >= 0 ? colors.success : colors.error)
           : tile(Truck, '#22A447', 'Envío', shipTotal > 0 ? formatCurrency(shipTotal) : 'Sin envío', shipLines.length ? `${shipLines.length} línea${shipLines.length === 1 ? '' : 's'}` : 'Incluido o no aplica')}
         {tile(Package, '#3F6E92', 'Productos', `${prog.out} de ${prog.total}`, prog.total === 0 ? 'Sin productos' : `${prog.delivered === prog.total ? 'entregados' : 'enviados'} · ${it.units} ud${it.units === 1 ? '' : 's'}.`)}
-        {tile(Factory, '#7B5CC4', 'Fabricante', order.manufacturer_name || '—', `${order.manufacturer_code ? order.manufacturer_code + ' · ' : ''}año ${order.year}`)}
+        {tile(Tags, '#3F6E92', 'Referencia de pedido', order.manufacturer_name || '—', `${order.manufacturer_code ? order.manufacturer_code + ' · ' : ''}año ${order.year}${supNames.length ? ' · ' + supNames.join(', ') : ''}`)}
       </View>
     </View>
   );
@@ -618,6 +663,10 @@ export default function OrderDetailScreen() {
             {itemChip(i, x)}
             <Text style={s.itemTotal}>{formatCurrency(x.valor_sin_iva)}</Text>
           </View>
+          <View style={s.supRow}>
+            {supplierChip(i, x)}
+            {logBtn(i, x)}
+          </View>
           <View style={s.metrics}>
             {metric('Neto ud.', formatCurrency(x.pvp_neto_sin_iva))}
             {!!x.descuento_porcentaje && metric('Dto.', `${x.descuento_porcentaje} %`)}
@@ -657,6 +706,8 @@ export default function OrderDetailScreen() {
   const hasUnitPrice = order.items.some(i => i.tpv_unitario > 0);
   const hasDiscount = order.items.some(i => !!i.descuento_porcentaje);
   /** Ordenador: productos a todo el ancho, como una factura (líneas con su estado, gastos de envío y totales a la derecha) */
+  // columna propia de «Fabricante» solo si hay sitio; si no, va debajo del estado
+  const supCol = width >= 1280;
   const invoice = card(
     'Productos',
     <Package size={16} color="#FFFFFF" />,
@@ -664,13 +715,14 @@ export default function OrderDetailScreen() {
       <View style={[s.tr, s.th]}>
         <Text style={[s.thText, s.cQty]}>Cant.</Text>
         <Text style={[s.thText, s.cName]}>Equipo y referencia</Text>
+        {supCol && <Text style={[s.thText, s.cSup]}>Fabricante</Text>}
         {order.items.length > 1 ? (
-          <Pressable onPress={() => setItemSheet('all')} style={[s.cState, s.thBtn]} accessibilityRole="button" accessibilityLabel="Cambiar el estado de todos los productos" testID="item-status-all-head">
-            <Text style={[s.thText, { color: colors.primary }]}>Estado</Text>
+          <Pressable onPress={() => setItemSheet('all')} style={[s.cState, !supCol && s.cStack, s.thBtn]} accessibilityRole="button" accessibilityLabel="Cambiar el estado de todos los productos" testID="item-status-all-head">
+            <Text style={[s.thText, { color: colors.primary }]}>{supCol ? 'Estado' : 'Estado y fabricante'}</Text>
             <ChevronDown size={13} color={colors.primary} strokeWidth={2.6} />
           </Pressable>
         ) : (
-          <Text style={[s.thText, s.cState]}>Estado</Text>
+          <Text style={[s.thText, s.cState, !supCol && s.cStack]}>{supCol ? 'Estado' : 'Estado y fabricante'}</Text>
         )}
         {hasUnitPrice && <Text style={[s.thText, s.cNum]}>Precio ud.</Text>}
         {hasDiscount && <Text style={[s.thText, s.cDto]}>Dto.</Text>}
@@ -690,7 +742,14 @@ export default function OrderDetailScreen() {
               </Text>
             )}
           </View>
-          <View style={s.cState}>{itemChip(i, x)}</View>
+          {supCol ? (
+            <>
+              <View style={[s.cSup, { gap: 6 }]}>{supplierChip(i, x)}{logBtn(i, x)}</View>
+              <View style={s.cState}>{itemChip(i, x)}</View>
+            </>
+          ) : (
+            <View style={[s.cState, s.cStack, { gap: 6 }]}>{itemChip(i, x)}{supplierChip(i, x)}{logBtn(i, x)}</View>
+          )}
           {hasUnitPrice && <Text style={[s.td, s.cNum, s.noWrap, !(x.tpv_unitario > 0) && s.dim]}>{x.tpv_unitario > 0 ? formatCurrency(x.tpv_unitario) : '—'}</Text>}
           {hasDiscount && <Text style={[s.td, s.cDto, s.noWrap, !x.descuento_porcentaje && s.dim]}>{x.descuento_porcentaje ? `${x.descuento_porcentaje} %` : '—'}</Text>}
           <Text style={[s.td, s.cNum, s.noWrap, s.tdStrong]}>{formatCurrency(x.valor_sin_iva)}</Text>
@@ -788,6 +847,27 @@ export default function OrderDetailScreen() {
         )}
       </ScrollView>
 
+      <SelectSheet
+        visible={supSheet !== null}
+        title={supSheet !== null ? `Fabricante de «${order.items[supSheet]?.product_name || 'producto'}»` : 'Fabricante'}
+        searchable={suppliers.length > 6}
+        searchPlaceholder="Buscar fabricante"
+        options={[
+          ...suppliers.map(x => ({ value: x.id, label: x.name, hint: x.contact ?? undefined })),
+          { value: '__new', label: '+ Añadir fabricante nuevo' },
+          ...(supSheet !== null && order.items[supSheet]?.supplier_id ? [{ value: '__none', label: 'Quitar fabricante', destructive: true }] : []),
+        ]}
+        selected={supSheet !== null ? order.items[supSheet]?.supplier_id : undefined}
+        onSelect={v => {
+          const i = supSheet;
+          if (i === null) return;
+          if (v === '__new') setLogSheet({ index: i, startNew: true });
+          else void updateItemSupplier(order.id, i, v === '__none' ? { supplier_id: undefined, supplier_name: undefined } : { supplier_id: v, supplier_name: suppliers.find(x => x.id === v)?.name ?? '' })
+            .catch(e => Alert.alert('No se pudo cambiar el fabricante', (e as Error).message));
+        }}
+        onClose={() => setSupSheet(null)}
+      />
+      <SupplierLogSheet order={order} index={logSheet?.index ?? null} startNew={logSheet?.startNew} onClose={() => setLogSheet(null)} />
       <SelectSheet
         visible={sheet === 'status'}
         title="Cambiar estado del pedido"
@@ -992,6 +1072,13 @@ function makeStyles(c: ThemeColors) {
     tdSub: { fontSize: 12.5, color: c.textSecondary, marginTop: 2 },
     cQty: { width: 44, textAlign: 'center' },
     cName: { flex: 1, minWidth: 170 },
+    cSup: { width: 190, flexShrink: 0, paddingRight: 8 },
+    supChip: { maxWidth: '100%' },
+    cStack: { width: 176, paddingRight: 8 },
+    supRow: { flexDirection: 'row', alignItems: 'center', gap: 8, flexWrap: 'wrap', marginTop: 8 },
+    logBtn: { flexDirection: 'row', alignItems: 'center', gap: 4, alignSelf: 'flex-start', minHeight: 28, paddingHorizontal: 9, borderRadius: 999, borderWidth: 1, ...(Platform.OS === 'web' ? ({ cursor: 'pointer' } as object) : {}) },
+    logDot: { width: 8, height: 8, borderRadius: 4 },
+    logBtnText: { fontSize: 12.5, fontWeight: '700', color: c.textSecondary, marginLeft: 3 },
     // Importes: ancho fijo y sin partir («912,00 €» no debe quedar en dos líneas); el concepto se estrecha
     cNum: { width: 100, flexShrink: 0, textAlign: 'right', paddingLeft: 6 },
     noWrap: (Platform.OS === 'web' ? { whiteSpace: 'nowrap' } : {}) as object,

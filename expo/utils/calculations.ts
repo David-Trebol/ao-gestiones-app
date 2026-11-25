@@ -32,6 +32,9 @@ export function calculateItemTotals(item: OrderFormItem): OrderItem {
     beneficio_bruto: Math.round(beneficio_bruto * 100) / 100,
     valor_con_iva: Math.round(valor_con_iva * 100) / 100,
     ...(item.item_status && item.item_status !== 'none' ? { item_status: item.item_status } : {}),
+    // fabricante y registro del producto: se conservan tal cual (no afectan a importes)
+    ...(item.supplier_id ? { supplier_id: item.supplier_id, supplier_name: item.supplier_name ?? '' } : {}),
+    ...(item.supplier_log && item.supplier_log.length > 0 ? { supplier_log: item.supplier_log } : {}),
   };
 }
 

@@ -32,7 +32,7 @@ const check = (n, ok, x = '') => results.push((ok ? 'OK  ' : 'FAIL') + ' ' + n +
     await p.getByText('Más recientes').click(); await w(400); await p.getByText('Importe: mayor primero', { exact: true }).click(); await w(500);
     const firstRef = await p.evaluate(() => { const el = document.querySelector('[data-testid^="order-row-"],[data-testid^="order-card-"]'); return el ? el.getAttribute('data-testid') : ''; });
     check(`${tag} ordenar por importe`, /o1$/.test(firstRef), firstRef);
-    await p.getByText('Fabricante', { exact: true }).first().click(); await w(400); await p.getByText('TechParts Global', { exact: true }).last().click(); await w(500); t = await txt();
+    await p.getByText('Referencia', { exact: true }).first().click(); await w(400); await p.getByText('TechParts Global', { exact: true }).last().click(); await w(500); t = await txt();
     check(`${tag} filtro fabricante`, /Todos los pedidos\W+1/i.test(t) && /Quitar filtros \(1\)/.test(t));
     // abrir un pedido y volver: se conservan filtros
     await p.getByText('TPG-2026-001').first().click(); await w(1500); t = await txt();

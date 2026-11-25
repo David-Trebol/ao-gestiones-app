@@ -20,7 +20,8 @@ export default function TabLayout() {
       }}
     >
       <Tabs.Screen name="(home)" options={{ title: 'Pedidos' }} />
-      <Tabs.Screen name="manufacturers" options={{ title: 'Fabricantes' }} />
+      <Tabs.Screen name="manufacturers" options={{ title: 'Referencias de pedido' }} />
+      <Tabs.Screen name="suppliers" options={{ title: 'Fabricantes' }} />
       <Tabs.Screen name="settings" options={{ title: 'Ajustes' }} />
       {/* La búsqueda vive en Pedidos; la ruta antigua redirige allí */}
       <Tabs.Screen name="search" options={{ href: null, title: 'Buscar' }} />

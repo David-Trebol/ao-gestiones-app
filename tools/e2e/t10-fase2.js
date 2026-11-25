@@ -26,8 +26,8 @@ const check = (name, ok, extra = '') => results.push((ok ? 'OK  ' : 'FAIL') + ' 
   await p.goto(`http://localhost:${process.env.PORT}/manufacturers`, { waitUntil: 'networkidle' }); await wait(1500);
   await p.getByTestId('manufacturer-menu-mz').click(); await wait(500);
   t = await text();
-  check('menú con acciones con nombre', ['Editar nombre y código', 'Asignar años', 'Duplicar fabricante', 'Eliminar fabricante'].every(x => t.includes(x)));
-  await p.getByText('Duplicar fabricante', { exact: true }).last().click(); await wait(1500);
+  check('menú con acciones con nombre', ['Editar nombre y código', 'Asignar años', 'Duplicar referencia', 'Eliminar referencia'].every(x => t.includes(x)));
+  await p.getByText('Duplicar referencia', { exact: true }).last().click(); await wait(1500);
   check('duplicar desde el menú', mock.db.manufacturers.length === 11, String(mock.db.manufacturers.length));
   const okb = p.getByTestId('web-alert-btn-OK'); if (await okb.count()) { await okb.click(); await wait(300); }
 

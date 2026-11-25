@@ -1,0 +1,74 @@
+import { CircleDollarSign, PackageCheck, ShoppingCart, StickyNote } from 'lucide-react-native';
+import type { OrderItem, SupplierEvent, SupplierEventType } from '@/types';
+
+/**
+ * Registro con el fabricante de cada producto: se va apuntando qué se hace y cuándo
+ * (pedido al fabricante, recibido, pagado u otra cosa), sin borrar lo anterior.
+ */
+export const SUPPLIER_EVENT_ORDER: SupplierEventType[] = ['ordered', 'received', 'paid', 'other'];
+
+export const SUPPLIER_EVENT_LABEL: Record<SupplierEventType, string> = {
+  ordered: 'Pedido al fabricante',
+  received: 'Recibido',
+  paid: 'Pagado',
+  other: 'Otro',
+};
+
+/** Nombre corto para chapas pequeñas */
+export const SUPPLIER_EVENT_SHORT: Record<SupplierEventType, string> = {
+  ordered: 'Pedido',
+  received: 'Recibido',
+  paid: 'Pagado',
+  other: 'Nota',
+};
+
+export const SUPPLIER_EVENT_TINT: Record<SupplierEventType, string> = {
+  ordered: '#0EA5E9',
+  received: '#22A447',
+  paid: '#7B5CC4',
+  other: '#8E8E93',
+};
+
+export const SUPPLIER_EVENT_ICON = {
+  ordered: ShoppingCart,
+  received: PackageCheck,
+  paid: CircleDollarSign,
+  other: StickyNote,
+} as const;
+
+/** Los tres trámites que se siguen con cada producto */
+export const SUPPLIER_STEPS: Exclude<SupplierEventType, 'other'>[] = ['ordered', 'received', 'paid'];
+
+/** Apuntes ordenados del más reciente al más antiguo */
+export function sortedLog(log: SupplierEvent[] | undefined): SupplierEvent[] {
+  return [...(log ?? [])].sort((a, b) => (b.date === a.date ? (b.created_at ?? '').localeCompare(a.created_at ?? '') : b.date.localeCompare(a.date)));
+}
+
+/** Última fecha de cada trámite (pedido, recibido, pagado), o null si aún no se ha hecho */
+export function supplierSteps(item: Pick<OrderItem, 'supplier_log'>): Record<'ordered' | 'received' | 'paid', string | null> {
+  const r: Record<'ordered' | 'received' | 'paid', string | null> = { ordered: null, received: null, paid: null };
+  for (const e of item.supplier_log ?? []) {
+    if (e.type === 'other') continue;
+    if (!r[e.type] || e.date > r[e.type]!) r[e.type] = e.date;
+  }
+  return r;
+}
+
+/** Fabricantes distintos de los productos de un pedido, en orden de aparición */
+export function orderSupplierNames(items: OrderItem[]): string[] {
+  const out: string[] = [];
+  for (const it of items) {
+    const n = it.supplier_name?.trim();
+    if (n && !out.includes(n)) out.push(n);
+  }
+  return out;
+}
+
+/** Fecha AAAA-MM-DD → DD/MM/AAAA */
+export const dmy = (iso: string) => (/^\d{4}-\d{2}-\d{2}$/.test(iso) ? `${iso.slice(8, 10)}/${iso.slice(5, 7)}/${iso.slice(0, 4)}` : iso);
+
+/** Hoy en AAAA-MM-DD (hora local) */
+export function todayISO(): string {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+}

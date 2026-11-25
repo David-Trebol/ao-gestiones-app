@@ -112,7 +112,7 @@ export default function ManufacturersScreen() {
 
   const handleDelete = useCallback((manufacturer: Manufacturer) => {
     Alert.alert(
-      '¿Eliminar fabricante?',
+      '¿Eliminar referencia de pedido?',
       `Se eliminará "${manufacturer.name}". Solo se puede eliminar si no tiene pedidos.`,
       [
         { text: 'Cancelar', style: 'cancel' },
@@ -123,7 +123,7 @@ export default function ManufacturersScreen() {
             try {
               const success = await deleteManufacturer(manufacturer.id);
               if (!success) {
-                Alert.alert('No se puede eliminar', 'Este fabricante tiene pedidos asociados. Elimina o mueve sus pedidos primero.');
+                Alert.alert('No se puede eliminar', 'Esta referencia tiene pedidos asociados. Elimina o mueve sus pedidos primero.');
               } else {
                 void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
               }
@@ -329,7 +329,7 @@ export default function ManufacturersScreen() {
   };
 
   const summary = [
-    { label: 'Fabricantes', value: String(manufacturers.length), Icon: Building2 },
+    { label: 'Referencias', value: String(manufacturers.length), Icon: Building2 },
     { label: 'Con pedidos', value: String(totals.withOrders), Icon: Layers },
     { label: 'Pedidos en total', value: String(totals.orders), Icon: Package },
     { label: 'Importe total', value: formatCurrency(totals.amount), Icon: Euro, hint: 'sin cancelados' },
@@ -401,9 +401,9 @@ export default function ManufacturersScreen() {
       <ScrollView style={{ flex: 1, width: '100%' }} contentContainerStyle={[content, { paddingBottom: bottomSpace }]} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
         <Animated.View style={{ opacity: headerFade, transform: [{ translateY: headerSlide }, { scale: headerScale }] }}>
           <PageHeader
-            title="Fabricantes"
-            subtitle={`${manufacturers.length} fabricante${manufacturers.length !== 1 ? 's' : ''}`}
-            actions={<Button label="Crear" icon={Plus} variant="primary" onPress={openCreate} accessibilityLabel="Crear fabricante" testID="create-manufacturer-btn" />}
+            title="Referencias de pedido"
+            subtitle={`${manufacturers.length} referencia${manufacturers.length !== 1 ? 's' : ''} · el código va al principio de cada pedido`}
+            actions={<Button label="Crear" icon={Plus} variant="primary" onPress={openCreate} accessibilityLabel="Crear referencia de pedido" testID="create-manufacturer-btn" />}
           />
         </Animated.View>
 
@@ -412,10 +412,10 @@ export default function ManufacturersScreen() {
             <View style={[styles.emptyIconWrap, { backgroundColor: colors.primarySoft }]}>
               <Building2 size={36} color={colors.primary} />
             </View>
-            <Text style={[styles.emptyTitle, { color: colors.text }]}>No hay fabricantes</Text>
+            <Text style={[styles.emptyTitle, { color: colors.text }]}>No hay referencias de pedido</Text>
             <Text style={[styles.emptyDescription, { color: colors.textSecondary }]}>Crea el primero para poder asignarle pedidos.</Text>
             <View style={{ marginTop: 16 }}>
-              <Button label="Crear fabricante" icon={Plus} variant="primary" onPress={openCreate} />
+              <Button label="Crear referencia" icon={Plus} variant="primary" onPress={openCreate} />
             </View>
           </View>
         ) : (
@@ -428,12 +428,12 @@ export default function ManufacturersScreen() {
               </ScrollView>
             )}
 
-            <SearchField value={query} onChangeText={setQuery} placeholder="Buscar fabricante por nombre o código" testID="search-manufacturers" style={{ marginBottom: 12 }} />
+            <SearchField value={query} onChangeText={setQuery} placeholder="Buscar referencia por nombre o código" testID="search-manufacturers" style={{ marginBottom: 12 }} />
             {legend}
 
             {shown.length === 0 ? (
               <View style={[styles.noResults, { backgroundColor: colors.surface }]}>
-                <Text style={[styles.emptyTitle, { color: colors.text, fontSize: 17 }]}>Ningún fabricante coincide con «{query}»</Text>
+                <Text style={[styles.emptyTitle, { color: colors.text, fontSize: 17 }]}>Ninguna referencia coincide con «{query}»</Text>
                 <Text style={[styles.emptyDescription, { color: colors.textSecondary }]}>Prueba con otra parte del nombre o con el código.</Text>
               </View>
             ) : grid ? (
@@ -451,8 +451,8 @@ export default function ManufacturersScreen() {
         options={[
           { value: 'edit', label: 'Editar nombre y código' },
           { value: 'years', label: 'Asignar años' },
-          { value: 'duplicate', label: 'Duplicar fabricante' },
-          { value: 'delete', label: 'Eliminar fabricante', destructive: true },
+          { value: 'duplicate', label: 'Duplicar referencia' },
+          { value: 'delete', label: 'Eliminar referencia', destructive: true },
         ]}
         onSelect={v => {
           const m = menuFor;
@@ -465,25 +465,25 @@ export default function ManufacturersScreen() {
         onClose={() => setMenuFor(null)}
       />
 
-      {modalShell(createDialogOpen, () => setCreateDialogOpen(false), 'Crear fabricante', 'El código va al principio de las referencias (CÓDIGO-AÑO-NÚMERO).', (
+      {modalShell(createDialogOpen, () => setCreateDialogOpen(false), 'Crear referencia de pedido', 'El código va al principio de cada pedido (CÓDIGO-AÑO-NÚMERO).', (
         <>
-          {field('Nombre *', <TextInput style={inputStyle} value={formName} onChangeText={setFormName} placeholder="Ej.: Acme Industries" placeholderTextColor={colors.textTertiary} accessibilityLabel="Nombre del fabricante" testID="create-name-input" />)}
-          {field('Código *', <TextInput style={inputStyle} value={formCode} onChangeText={(v) => setFormCode(v.toUpperCase())} placeholder="Ej.: ACM" placeholderTextColor={colors.textTertiary} maxLength={30} autoCapitalize="characters" accessibilityLabel="Código del fabricante" testID="create-code-input" />)}
+          {field('Nombre *', <TextInput style={inputStyle} value={formName} onChangeText={setFormName} placeholder="Ej.: Acme Industries" placeholderTextColor={colors.textTertiary} accessibilityLabel="Nombre de la referencia" testID="create-name-input" />)}
+          {field('Código *', <TextInput style={inputStyle} value={formCode} onChangeText={(v) => setFormCode(v.toUpperCase())} placeholder="Ej.: ACM" placeholderTextColor={colors.textTertiary} maxLength={30} autoCapitalize="characters" accessibilityLabel="Código de la referencia" testID="create-code-input" />)}
           {modalButtons(() => setCreateDialogOpen(false), handleCreate, 'Crear')}
         </>
       ))}
 
-      {modalShell(editDialogOpen, () => setEditDialogOpen(false), 'Editar fabricante', selectedManufacturer?.name, (
+      {modalShell(editDialogOpen, () => setEditDialogOpen(false), 'Editar referencia de pedido', selectedManufacturer?.name, (
         <>
-          {field('Nombre *', <TextInput style={inputStyle} value={formName} onChangeText={setFormName} accessibilityLabel="Nombre del fabricante" testID="edit-name-input" />)}
-          {field('Código *', <TextInput style={inputStyle} value={formCode} onChangeText={(v) => setFormCode(v.toUpperCase())} maxLength={30} autoCapitalize="characters" accessibilityLabel="Código del fabricante" testID="edit-code-input" />)}
+          {field('Nombre *', <TextInput style={inputStyle} value={formName} onChangeText={setFormName} accessibilityLabel="Nombre de la referencia" testID="edit-name-input" />)}
+          {field('Código *', <TextInput style={inputStyle} value={formCode} onChangeText={(v) => setFormCode(v.toUpperCase())} maxLength={30} autoCapitalize="characters" accessibilityLabel="Código de la referencia" testID="edit-code-input" />)}
           {modalButtons(() => { setEditDialogOpen(false); setSelectedManufacturer(null); }, handleEdit, 'Actualizar')}
         </>
       ))}
 
       {modalShell(yearsDialogOpen, () => setYearsDialogOpen(false), 'Asignar años', selectedManufacturer?.name, (
         <>
-          <Text style={[styles.modalDescription, { color: colors.textSecondary }]}>Elige los años en los que trabajas con este fabricante:</Text>
+          <Text style={[styles.modalDescription, { color: colors.textSecondary }]}>Elige los años en los que se usa esta referencia:</Text>
           <View style={styles.yearsGrid}>
             {years.map(year => {
               const on = selectedYears.includes(year);

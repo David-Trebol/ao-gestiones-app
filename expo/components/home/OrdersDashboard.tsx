@@ -1,13 +1,14 @@
 import React, { useMemo, useState } from 'react';
 import { Alert, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { useRouter } from 'expo-router';
-import { AlertTriangle, ChevronDown, Download, Factory, FileText, Mail, Package, Phone, Search, SlidersHorizontal, X } from 'lucide-react-native';
+import { AlertTriangle, ChevronDown, Download, Factory, FileText, Mail, Tags, Package, Phone, Search, SlidersHorizontal, X } from 'lucide-react-native';
 import { useTheme } from '@/contexts/ThemeContext';
 import { useData } from '@/contexts/DataContext';
 import { ThemeColors , SystemTint } from '@/constants/colors';
 import { cardShadow, panel, radius, webInputReset } from '@/constants/theme';
 import { fx, enter, useCountUp } from '@/constants/motion';
 import { itemProgress, itemStatusOf, itemTone } from '@/constants/itemStatus';
+import { orderSupplierNames } from '@/constants/supplierLog';
 import StatusBadge, { STATUS_ICONS, STATUS_ORDER, statusConfig } from '@/components/StatusBadge';
 import SelectSheet, { SheetOption } from '@/components/SelectSheet';
 import { usePageLayout } from '@/components/Page';
@@ -120,8 +121,8 @@ export default function OrdersDashboard() {
     switch (sheet) {
       case 'manufacturer':
         return {
-          title: 'Fabricante',
-          options: [{ value: '__all', label: 'Todos los fabricantes' }, ...manufacturers.map(m => ({ value: m.id, label: m.name, hint: m.code }))],
+          title: 'Referencia de pedido',
+          options: [{ value: '__all', label: 'Todas las referencias' }, ...manufacturers.map(m => ({ value: m.id, label: m.name, hint: m.code }))],
           selected: filters.manufacturerId || '__all',
           onSelect: v => setFilters({ manufacturerId: v === '__all' ? '' : v }),
         };
@@ -303,7 +304,7 @@ export default function OrdersDashboard() {
                 <SlidersHorizontal size={16} color={colors.textSecondary} />
               </View>
               {chip('year', filters.year || 'Año', !!filters.year)}
-              {chip('manufacturer', mfName ?? 'Fabricante', !!filters.manufacturerId)}
+              {chip('manufacturer', mfName ?? 'Referencia', !!filters.manufacturerId)}
               {(owners.length > 0 || !!filters.owner) && chip('owner', filters.owner === '__none' ? 'Sin responsable' : filters.owner || 'Responsable', !!filters.owner)}
               {chip('period', filters.period === 'all' ? 'Fecha' : PERIOD_LABELS[filters.period], filters.period !== 'all')}
               {chip('sort', SORT_LABELS[filters.sort], false)}
@@ -395,6 +396,20 @@ function DocRefs({ o }: { o: Order }) {
   );
 }
 
+/** Fabricantes reales de los productos del pedido (si se han elegido) */
+function SupplierLine({ o }: { o: Order }) {
+  const { colors } = useTheme();
+  const s = useMemo(() => makeStyles(colors), [colors]);
+  const names = orderSupplierNames(o.items);
+  if (names.length === 0) return null;
+  return (
+    <View style={s.iconLine} testID={`order-suppliers-${o.id}`}>
+      <Factory size={13} color="#7B5CC4" />
+      <Text style={[s.tdSub, { flexShrink: 1, color: colors.text }]} numberOfLines={1}>{names.join(', ')}</Text>
+    </View>
+  );
+}
+
 function LateLine({ o }: { o: Order }) {
   const { colors } = useTheme();
   const s = useMemo(() => makeStyles(colors), [colors]);
@@ -465,9 +480,10 @@ export function OrderTable({ orders, onOpen, showReasons }: { orders: Order[]; o
                 {formatDate(o.created_at)}
               </Text>
               <View style={s.iconLine}>
-                <Factory size={13} color={colors.accent} />
+                <Tags size={13} color={colors.accent} />
                 <Text style={[s.tdSub, { flexShrink: 1 }]} numberOfLines={1}>{o.manufacturer_name} · {o.year}</Text>
               </View>
+              <SupplierLine o={o} />
             </View>
             <View style={[s.cItems, { gap: 3 }]}>
               <View style={s.iconLine}>
@@ -553,7 +569,6 @@ export function OrderCardItem({ order: o, onOpen, twoCols, showReasons, grouped,
           </Text>
         )}
       </View>
-      {!!o.custom_reference && <Text style={s.tdSub}>Ref. {o.custom_reference}</Text>}
       {reasons.length > 0 && <Text style={[s.tdSub, { color: colors.warning }]}>{reasons.join(' · ')}</Text>}
       {(!!o.expected_date || !!o.owner || !!o.next_action) && (
         <View style={s.follow}>
@@ -570,6 +585,7 @@ export function OrderCardItem({ order: o, onOpen, twoCols, showReasons, grouped,
         <View style={s.oMetaWrap}>
           <Text style={s.oMf} numberOfLines={1}>{o.manufacturer_name} · {o.year}</Text>
           <Text style={s.oMeta} numberOfLines={1}>{formatDate(o.created_at)}</Text>
+          <SupplierLine o={o} />
         </View>
         <Text style={s.oTotal}>{formatCurrency(o.total_with_vat)}</Text>
       </View>

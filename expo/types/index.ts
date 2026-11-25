@@ -24,7 +24,37 @@ export interface Customer {
 /** Estado de cada producto dentro del pedido (opcional; sin valor = sin empezar) */
 export type ItemStatus = 'none' | 'pending' | 'shipped' | 'delivered';
 
-export interface OrderItem {
+/** Apunte del registro con el fabricante de un producto: qué se hizo y cuándo */
+export type SupplierEventType = 'ordered' | 'received' | 'paid' | 'other';
+export interface SupplierEvent {
+  id: string;
+  type: SupplierEventType;
+  /** AAAA-MM-DD */
+  date: string;
+  note?: string;
+  created_at?: string;
+}
+
+/** Fabricante real al que se le compra un producto (tabla «suppliers») */
+export interface Supplier {
+  id: string;
+  name: string;
+  contact: string | null;
+  phone: string | null;
+  email: string | null;
+  notes: string | null;
+  created_at: string;
+}
+
+/** Datos opcionales del fabricante de un producto (dentro de orders.items) */
+export interface ItemSupplierFields {
+  supplier_id?: string;
+  /** nombre copiado para mostrarlo aunque se borre el fabricante */
+  supplier_name?: string;
+  supplier_log?: SupplierEvent[];
+}
+
+export interface OrderItem extends ItemSupplierFields {
   product_name: string;
   quantity: number;
   costo_unitario: number;
@@ -110,7 +140,7 @@ export interface OrderFormData {
   next_action: string;
 }
 
-export interface OrderFormItem {
+export interface OrderFormItem extends ItemSupplierFields {
   item_status?: ItemStatus;
   product_name: string;
   quantity: number;

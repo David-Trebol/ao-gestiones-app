@@ -10,7 +10,7 @@ export default function ManufacturersLayout() {
     <Stack
       screenOptions={headerOptions(colors)}
     >
-      <Stack.Screen name="index" options={{ headerShown: false, title: 'Fabricantes' }} />
+      <Stack.Screen name="index" options={{ headerShown: false, title: 'Referencias de pedido' }} />
     </Stack>
   );
 }

@@ -35,13 +35,13 @@ const mkOrder = (id, ref, m, year, extra = {}) => ({ id, reference_number: ref, 
   check('búsqueda por nº factura (1 pedido)', /PEDIDOS\W+1\b/i.test(await text()), ((await text()).match(/PEDIDOS\W+\d+/i) || [''])[0]);
   await p.getByTestId('home-search').fill(''); await wait(600);
   // Fabricantes: editar nombre se propaga a pedidos
-  await tab('Fabricantes');
+  await tab('Referencias');
   await p.getByTestId('edit-manufacturer-m1').click(); await wait(800);
   await p.getByTestId('edit-name-input').fill('Acme Renombrada');
   await p.getByText('Actualizar', { exact: true }).last().click(); await wait(2000);
   check('renombrar fabricante actualiza sus pedidos', db.orders.filter(o => o.manufacturer_id === 'm1').every(o => o.manufacturer_name === 'Acme Renombrada'));
   // borrar fabricante con pedidos -> bloqueado
-  await p.getByTestId('manufacturer-menu-m2').click(); await wait(600); await p.getByText('Eliminar fabricante', { exact: true }).last().click(); await wait(800);
+  await p.getByTestId('manufacturer-menu-m2').click(); await wait(600); await p.getByText('Eliminar referencia', { exact: true }).last().click(); await wait(800);
   await btn('Eliminar');
   check('no deja borrar fabricante con pedidos', db.manufacturers.some(m => m.id === 'm2') && /tiene pedidos asociados/.test(await text()));
   const ok2 = p.getByTestId('web-alert-btn-OK'); if (await ok2.count()) await ok2.click(); await wait(400);
@@ -50,7 +50,7 @@ const mkOrder = (id, ref, m, year, extra = {}) => ({ id, reference_number: ref, 
   await shot('31-settings', true);
   const s = await text();
   check('ajustes muestra usuario y email', /David/.test(s) && /dvdtrebol3@gmail.com/.test(s));
-  check('resumen: 6 pedidos, 2 fabricantes, 2 años', /Pedidos \| 6\b/.test(s) && /Fabricantes \| 2\b/.test(s) && /Años \| 2\b/.test(s), (s.match(/Resumen[^]*?Años/) || [''])[0]);
+  check('resumen: 6 pedidos, 2 fabricantes, 2 años', /Pedidos \| 6\b/.test(s) && /Referencias \| 2\b/.test(s) && /Años \| 2\b/.test(s), (s.match(/Resumen[^]*?Años/) || [''])[0]);
   check('sin "Restaurar datos de ejemplo"', !/Restaurar datos de ejemplo/.test(s));
   check('facturación total 726,00 €', /726,00\s?€/.test(s));
   // Escaneo IA sin clave -> mensaje claro (se prueba la función directamente)

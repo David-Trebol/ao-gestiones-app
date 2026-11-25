@@ -16,7 +16,8 @@ const PAGES = [
   ['ficha', '/order-detail?orderId=' + (big ? 'b0' : 'o1')],
   ['formulario', '/order-form?editOrderId=' + (big ? 'b0' : 'o1')],
   ['nuevo', '/order-form'],
-  ['fabricantes', '/manufacturers'],
+  ['referencias', '/manufacturers'],
+  ['fabricantes', '/suppliers'],
   ['ajustes', '/settings'],
 ];
 

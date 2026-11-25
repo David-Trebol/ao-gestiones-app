@@ -244,7 +244,7 @@ export default function LoginScreen() {
   // Lo que hace la app (solo funciones que existen)
   const features: { Icon: typeof Package; title: string; text: string }[] = [
     { Icon: Package, title: 'Pedidos y clientes', text: 'Cada pedido con su cliente, productos, importes y seguimiento.' },
-    { Icon: Search, title: 'Encuentra cualquier pedido', text: 'Por referencia, cliente, email, NIF o producto, por año y por fabricante.' },
+    { Icon: Search, title: 'Encuentra cualquier pedido', text: 'Por referencia, cliente, email, NIF o producto, por año y por referencia de pedido.' },
     { Icon: ScanLine, title: 'Lee tus documentos', text: 'Rellena un pedido desde un PDF o una foto, sin enviarlo a ningún servicio.' },
   ];
 

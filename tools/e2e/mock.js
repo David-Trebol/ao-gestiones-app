@@ -7,7 +7,7 @@ exports.PASSWORD = 'ClaveSegura123';
 exports.createMock = () => {
   const db = {
     profiles: [{ id: USER.id, email: USER.email, display_name: 'David', role: 'admin', active: true, created_at: new Date().toISOString() }],
-    years: [], manufacturers: [], orders: [],
+    years: [], manufacturers: [], orders: [], suppliers: [],
   };
   const calls = [];
   const pk = { years: 'year' };

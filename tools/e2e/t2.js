@@ -12,7 +12,7 @@ const check = (name, ok, extra = '') => { results.push((ok ? 'OK  ' : 'FAIL') + 
   await p.getByText('Añadir', { exact: true }).last().click(); await wait(1500);
   check('crear año 2026', db().years.some(y => y.year === 2026), JSON.stringify(db().years));
   // 2. Fabricantes
-  await tab('Fabricantes');
+  await tab('Referencias');
   for (const [n, c] of [['Acme Industries', 'acm'], ['TechParts Global', 'TPG']]) {
     await p.getByTestId('create-manufacturer-btn').click(); await wait(700);
     await p.getByTestId('create-name-input').fill(n); await p.getByTestId('create-code-input').fill(c);
@@ -24,7 +24,7 @@ const check = (name, ok, extra = '') => { results.push((ok ? 'OK  ' : 'FAIL') + 
   await p.getByTestId('create-name-input').fill('Otro'); await p.getByTestId('create-code-input').fill('ACM');
   await p.getByText('Crear', { exact: true }).last().click(); await wait(1200);
   const t = await text();
-  check('código duplicado rechazado con mensaje', /Ya existe un fabricante con el código/.test(t) && db().manufacturers.length === 2);
+  check('código duplicado rechazado con mensaje', /Ya existe una referencia con el código/.test(t) && db().manufacturers.length === 2);
   const okb = p.getByText('OK', { exact: true }); if (await okb.count()) { await okb.last().click(); await wait(400); }
   await p.getByText('Cancelar', { exact: true }).last().click(); await wait(600);
   // 3. Pedido nuevo con decimales y descuento
@@ -35,7 +35,7 @@ const check = (name, ok, extra = '') => { results.push((ok ? 'OK  ' : 'FAIL') + 
   // validación junto a los campos
   await p.getByTestId('submit-order-btn').click(); await wait(600);
   const vt = await text();
-  check('errores junto a los campos al guardar vacío', /Elige el fabricante del pedido/.test(vt) && /Escribe el nombre del producto/.test(vt) && /datos obligatorios/.test(vt));
+  check('errores junto a los campos al guardar vacío', /Elige la referencia de pedido/.test(vt) && /Escribe el nombre del producto/.test(vt) && /datos obligatorios/.test(vt));
   check('no se guarda con errores', db().orders.length === 0);
   const f = (ph, v) => p.getByLabel(ph, { exact: true }).first().fill(v);
   await f('Empresa', 'Cliente Prueba SL'); await f('NIF / CIF', 'B12345678'); await f('Email', 'cliente@prueba.es');
