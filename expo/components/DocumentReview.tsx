@@ -227,12 +227,21 @@ export default function DocumentReview(p: Props) {
         <Info size={13} color={doc.customerConfident ? colors.textSecondary : colors.warning} />
         <Text style={[s.muted, { flex: 1 }, !doc.customerConfident && { color: colors.warning }]}>{doc.customerReason}</Text>
       </View>
-      {doc.manufacturerMatch && (
-        <Pressable onPress={() => onChange({ ...state, applyManufacturer: !state.applyManufacturer })} style={s.inlineCheck} accessibilityRole="checkbox" accessibilityState={{ checked: state.applyManufacturer }}>
+      {!!state.manufacturerId && (
+        <Pressable onPress={() => onChange({ ...state, applyManufacturer: !state.applyManufacturer })} style={s.inlineCheck} accessibilityRole="checkbox" accessibilityState={{ checked: state.applyManufacturer }} testID="review-apply-manufacturer">
           <View style={[s.check, state.applyManufacturer && s.checkOn]}>{state.applyManufacturer && <Check size={14} color="#fff" strokeWidth={3} />}</View>
           <Text style={s.body}>
-            Seleccionar el fabricante <Text style={{ fontWeight: '600' }}>{doc.manufacturerMatch.name}</Text>
+            Elegir la referencia de pedido <Text style={{ fontWeight: '600' }}>{state.manufacturerName}</Text>
             {p.manufacturerName ? ` (ahora: ${p.manufacturerName})` : ''}
+          </Text>
+        </Pressable>
+      )}
+      {!!state.ownRef && (
+        <Pressable onPress={() => onChange({ ...state, applyOwnRef: !state.applyOwnRef })} style={s.inlineCheck} accessibilityRole="checkbox" accessibilityState={{ checked: state.applyOwnRef }} testID="review-apply-ownref">
+          <View style={[s.check, state.applyOwnRef && s.checkOn]}>{state.applyOwnRef && <Check size={14} color="#fff" strokeWidth={3} />}</View>
+          <Text style={s.body}>
+            Poner la referencia <Text style={{ fontWeight: '600' }}>{state.ownRef}</Text>
+            {doc.ownRef?.source ? <Text style={s.muted}>{`  · leída en «${doc.ownRef.source}»`}</Text> : null}
           </Text>
         </Pressable>
       )}
@@ -367,7 +376,7 @@ export default function DocumentReview(p: Props) {
           <Pressable onPress={p.onCancel} style={[s.btn, s.btnGhost]} accessibilityRole="button">
             <Text style={[s.btnText, { color: colors.text }]}>Cancelar</Text>
           </Pressable>
-          <Pressable onPress={p.onApply} style={[s.btn, s.btnPrimary, !appliedFields && !appliedLines && !state.applyManufacturer && { opacity: 0.5 }]} disabled={!appliedFields && !appliedLines && !state.applyManufacturer} accessibilityRole="button">
+          <Pressable onPress={p.onApply} style={[s.btn, s.btnPrimary, !appliedFields && !appliedLines && !state.applyManufacturer && !state.applyOwnRef && { opacity: 0.5 }]} disabled={!appliedFields && !appliedLines && !state.applyManufacturer && !state.applyOwnRef} accessibilityRole="button">
             <Text style={[s.btnText, { color: '#fff' }]}>Aplicar al formulario</Text>
           </Pressable>
         </View>

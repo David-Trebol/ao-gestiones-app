@@ -1,3 +1,6 @@
 # Lectura de documentos (utils/docread)
 
 `read.web.ts` abre el archivo en el navegador: PDF con texto → PDF.js; imágenes y PDF escaneados → Tesseract con corrección de inclinación (`layout.deskew`) y prueba de giros 90/180/270. `parse.ts` reconoce con reglas emisor/cliente, NIF/CIF/NIE con letra de control, CP→provincia, referencias, líneas (cantidad × precio − dto = importe; separa números que el OCR junta solo si cuadran), totales e IVA. `review.ts` + `components/DocumentReview.tsx` = pantalla de revisión: nada se aplica al formulario sin marcarlo y nunca se sobrescribe un dato existente por defecto. En nativo (`read.ts`) solo informa de que está disponible en la web.
+
+
+**Referencia de pedido y referencia propia:** `findOwnRef` (parse.ts) busca en mayúsculas el código de una «Referencia de pedido» (o su nombre corto, p. ej. PSI) seguido de número (ESP-620, ESP 620, PSI/123) y prefiere líneas con ref./pedido/oferta. La revisión propone elegir esa referencia de pedido y poner la referencia propia (si el campo está vacío). Los nombres se comparan como palabra completa: «ESP» ya no casa con «ESPAÑA» (antes eso dejaba ESP elegida casi siempre). Si «Su pedido/Su ref.» es nuestra referencia, no se copia como nº de pedido del cliente. Tras aplicar, el documento queda visible arriba del formulario (`DocPreviewPanel`, solo en memoria, no se guarda).

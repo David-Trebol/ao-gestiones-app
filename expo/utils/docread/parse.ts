@@ -985,7 +985,10 @@ export function parseDocument(lines: DocLine[], ctx: ParseContext = {}): ParsedD
   const matches = (p: Party, name: string) => {
     const a = nm(p);
     const b = norm(name).replace(/\b(s\.?l\.?u?|s\.?a\.?u?)\.?$/i, '').trim();
-    return !!b && b.length >= 3 && (a.includes(b) || p.block.some(t => norm(t).includes(b)));
+    if (!b || b.length < 3) return false;
+    // Palabra completa: «ESP» no debe casar con «España», ni «SAT» con «Satélite».
+    const re = new RegExp(`(^|[^a-z0-9])${b.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}($|[^a-z0-9])`);
+    return re.test(a) || p.block.some(t => re.test(norm(t)));
   };
   const known = ctx.knownCustomers ?? [];
   const isKnown = (p: Party) =>
@@ -996,6 +999,12 @@ export function parseDocument(lines: DocLine[], ctx: ParseContext = {}): ParsedD
     if (matches(doc.issuer, m.name)) doc.manufacturerMatch = { id: m.id, name: m.name, party: 'issuer' };
     else if (matches(doc.recipient, m.name)) doc.manufacturerMatch = { id: m.id, name: m.name, party: 'recipient' };
     if (doc.manufacturerMatch) break;
+  }
+  doc.ownRef = findOwnRef(lines.map(l => l.text), ctx.manufacturers ?? []);
+  // Si el «Su pedido / Su ref.» es justo nuestra referencia, no es el nº de pedido del cliente
+  if (doc.ownRef && doc.refs.numero_pedido_cliente) {
+    const v = doc.refs.numero_pedido_cliente.value.toUpperCase().replace(/[^A-Z0-9]/g, '');
+    if (v === `${doc.ownRef.code}${doc.ownRef.number}` || v.endsWith(`${doc.ownRef.code}${doc.ownRef.number}`)) delete doc.refs.numero_pedido_cliente;
   }
   const hasRecipient = !!doc.recipient.block.length;
   if (hasRecipient && isKnown(doc.recipient) && !isKnown(doc.issuer)) {
@@ -1067,3 +1076,37 @@ export function parseDocument(lines: DocLine[], ctx: ParseContext = {}): ParsedD
 }
 
 const fmt = (n: number) => n.toLocaleString('es-ES', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ' €';
+
+/**
+ * Referencia propia escrita en el documento: código de una «Referencia de pedido» (o su nombre corto,
+ * p. ej. PSI) seguido del número: «ESP-620», «ESP 620», «ESP620», «PSI/123». Solo en mayúsculas,
+ * para no confundir palabras normales. Se prefieren las líneas que hablan de referencia, pedido u oferta.
+ */
+export function findOwnRef(texts: string[], manufacturers: { id: string; name: string; code?: string }[]): ParsedDoc['ownRef'] {
+  const keys: { m: (typeof manufacturers)[number]; key: string }[] = [];
+  for (const m of manufacturers) {
+    const code = (m.code || '').trim().toUpperCase();
+    if (code.length >= 2) keys.push({ m, key: code });
+    const nm = (m.name || '').trim().toUpperCase();
+    if (/^[A-Z]{2,6}$/.test(nm) && nm !== code) keys.push({ m, key: nm });
+  }
+  if (!keys.length) return undefined;
+  // Los más largos primero (WALZ antes que AO si compartieran letras)
+  keys.sort((a, b) => b.key.length - a.key.length);
+  const esc = (x: string) => x.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  const re = new RegExp(`(?:^|[^A-Za-z0-9])(${keys.map(k => esc(k.key)).join('|')})\\s?[-–_/.]?\\s?(\\d{2,7})(?![\\d.,]\\d|\\d)`, 'g');
+  let best: { score: number; i: number; r: NonNullable<ParsedDoc['ownRef']> } | undefined;
+  texts.forEach((t, i) => {
+    re.lastIndex = 0;
+    let m: RegExpExecArray | null;
+    while ((m = re.exec(t))) {
+      const k = keys.find(x => x.key === m![1]);
+      if (!k) continue;
+      const n = parseInt(m[2], 10);
+      if (!n) continue;
+      const score = (/\b(ref|referencia|n\/|s\/|pedido|oferta|proforma|presupuesto|factura)/i.test(t) ? 2 : 0) + (i < 40 ? 1 : 0);
+      if (!best || score > best.score) best = { score, i, r: { id: k.m.id, name: k.m.name, code: (k.m.code || k.key).toUpperCase(), number: n, source: t.trim().slice(0, 120) } };
+    }
+  });
+  return best?.r;
+}

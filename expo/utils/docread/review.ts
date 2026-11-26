@@ -46,6 +46,12 @@ export interface ReviewState {
   vatRate: string; // texto editable
   vatFromDoc: boolean;
   applyManufacturer: boolean;
+  /** Referencia de pedido que se elegiría (la de la referencia escrita o, si no, la del emisor/destinatario) */
+  manufacturerId?: string;
+  manufacturerName?: string;
+  /** Referencia propia leída (ESP-620) y si se aplica */
+  ownRef?: string;
+  applyOwnRef: boolean;
 }
 
 const CLIENT_FIELDS: { key: CustomerKey; label: string }[] = [
@@ -134,6 +140,11 @@ function isEmptyItem(i: OrderFormItem) {
   return !i.product_name.trim() && !i.tpv_unitario && !i.costo_unitario && !i.total_sin_iva;
 }
 
+/** La referencia de pedido que indica el documento: primero la escrita (ESP-620), si no, por nombre. */
+function docManufacturer(doc: ParsedDoc): { id: string; name: string } | undefined {
+  return doc.ownRef ?? doc.manufacturerMatch;
+}
+
 export function buildReview(doc: ParsedDoc, form: OrderFormData, currentManufacturerId: string): ReviewState {
   const side = doc.customerIs;
   const formHasLines = form.items.some(i => !isEmptyItem(i));
@@ -161,7 +172,11 @@ export function buildReview(doc: ParsedDoc, form: OrderFormData, currentManufact
     priceAs: 'tpv',
     vatRate: vat !== null ? String(vat).replace('.', ',') : '',
     vatFromDoc: vat !== null,
-    applyManufacturer: !!doc.manufacturerMatch && doc.manufacturerMatch.id !== currentManufacturerId && !currentManufacturerId,
+    applyManufacturer: !!docManufacturer(doc) && !currentManufacturerId,
+    manufacturerId: docManufacturer(doc)?.id,
+    manufacturerName: docManufacturer(doc)?.name,
+    ownRef: doc.ownRef ? `${doc.ownRef.code}-${doc.ownRef.number}` : undefined,
+    applyOwnRef: !!doc.ownRef && !form.custom_reference.trim() && (!currentManufacturerId || currentManufacturerId === doc.ownRef.id),
   };
 }
 
@@ -229,8 +244,11 @@ export function applyReview(form: OrderFormData, r: ReviewState, manufacturerId?
   }
   if (ships.length) shipping = r.linesMode === 'replace' ? ships : [...form.shipping_items, ...ships];
   const next: OrderFormData = { ...form, customer, items, shipping_items: shipping };
-  if (r.applyManufacturer && manufacturerId) next.manufacturer_id = manufacturerId;
+  const mId = manufacturerId ?? r.manufacturerId;
+  if (r.applyManufacturer && mId) next.manufacturer_id = mId;
+  if (r.applyOwnRef && r.ownRef && !form.custom_reference.trim()) next.custom_reference = r.ownRef;
   const parts = [] as string[];
+  if (r.applyOwnRef && r.ownRef && !form.custom_reference.trim()) parts.push(`la referencia ${r.ownRef}`);
   if (nFields) parts.push(`${nFields} dato${nFields === 1 ? '' : 's'}`);
   if (products.length) parts.push(`${products.length} línea${products.length === 1 ? '' : 's'} de producto`);
   if (ships.length) parts.push(`${ships.length} gasto${ships.length === 1 ? '' : 's'} de envío`);

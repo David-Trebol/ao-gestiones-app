@@ -30,6 +30,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import DocumentReview from '@/components/DocumentReview';
 import DateField from '@/components/DateField';
 import ManualRefField from '@/components/ManualRefField';
+import DocPreviewPanel, { type DocPreview } from '@/components/DocPreviewPanel';
 import { manualRefOwner, nextManualRef, normalizeManualRef, orderRefLabel } from '@/utils/references';
 import { useAuth } from '@/contexts/AuthContext';
 import { formatISODate, todayISO } from '@/utils/orderFilters';
@@ -134,6 +135,8 @@ export default function OrderFormScreen() {
   const [scan, setScan] = useState<{ step: string; fraction?: number; fileName: string } | null>(null);
   const isExtracting = !!scan;
   const [scanError, setScanError] = useState<string | null>(null);
+  // Documento leído: se queda visible arriba del formulario para contrastar (solo en memoria)
+  const [docPreview, setDocPreview] = useState<DocPreview | null>(null);
   const [review, setReview] = useState<{ read: ReadResult; doc: ParsedDoc; state: ReviewState; fileName: string } | null>(null);
   const [saving, setSaving] = useState<boolean>(false);
   const pulseAnim = useRef(new Animated.Value(0.4)).current;
@@ -341,10 +344,17 @@ export default function OrderFormScreen() {
 
   const applyReviewToForm = useCallback(() => {
     if (!review) return;
-    const { form, summary } = applyReview(formRef.current, review.state, review.doc.manufacturerMatch?.id);
+    const { form, summary } = applyReview(formRef.current, review.state);
     setFormData(form);
     if (form.manufacturer_id !== formRef.current.manufacturer_id) {
       setSelectedManufacturerIndex(manufacturers.findIndex(m => m.id === form.manufacturer_id));
+    }
+    if (review.read.previews.length) {
+      setDocPreview({
+        fileName: review.fileName,
+        previews: review.read.previews,
+        aspects: review.read.previews.map((_, i) => { const pg = review.read.pages[i]; return pg?.width && pg?.height ? pg.width / pg.height : 0.707; }),
+      });
     }
     setReview(null);
     void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
@@ -612,6 +622,8 @@ export default function OrderFormScreen() {
             {DOC_READ_SUPPORTED ? ' Con «Leer documento» puedes rellenarlo desde un PDF o una foto; se lee en tu dispositivo.' : ''}
           </Text>
 
+          {docPreview && <DocPreviewPanel doc={docPreview} onRemove={() => setDocPreview(null)} />}
+
           {(() => {
             // ---------- Pedido: fabricante, año, ref. manual y estado
             const pedidoSection = (
@@ -634,7 +646,7 @@ export default function OrderFormScreen() {
                     testID="manufacturer-select"
                   >
                     <Text style={[styles.selectText, { color: manufacturers[selectedManufacturerIndex] ? colors.text : colors.textTertiary }]} numberOfLines={1}>
-                      {manufacturers[selectedManufacturerIndex] ? `${manufacturers[selectedManufacturerIndex].name} (${manufacturers[selectedManufacturerIndex].code})` : 'Elige la referencia'}
+                      {manufacturers[selectedManufacturerIndex] ? `${manufacturers[selectedManufacturerIndex].name} (${manufacturers[selectedManufacturerIndex].code})` : 'Seleccionar referencia'}
                     </Text>
                     <ChevronDown size={18} color={colors.textSecondary} />
                   </Pressable>

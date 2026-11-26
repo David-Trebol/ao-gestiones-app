@@ -100,6 +100,8 @@ export interface ParsedDoc {
   customerReason: string;
   /** Fabricante existente que aparece en el documento (si coincide) */
   manufacturerMatch?: { id: string; name: string; party: 'issuer' | 'recipient' };
+  /** Referencia propia que aparece escrita en el documento (ESP-620, PSI 123…) */
+  ownRef?: { id: string; name: string; code: string; number: number; source: string };
   refs: {
     numero_documento?: Field;
     numero_pedido_cliente?: Field;
