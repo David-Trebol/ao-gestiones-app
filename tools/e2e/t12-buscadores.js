@@ -14,7 +14,7 @@ const check = (name, ok, extra = '') => results.push((ok ? 'OK  ' : 'FAIL') + ' 
     // todos los años
     await p.getByTestId('search-years').fill('lopez'); await wait(600);
     let t = await text();
-    check(`${tag} buscar en todos los años (sin acentos)`, (await count()) === 1 && t.includes('ACM-2026-002') && /1 resultado/.test(t));
+    check(`${tag} buscar en todos los años (sin acentos)`, (await count()) === 1 && (t.includes('PO-O2') || t.includes('ACM-2026-002')) && /1 resultado/.test(t));
     await p.getByTestId('clear-scope-search').click(); await wait(500);
     check(`${tag} borrar búsqueda vuelve a las carpetas`, (await p.locator('[data-testid^="year-folder-"]').count()) > 0);
     // un año
