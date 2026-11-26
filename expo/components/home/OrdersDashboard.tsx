@@ -1,5 +1,5 @@
 import React, { useMemo, useState } from 'react';
-import { Alert, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { Alert, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View, type TextStyle } from 'react-native';
 import { useRouter } from 'expo-router';
 import { AlertTriangle, ChevronDown, ChevronRight, Hourglass, Download, Factory, FileText, Mail, Tags, Package, Phone, Search, SlidersHorizontal, X } from 'lucide-react-native';
 import { useTheme } from '@/contexts/ThemeContext';
@@ -14,6 +14,7 @@ import SelectSheet, { SheetOption } from '@/components/SelectSheet';
 import { usePageLayout } from '@/components/Page';
 import type { Order, OrderStatus } from '@/types';
 import { formatCurrency, formatDate } from '@/utils/calculations';
+import { orderRef, orderRefLabel } from '@/utils/references';
 import { exportOrdersToExcel } from '@/utils/exportExcel';
 import {
   ATTENTION_RULES,
@@ -295,7 +296,7 @@ export default function OrdersDashboard() {
                     <View style={[s.incDot, { backgroundColor: INC }]} />
                     <View style={{ flex: 1, minWidth: 0 }}>
                       <Text style={s.incItemTitle} numberOfLines={1}>{x.product}</Text>
-                      <Text style={s.tdSub} numberOfLines={1}>{`${x.order.reference_number} · ${x.text}`}</Text>
+                      <Text style={s.tdSub} numberOfLines={1}>{`${orderRefLabel(x.order)} · ${x.text}`}</Text>
                     </View>
                     <ChevronRight size={16} color={colors.textTertiary} />
                   </Pressable>
@@ -437,11 +438,22 @@ export function ExpectedText({ o, prefix = '' }: { o: Order; prefix?: string }) 
 
 /** Una sola línea corta bajo el estado: «47 d de retraso», «Previsto hoy» o «Previsto 15/01» (la fila no crece) */
 /** Referencia interna, nº de factura y nº de proforma, juntos en una línea (solo los que tenga el pedido) */
+/** Referencia propia (ESP-620) con el año aparte, más pequeño; si no hay, la automática. */
+function RefText({ o, style, yearStyle }: { o: Order; style: TextStyle; yearStyle: TextStyle }) {
+  const r = orderRef(o);
+  return (
+    <Text style={style} numberOfLines={1} testID={`order-ref-${o.id}`}>
+      {r.ref}
+      {r.manual && !!o.year && <Text style={yearStyle}>{` (${o.year})`}</Text>}
+    </Text>
+  );
+}
+
 function DocRefs({ o }: { o: Order }) {
   const { colors } = useTheme();
   const s = useMemo(() => makeStyles(colors), [colors]);
   const c = o.customer;
-  const refs = ([['Ref.', o.custom_reference], ['Fra.', c?.numero_factura], ['Prof.', c?.oferta_proforma]] as const)
+  const refs = ([['Fra.', c?.numero_factura], ['Prof.', c?.oferta_proforma]] as const)
     .map(([k, v]) => [k, (v ?? '').trim()] as const)
     .filter(([, v]) => !!v);
   if (refs.length === 0) return null;
@@ -525,7 +537,7 @@ export function OrderTable({ orders, onOpen, showReasons }: { orders: Order[]; o
             onPress={() => onOpen(o)}
             style={({ hovered, pressed }: { pressed: boolean; hovered?: boolean }) => [s.tr, s.trBody, enter(i, 'rise', { base: 120, step: 35 }), i > 0 && s.rowBorder, (hovered || pressed) && { backgroundColor: colors.primarySoft }, Platform.OS === 'web' && ({ cursor: 'pointer' } as object)]}
             accessibilityRole="link"
-            accessibilityLabel={`Pedido ${o.reference_number}, ${c?.nombre_empresa || 'sin cliente'}, ${it.label}, ${statusConfig[o.status].label}, ${formatCurrency(o.total_with_vat)}`}
+            accessibilityLabel={`Pedido ${orderRefLabel(o)}, ${c?.nombre_empresa || 'sin cliente'}, ${it.label}, ${statusConfig[o.status].label}, ${formatCurrency(o.total_with_vat)}`}
             testID={`order-row-${o.id}`}
           >
             <View style={[s.cClient, { gap: 3 }]}>
@@ -555,7 +567,7 @@ export function OrderTable({ orders, onOpen, showReasons }: { orders: Order[]; o
               )}
             </View>
             <View style={[s.cRef, { gap: 3 }]}>
-              <Text style={s.refText} numberOfLines={1}>{o.reference_number}</Text>
+              <RefText o={o} style={s.refText} yearStyle={s.refYear} />
               <Text style={s.tdSub} numberOfLines={1}>
                 {formatDate(o.created_at)}
               </Text>
@@ -610,13 +622,13 @@ export function OrderCardItem({ order: o, onOpen, twoCols, showReasons, grouped,
         (pressed || hovered) && { backgroundColor: grouped ? colors.fill : colors.primarySoft },
       ]}
       accessibilityRole="link"
-      accessibilityLabel={`Pedido ${o.reference_number}, ${c?.nombre_empresa || 'sin cliente'}, ${it.label}, ${statusConfig[o.status].label}, ${formatCurrency(o.total_with_vat)}`}
+      accessibilityLabel={`Pedido ${orderRefLabel(o)}, ${c?.nombre_empresa || 'sin cliente'}, ${it.label}, ${statusConfig[o.status].label}, ${formatCurrency(o.total_with_vat)}`}
       testID={`order-card-${o.id}`}
       {...(grouped ? {} : fx('lift'))}
     >
       {grouped && !first && <View style={s.oSep} />}
       <View style={s.oTop}>
-        <Text style={s.oRef}>{o.reference_number}</Text>
+        <RefText o={o} style={s.oRef} yearStyle={s.refYear} />
         <StatusBadge status={o.status} size="sm" />
       </View>
       <Text style={s.oClient} numberOfLines={2}>{c?.nombre_empresa || 'Sin cliente'}</Text>
@@ -739,6 +751,7 @@ function makeStyles(c: ThemeColors) {
     cMf: { flex: 1.1, minWidth: 0 },
     cStatus: { width: 130, alignItems: 'flex-start' },
     trBody: { alignItems: 'flex-start', paddingVertical: 16 },
+    refYear: { fontSize: 13, fontWeight: '600', color: c.textSecondary },
     refText: { fontSize: 16, fontWeight: '800', color: c.reference, letterSpacing: 0.1, fontVariant: ['tabular-nums'] },
     clientText: { fontSize: 16.5, fontWeight: '800', color: c.text, letterSpacing: -0.1 },
     totalText: { fontSize: 18, letterSpacing: -0.3, fontWeight: '800', color: c.text, fontVariant: ['tabular-nums'], ...(Platform.OS === 'web' ? ({ whiteSpace: 'nowrap' } as object) : {}) },

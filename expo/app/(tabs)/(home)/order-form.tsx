@@ -29,6 +29,8 @@ import * as DocumentPicker from 'expo-document-picker';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import DocumentReview from '@/components/DocumentReview';
 import DateField from '@/components/DateField';
+import ManualRefField from '@/components/ManualRefField';
+import { nextManualRef, normalizeManualRef, orderRefLabel } from '@/utils/references';
 import { useAuth } from '@/contexts/AuthContext';
 import { formatISODate, todayISO } from '@/utils/orderFilters';
 import { DOC_READ_SUPPORTED, DocReadError, readDocument, releaseReader, type ReadInput } from '@/utils/docread/read';
@@ -121,6 +123,8 @@ export default function OrderFormScreen() {
     owner: '',
     next_action: '',
   });
+  const refCode = useMemo(() => manufacturers.find(m => m.id === formData.manufacturer_id)?.code ?? '', [manufacturers, formData.manufacturer_id]);
+  const refSuggestion = useMemo(() => nextManualRef(orders, refCode, editingOrder?.id), [orders, refCode, editingOrder?.id]);
 
   const [selectedManufacturerIndex, setSelectedManufacturerIndex] = useState<number>(-1);
   const [mfSheetOpen, setMfSheetOpen] = useState(false);
@@ -439,11 +443,12 @@ export default function OrderFormScreen() {
 
     if (saving) return;
     setSaving(true);
+    const toSave = { ...formData, custom_reference: normalizeManualRef(formData.custom_reference, refCode) };
     try {
       if (editingOrder) {
-        await updateOrder(editingOrder.id, formData);
+        await updateOrder(editingOrder.id, toSave);
       } else {
-        await addOrder(formData);
+        await addOrder(toSave);
       }
       void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       if (router.canGoBack()) router.back();
@@ -453,7 +458,7 @@ export default function OrderFormScreen() {
     } finally {
       setSaving(false);
     }
-  }, [formData, errors, editingOrder, addOrder, updateOrder, router, saving]);
+  }, [formData, errors, editingOrder, addOrder, updateOrder, router, saving, refCode]);
 
   const docsList = [
     formData.customer.numero_referencia_pedido && `Pedido ${formData.customer.numero_referencia_pedido}`,
@@ -521,7 +526,7 @@ export default function OrderFormScreen() {
           </Pressable>
           <View style={[styles.topTitleWrap, compact && { left: 120, right: 230 }]} pointerEvents="none">
             <Text style={[styles.topTitleText, { color: colors.text }]} numberOfLines={1} accessibilityRole="header">
-              {editingOrder ? editingOrder.reference_number : 'Nuevo pedido'}
+              {editingOrder ? orderRefLabel(editingOrder) : 'Nuevo pedido'}
             </Text>
             {compact && (
               <Text style={[styles.topTotal, { color: showErrors && errorCount > 0 ? colors.error : colors.textSecondary }]} numberOfLines={1}>
@@ -634,19 +639,19 @@ export default function OrderFormScreen() {
                 )}
                 {!!err('manufacturer') && <Text style={[styles.errorText, { color: colors.error }]}>{err('manufacturer')}</Text>}
 
-                <View style={styles.fieldRow}>
+                <View style={[styles.fieldRow, { flexWrap: 'wrap', columnGap: 12, rowGap: 0 }]}>
                   <NumberFormField label="Año" required value={formData.year} onChangeValue={(n) => setFormData(prev => ({ ...prev, year: n }))} integer half error={err('year')} />
-                  <FormField
-                    label="Ref. manual"
+                  <ManualRefField
+                    code={refCode}
+                    year={formData.year}
                     value={formData.custom_reference}
-                    onChangeText={(v) => setFormData(prev => ({ ...prev, custom_reference: v }))}
-                    placeholder="Ej.: REF-001"
-                    half
-                    autoCapitalize="characters"
+                    onChange={(v) => setFormData(prev => ({ ...prev, custom_reference: v }))}
+                    suggestion={refSuggestion}
+                    style={styles.refField}
                   />
                 </View>
                 <Text style={[styles.help, { color: colors.textSecondary, marginTop: -6, marginBottom: 12 }]}>
-                  La referencia del pedido ({formData.manufacturer_id ? `${manufacturers.find(m => m.id === formData.manufacturer_id)?.code ?? ''}-${formData.year}-…` : 'CÓDIGO-AÑO-NÚMERO'}) se asigna sola al guardar.
+                  {refCode ? `Vuestra referencia: ${refCode}- y el número. El año va aparte. Si la dejas vacía, se usa la automática (${refCode}-${formData.year}-…).` : 'Elige la referencia de pedido para numerar el pedido.'}
                 </Text>
 
                 <Text style={[styles.fieldLabel, { color: colors.textSecondary }]}>
@@ -1545,6 +1550,7 @@ const styles = StyleSheet.create({
   chipTextSelected: {
     color: StaticColors.white,
   },
+  refField: { flexGrow: 1, flexBasis: 170, minWidth: 170, marginBottom: 12 },
   fieldRow: {
     flexDirection: 'row',
     gap: 12,

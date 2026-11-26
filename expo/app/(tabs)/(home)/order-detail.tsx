@@ -1,10 +1,10 @@
 import React, { useCallback, useMemo, useState } from 'react';
-import { Alert, Platform, Linking, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { Alert, Platform, Linking, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import { Briefcase, CalendarDays, Check, ChevronDown, ChevronLeft, Clock, Copy, Euro, Factory, FileText, IdCard, Mail, MapPin, MoreHorizontal, Package, Pencil, Phone, Receipt, Route, Tags, Truck, User, UserRound, X, XCircle } from 'lucide-react-native';
 import * as Haptics from 'expo-haptics';
 import { CompactTitleBar, useCollapsingTitle, usePageLayout } from '@/components/Page';
-import { canvas, heroFill, panel, webInputReset } from '@/constants/theme';
+import { canvas, heroFill, panel } from '@/constants/theme';
 import { enter, fx, pulse, sheen, useCountUp } from '@/constants/motion';
 import { ITEM_STATUS_HINT, ITEM_STATUS_LABEL, ITEM_STATUS_ORDER, itemProgress, itemStatusOf, itemTone } from '@/constants/itemStatus';
 import { useTheme } from '@/contexts/ThemeContext';
@@ -16,6 +16,8 @@ import SupplierLogSheet from '@/components/SupplierLogSheet';
 import { SUPPLIER_EVENT_SHORT, SUPPLIER_EVENT_TINT, SUPPLIER_PENDING_TINT, SUPPLIER_STEPS, SUPPLIER_TINT, dmy, isPaymentPending, nextSupplierStep, orderSupplierNames, supplierSteps } from '@/constants/supplierLog';
 import type { ItemStatus, OrderItem, OrderStatus } from '@/types';
 import { formatCurrency, formatDate } from '@/utils/calculations';
+import { nextManualRef, normalizeManualRef, orderRef, orderRefLabel } from '@/utils/references';
+import ManualRefField from '@/components/ManualRefField';
 import { addressLine, formatISODate, itemsSummary, overdueDays } from '@/utils/orderFilters';
 
 /** Pasos del pedido en la barra de progreso (Cancelado va aparte) */
@@ -33,6 +35,7 @@ export default function OrderDetailScreen() {
   const desktop = width >= 1024;
   const s = useMemo(() => makeStyles(colors), [colors]);
   const order = useMemo(() => orders.find(o => o.id === orderId), [orders, orderId]);
+  const refSuggestion = useMemo(() => (order ? nextManualRef(orders, order.manufacturer_code, order.id) : null), [orders, order]);
   // el total cuenta hasta su valor al abrir el pedido
   const totalShown = useCountUp(order?.total_with_vat ?? 0);
 
@@ -55,7 +58,7 @@ export default function OrderDetailScreen() {
 
   const handleDuplicate = useCallback(() => {
     if (!order) return;
-    Alert.alert('Duplicar pedido', `Se creará una copia de ${order.reference_number} como pedido pendiente, sin nº de factura ni de recibo.`, [
+    Alert.alert('Duplicar pedido', `Se creará una copia de ${orderRefLabel(order)} como pedido pendiente, sin nº de factura ni de recibo.`, [
       { text: 'Cancelar', style: 'cancel' },
       {
         text: 'Duplicar',
@@ -63,7 +66,7 @@ export default function OrderDetailScreen() {
           try {
             const copy = await duplicateOrder(order.id);
             void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-            Alert.alert('Pedido duplicado', `Se ha creado ${copy.reference_number}.`, [
+            Alert.alert('Pedido duplicado', `Se ha creado ${orderRefLabel(copy)}.`, [
               { text: 'Seguir aquí', style: 'cancel' },
               { text: 'Abrir la copia', onPress: () => router.replace(`/order-detail?orderId=${copy.id}` as never) },
             ]);
@@ -77,7 +80,7 @@ export default function OrderDetailScreen() {
 
   const handleDelete = useCallback(() => {
     if (!order) return;
-    Alert.alert('Eliminar pedido', `Se eliminará ${order.reference_number} de forma permanente. Esta acción no se puede deshacer.`, [
+    Alert.alert('Eliminar pedido', `Se eliminará ${orderRefLabel(order)} de forma permanente. Esta acción no se puede deshacer.`, [
       { text: 'Cancelar', style: 'cancel' },
       {
         text: 'Eliminar',
@@ -129,7 +132,7 @@ export default function OrderDetailScreen() {
     if (!order) return;
     setBusy(true);
     try {
-      await updateOrderField(order.id, 'custom_reference', refValue.trim());
+      await updateOrderField(order.id, 'custom_reference', normalizeManualRef(refValue, order.manufacturer_code));
       setEditingRef(false);
     } catch (e) {
       Alert.alert('No se pudo guardar', (e as Error).message);
@@ -350,9 +353,12 @@ export default function OrderDetailScreen() {
           <View style={s.heroTopRow}>
             <View style={{ minWidth: 0, flexShrink: 1 }}>
               <Text style={s.heroCaption}>Referencia</Text>
-              <Text style={s.ref} selectable accessibilityRole="header" numberOfLines={1} adjustsFontSizeToFit>
-                {order.reference_number}
-              </Text>
+              <View style={s.refLine}>
+                <Text style={[s.ref, { flexShrink: 1 }]} selectable accessibilityRole="header" numberOfLines={1} adjustsFontSizeToFit testID="hero-ref">
+                  {orderRef(order).ref}
+                </Text>
+                {orderRef(order).manual && <Text style={s.refYear} testID="hero-ref-year">({order.year})</Text>}
+              </View>
             </View>
             {!desktop && statusPill}
           </View>
@@ -567,19 +573,19 @@ export default function OrderDetailScreen() {
   const refRow = editingRef ? (
     // Editando: una fila normal (no un botón), porque en web un botón desactivado bloqueaba el clic en ✓ y ✗
     <View style={[s.row, s.rowSep]}>
-      <Text style={s.rowLabel}>Ref. manual</Text>
+      <Text style={s.rowLabel}>Referencia</Text>
       <View style={s.refEditRow}>
-        <TextInput
+        <ManualRefField
+          code={order.manufacturer_code}
+          year={order.year}
           value={refValue}
-          onChangeText={setRefValue}
-          placeholder="Referencia manual"
-          placeholderTextColor={colors.textTertiary}
-          style={s.refInput}
+          onChange={setRefValue}
+          suggestion={refSuggestion}
+          label=""
+          style={s.refField}
+          testID="ref"
           autoFocus
-          onSubmitEditing={saveRef}
-          returnKeyType="done"
-          accessibilityLabel="Referencia manual"
-          testID="ref-input"
+          onSubmit={saveRef}
         />
         <Pressable onPress={saveRef} disabled={busy} style={[s.iconBtn, { backgroundColor: colors.primaryFill }]} accessibilityRole="button" accessibilityLabel="Guardar referencia manual" testID="ref-save">
           <Check size={18} color={colors.onPrimary} />
@@ -600,9 +606,9 @@ export default function OrderDetailScreen() {
       accessibilityLabel="Editar referencia manual"
       testID="ref-edit"
     >
-      <Text style={s.rowLabel}>Ref. manual</Text>
+      <Text style={s.rowLabel}>Referencia</Text>
       <View style={s.rowRight}>
-        <Text style={s.rowValue}>{order.custom_reference || '—'}</Text>
+        <Text style={s.rowValue} testID="ref-value">{order.custom_reference ? orderRefLabel(order) : '—'}</Text>
         <Pencil size={14} color={colors.textSecondary} />
       </View>
     </Pressable>
@@ -829,8 +835,8 @@ export default function OrderDetailScreen() {
 
   return (
     <View style={s.root}>
-      <Stack.Screen options={{ title: order.reference_number, headerShown: false }} />
-      <CompactTitleBar title={order.reference_number} shown={compactShown} />
+      <Stack.Screen options={{ title: orderRefLabel(order), headerShown: false }} />
+      <CompactTitleBar title={orderRefLabel(order)} shown={compactShown} />
       <ScrollView {...scrollProps} contentContainerStyle={[s.content, content, { paddingBottom: bottomSpace }]}>
         {header}
         {desktop ? (
@@ -885,7 +891,7 @@ export default function OrderDetailScreen() {
       />
       <SelectSheet
         visible={sheet === 'more'}
-        title={order.reference_number}
+        title={orderRefLabel(order)}
         options={[
           { value: 'status', label: 'Cambiar estado…' },
           { value: 'ref', label: 'Editar referencia manual' },
@@ -970,6 +976,8 @@ function makeStyles(c: ThemeColors) {
     heroSide: { gap: 10, alignItems: 'flex-start' },
     heroCaption: { fontSize: 13, fontWeight: '700', color: 'rgba(0, 42, 57, 0.72)' },
     ref: { fontSize: 20, lineHeight: 25, fontWeight: '800', color: c.onPrimary, letterSpacing: 0.2, fontVariant: ['tabular-nums'] },
+    refLine: { flexDirection: 'row', alignItems: 'baseline', gap: 6, minWidth: 0 },
+    refYear: { fontSize: 15, fontWeight: '600', color: c.onPrimary, opacity: 0.82, fontVariant: ['tabular-nums'] },
     // la flecha va dentro de la misma píldora que el estado, sobre un vidrio claro para que se lea encima del naranja
     statusBtn: {
       flexDirection: 'row', alignItems: 'center', gap: 9, minHeight: 48, paddingLeft: 6, paddingRight: 14, borderRadius: 999,
@@ -1057,8 +1065,8 @@ function makeStyles(c: ThemeColors) {
     totalRow: { minHeight: 54, backgroundColor: c.primarySoft },
     totalRowLabel: { flex: 1, fontSize: 17, fontWeight: '700', color: c.text },
     totalRowValue: { fontSize: 22, fontWeight: '800', color: c.text, letterSpacing: -0.4, fontVariant: ['tabular-nums'] },
-    refEditRow: { flex: 1, flexDirection: 'row', gap: 8, alignItems: 'center' },
-    refInput: { flex: 1, minWidth: 0, height: 40, borderRadius: 10, backgroundColor: c.fill, paddingHorizontal: 12, fontSize: 16, color: c.text, borderWidth: 2, borderColor: c.primary, ...webInputReset },
+    refEditRow: { flex: 1, flexDirection: 'row', gap: 8, alignItems: 'flex-start' },
+    refField: { flex: 1, minWidth: 0 },
     iconBtn: { width: 44, height: 44, borderRadius: 22, alignItems: 'center', justifyContent: 'center' },
     // tabla de productos
     tr: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 16, paddingVertical: 10, minHeight: 48 },
