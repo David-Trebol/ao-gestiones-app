@@ -40,7 +40,7 @@ const visibleMarks = (p, marks) => p.evaluate(ms => {
     await ctx.route('wss://**', r => r.abort());
     const p = await ctx.newPage();
     await p.goto(base + '/?r=' + Date.now(), { waitUntil: 'networkidle' }); await p.waitForTimeout(1500);
-    await p.getByTestId('login-username').fill('dvdtrebol3@gmail.com'); await p.getByTestId('login-password').fill(PASSWORD);
+    await p.getByTestId('login-username').fill('admin@ao-gestiones.test'); await p.getByTestId('login-password').fill(PASSWORD);
     await p.getByTestId('login-submit').click(); await p.waitForTimeout(2500);
     const PED = ['Resumen y lista', 'Todos los pedidos'], FAB = ['Crear'], AJU = ['Cerrar sesión', 'Apariencia'];
     await p.getByTestId('nav-Fabricantes').click(); await p.waitForTimeout(1200);

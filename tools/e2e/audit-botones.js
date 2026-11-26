@@ -14,7 +14,7 @@ const W = +(process.env.W || 390), H = +(process.env.H || 844);
   const errs = []; p.on('pageerror', e => errs.push(e.message.slice(0, 160)));
   p.on('dialog', d => d.dismiss());
   await p.goto(base + '/', { waitUntil: 'networkidle' }); await p.waitForTimeout(1200);
-  await p.getByTestId('login-username').fill('dvdtrebol3@gmail.com');
+  await p.getByTestId('login-username').fill('admin@ao-gestiones.test');
   await p.getByTestId('login-password').fill(PASSWORD);
   await p.getByTestId('login-submit').click(); await p.waitForTimeout(3000);
   const screens = ['/', '/order-detail?orderId=o5', '/order-form?editOrderId=o5', '/order-form', '/manufacturers', '/settings'];

@@ -15,7 +15,7 @@ const check = (name, ok, extra = '') => { console.log(`${ok ? 'OK  ' : 'FAIL'} $
     await ctx.route('wss://**', r => r.abort());
     const p = await ctx.newPage();
     await p.goto(base + '/?r=' + Date.now(), { waitUntil: 'networkidle' }); await p.waitForTimeout(1200);
-    await p.getByTestId('login-username').fill('dvdtrebol3@gmail.com');
+    await p.getByTestId('login-username').fill('admin@ao-gestiones.test');
     await p.getByTestId('login-password').fill(PASSWORD);
     await p.getByTestId('login-submit').click(); await p.waitForTimeout(2500);
     await p.waitForTimeout(1500);

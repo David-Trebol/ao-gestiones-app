@@ -15,7 +15,7 @@ const sizes = [[390, 844, 'm'], [768, 1024, 't'], [1440, 900, 'd']];
     const p = await ctx.newPage();
     const errs = []; p.on('pageerror', e => errs.push(e.message));
     await p.goto(`http://localhost:${port}`, { waitUntil: 'networkidle' }); await p.waitForTimeout(1500);
-    await p.getByTestId('login-username').fill('dvdtrebol3@gmail.com'); await p.getByTestId('login-password').fill(PASSWORD);
+    await p.getByTestId('login-username').fill('admin@ao-gestiones.test'); await p.getByTestId('login-password').fill(PASSWORD);
     await p.getByTestId('login-submit').click(); await p.waitForTimeout(2500);
     await p.getByTestId('home-mode-carpetas').click(); await p.waitForTimeout(1200);
     await p.screenshot({ path: `out/carpetas-1-anos-${tag}.png` });

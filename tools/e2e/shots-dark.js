@@ -15,7 +15,7 @@ const port = process.argv[2] || 8780;
     const base = `http://localhost:${port}`;
     await p.goto(base, { waitUntil: 'networkidle' }); await p.waitForTimeout(1500);
     await p.screenshot({ path: `out/dark-login-${tag}.png` });
-    await p.getByTestId('login-username').fill('dvdtrebol3@gmail.com'); await p.getByTestId('login-password').fill(PASSWORD);
+    await p.getByTestId('login-username').fill('admin@ao-gestiones.test'); await p.getByTestId('login-password').fill(PASSWORD);
     await p.getByTestId('login-submit').click(); await p.waitForTimeout(2500);
     for (const [name, url] of [['home', '/'], ['detail', '/order-detail?orderId=o1'], ['form', '/order-form?editOrderId=o1'], ['settings', '/settings']]) {
       if (url !== '/') await p.goto(base + url, { waitUntil: 'networkidle' });

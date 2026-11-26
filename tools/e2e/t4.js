@@ -49,7 +49,7 @@ const mkOrder = (id, ref, m, year, extra = {}) => ({ id, reference_number: ref, 
   await tab('Ajustes');
   await shot('31-settings', true);
   const s = await text();
-  check('ajustes muestra usuario y email', /David/.test(s) && /dvdtrebol3@gmail.com/.test(s));
+  check('ajustes muestra usuario y email', /David/.test(s) && /admin@ao-gestiones.test/.test(s));
   check('resumen: 6 pedidos, 2 fabricantes, 2 años', /Pedidos \| 6\b/.test(s) && /Referencias \| 2\b/.test(s) && /Años \| 2\b/.test(s), (s.match(/Resumen[^]*?Años/) || [''])[0]);
   check('sin "Restaurar datos de ejemplo"', !/Restaurar datos de ejemplo/.test(s));
   check('facturación total 726,00 €', /726,00\s?€/.test(s));

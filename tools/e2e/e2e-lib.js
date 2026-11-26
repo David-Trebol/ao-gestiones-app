@@ -15,7 +15,7 @@ exports.boot = async ({ login = true, viewport = { width: 390, height: 844 } } =
   const wait = ms => p.waitForTimeout(ms);
   await p.goto('http://localhost:' + (process.env.PORT || '8766') + '/', { waitUntil: 'networkidle' }); await wait(1500);
   const doLogin = async (pw = PASSWORD) => {
-    await p.getByTestId('login-username').fill('dvdtrebol3@gmail.com');
+    await p.getByTestId('login-username').fill('admin@ao-gestiones.test');
     await p.getByTestId('login-password').fill(pw);
     await p.getByTestId('login-submit').click(); await wait(2000);
   };

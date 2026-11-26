@@ -27,7 +27,7 @@ const tag = `${W}-${data}${theme === 'dark' ? '-dark' : ''}`;
   await p.goto(base, { waitUntil: 'networkidle' });
   if (theme === 'dark') { await p.evaluate(() => localStorage.setItem('@ao_theme_mode', 'dark')); await p.reload({ waitUntil: 'networkidle' }); }
   await w(1500); await shot('01-login'); await measure('login');
-  await p.getByTestId('login-username').fill('dvdtrebol3@gmail.com'); await p.getByTestId('login-password').fill(PASSWORD);
+  await p.getByTestId('login-username').fill('admin@ao-gestiones.test'); await p.getByTestId('login-password').fill(PASSWORD);
   await p.getByTestId('login-submit').click(); await w(2500);
   await shot('02-inicio'); await measure('inicio');
   await p.mouse.move(W / 2, H / 2); await p.mouse.wheel(0, H * 0.9); await shot('02b-inicio-scroll');

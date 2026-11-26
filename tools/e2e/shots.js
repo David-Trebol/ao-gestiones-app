@@ -18,7 +18,7 @@ const sizes = [[320, 640, 'xs'], [390, 844, 'm'], [844, 390, 'land'], [768, 1024
     const errs = []; p.on('pageerror', e => errs.push(e.message));
     const base = `http://localhost:${port}`;
     await p.goto(base, { waitUntil: 'networkidle' }); await p.waitForTimeout(1500);
-    await p.getByTestId('login-username').fill('dvdtrebol3@gmail.com'); await p.getByTestId('login-password').fill(PASSWORD);
+    await p.getByTestId('login-username').fill('admin@ao-gestiones.test'); await p.getByTestId('login-password').fill(PASSWORD);
     await p.getByTestId('login-submit').click(); await p.waitForTimeout(2500);
     const urls = { home: '/', detail: '/order-detail?orderId=' + (big === 'big' ? 'b0' : 'o1'), form: '/order-form?editOrderId=' + (big === 'big' ? 'b0' : 'o1'), manufacturers: '/manufacturers', newform: '/order-form', settings: '/settings' };
     for (const pg of pages) {

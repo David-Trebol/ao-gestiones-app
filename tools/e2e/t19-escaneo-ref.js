@@ -28,7 +28,7 @@ const HTML = `<html><body style="font-family:Arial;font-size:13px;padding:40px">
     const p = await ctx.newPage(); const errs = []; p.on('pageerror', e => errs.push(e.message));
     const wt = ms => p.waitForTimeout(ms);
     await p.goto(base + '/', { waitUntil: 'networkidle' }); await wt(1000);
-    await p.getByTestId('login-username').fill('dvdtrebol3@gmail.com');
+    await p.getByTestId('login-username').fill('admin@ao-gestiones.test');
     await p.getByTestId('login-password').fill(PASSWORD);
     await p.getByTestId('login-submit').click(); await wt(2500);
     // Como en el caso real: «Nuevo pedido» desde dentro de la carpeta ESP

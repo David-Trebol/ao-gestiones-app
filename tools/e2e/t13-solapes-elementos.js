@@ -143,7 +143,7 @@ function audit() {
       const pages = [['entrada', null], ...PAGES];
       for (const [name, url] of pages) {
         if (name === 'inicio') {
-          await p.getByTestId('login-username').fill('dvdtrebol3@gmail.com');
+          await p.getByTestId('login-username').fill('admin@ao-gestiones.test');
           await p.getByTestId('login-password').fill(PASSWORD);
           await p.getByTestId('login-submit').click();
           await p.waitForTimeout(2500);

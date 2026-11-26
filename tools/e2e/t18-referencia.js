@@ -21,7 +21,7 @@ const check = (name, ok, extra = '') => { console.log(`${ok ? 'OK  ' : 'FAIL'} $
     const wt = ms => p.waitForTimeout(ms);
     const shot = async n => { if (OUT) await p.screenshot({ path: `${OUT}/ref-${w}-${n}.png` }); };
     await p.goto(base + '/', { waitUntil: 'networkidle' }); await wt(1000);
-    await p.getByTestId('login-username').fill('dvdtrebol3@gmail.com');
+    await p.getByTestId('login-username').fill('admin@ao-gestiones.test');
     await p.getByTestId('login-password').fill(PASSWORD);
     await p.getByTestId('login-submit').click(); await wt(2500);
 

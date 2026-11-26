@@ -14,7 +14,7 @@ const sizes = (process.env.SIZES || '1440x900,390x844').split(',').map(s => s.sp
     await ctx.route('wss://**', r => r.abort());
     const p = await ctx.newPage(); const errs = []; p.on('pageerror', e => errs.push(e.message));
     await p.goto(base + '/', { waitUntil: 'networkidle' }); await p.waitForTimeout(1000);
-    await p.getByTestId('login-username').fill('dvdtrebol3@gmail.com');
+    await p.getByTestId('login-username').fill('admin@ao-gestiones.test');
     await p.getByTestId('login-password').fill(PASSWORD);
     await p.getByTestId('login-submit').click(); await p.waitForTimeout(2500);
     await p.goto(base + '/order-detail?orderId=' + (process.env.ID || 'o1'), { waitUntil: 'networkidle' }); await p.waitForTimeout(2200);

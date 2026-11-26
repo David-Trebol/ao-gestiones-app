@@ -14,7 +14,7 @@ const OUT = process.env.OUT || __dirname + '/../out';
     const p = await ctx.newPage();
     const errs = []; p.on('pageerror', e => errs.push(e.message));
     await p.goto(base + '/', { waitUntil: 'networkidle' }); await p.waitForTimeout(1200);
-    await p.getByTestId('login-username').fill('dvdtrebol3@gmail.com');
+    await p.getByTestId('login-username').fill('admin@ao-gestiones.test');
     await p.getByTestId('login-password').fill(PASSWORD);
     await p.getByTestId('login-submit').tap(); await p.waitForTimeout(3500);
     const tag = `${w}x${h}`;

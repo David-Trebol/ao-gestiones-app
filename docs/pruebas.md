@@ -15,6 +15,7 @@ PORT=8780 node e2e/t10-fase2.js              # selector de fabricante con buscad
 PORT=8780 node e2e/t11-solapes.js            # que al cambiar de pantalla no se vea la anterior por debajo (BASE=https://… para probar la web publicada)
 PORT=8780 node e2e/t12-buscadores.js         # buscadores de todos los años, de un año y de un fabricante
 PORT=8780 node e2e/t13-solapes-elementos.js  # detector de elementos que se pisan o se salen, en 7 tamaños, claro y oscuro (BIG=1 con 300 pedidos; BASE=https://… para la web publicada)
+PORT=8780 node e2e/t20-cabeceras.js         # cabeceras de seguridad (CSP): entrar, leer PDF y foto, Excel (BASE=https://… para las reales)
 PORT=8780 node e2e/t14-ficha.js              # editar la referencia manual desde la ficha (✓, ✗ y Enter)
 node e2e/shots-dark.js 8780                  # capturas en modo oscuro; también shots-login.js y shots-carpetas.js
 node e2e/shots.js <prefijo> 8780 [normal|big] home,detail,form,manufacturers,settings   # capturas en 6 tamaños + comprobación de desbordes

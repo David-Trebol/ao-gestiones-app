@@ -17,7 +17,7 @@ const check = (n, ok, x = '') => results.push((ok ? 'OK  ' : 'FAIL') + ' ' + n +
     const txt = async () => (await p.evaluate(() => document.body.innerText)).replace(/\n+/g, ' | ');
     const base = `http://localhost:${process.env.PORT}`;
     await p.goto(base, { waitUntil: 'networkidle' }); await w(1200);
-    await p.getByTestId('login-username').fill('dvdtrebol3@gmail.com'); await p.getByTestId('login-password').fill(PASSWORD);
+    await p.getByTestId('login-username').fill('admin@ao-gestiones.test'); await p.getByTestId('login-password').fill(PASSWORD);
     await p.getByTestId('login-submit').click(); await w(2500);
     let t = await txt();
     check(`${tag} contadores con nombres completos`, ['Pendiente', 'Procesando', 'Enviado', 'Entregado', 'Cancelado'].every(x => t.includes(x)) && !/Env\.|Pend\./.test(t));

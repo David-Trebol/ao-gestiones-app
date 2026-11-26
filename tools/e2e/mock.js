@@ -1,6 +1,6 @@
 // Simulador mínimo de Supabase (Auth + PostgREST + Functions) para probar la interfaz en local
 const B64 = o => Buffer.from(JSON.stringify(o)).toString('base64url');
-const USER = { id: '11111111-1111-1111-1111-111111111111', email: 'dvdtrebol3@gmail.com', aud: 'authenticated', role: 'authenticated', app_metadata: {}, user_metadata: {}, created_at: new Date().toISOString() };
+const USER = { id: '11111111-1111-1111-1111-111111111111', email: 'admin@ao-gestiones.test', aud: 'authenticated', role: 'authenticated', app_metadata: {}, user_metadata: {}, created_at: new Date().toISOString() };
 const TOKEN = `${B64({ alg: 'HS256', typ: 'JWT' })}.${B64({ sub: USER.id, email: USER.email, role: 'authenticated', aud: 'authenticated', exp: Math.floor(Date.now() / 1000) + 36000 })}.sig`;
 
 exports.PASSWORD = 'ClaveSegura123';

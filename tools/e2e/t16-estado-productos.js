@@ -17,7 +17,7 @@ const check = (name, ok, extra = '') => { console.log(`${ok ? 'OK  ' : 'FAIL'} $
     p.on('dialog', d => d.accept());
     const wt = ms => p.waitForTimeout(ms);
     await p.goto(base + '/', { waitUntil: 'networkidle' }); await wt(1000);
-    await p.getByTestId('login-username').fill('dvdtrebol3@gmail.com');
+    await p.getByTestId('login-username').fill('admin@ao-gestiones.test');
     await p.getByTestId('login-password').fill(PASSWORD);
     await p.getByTestId('login-submit').click(); await wt(2500);
     await p.goto(base + '/order-detail?orderId=o1', { waitUntil: 'networkidle' }); await wt(2500);

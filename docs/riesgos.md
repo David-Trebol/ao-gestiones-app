@@ -5,3 +5,5 @@
 - «Eliminar todos los datos» (Ajustes, solo admin) borra todo con una confirmación: endurecerlo es parte de la fase 0.
 - Sin comprobar: a qué dirección devuelve el correo de «He olvidado mi contraseña» (Site URL de Supabase Auth) y la protección de contraseñas filtradas.
 - La app descarga todos los pedidos al entrar: bien hasta unos miles; más allá habrá que paginar.
+
+- Auditoría del 26/11/2026: cabeceras de seguridad (CSP, X-Frame-Options…) en `expo/vercel.json`; si se añade un servicio externo nuevo (fuentes, APIs), hay que añadirlo a la CSP o se bloqueará. Pendiente del propietario: desactivar «Allow new users to sign up» en Supabase y decidir copias de seguridad y permisos de borrado. El email real estuvo en commits antiguos del repositorio público.
