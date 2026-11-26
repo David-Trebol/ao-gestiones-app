@@ -430,8 +430,10 @@ export const [DataProvider, useData] = createContextHook(() => {
       .eq('manufacturer_id', id);
     if (countError) fail(countError);
     if ((count ?? 0) > 0) return false;
-    const { error } = await supabase.from('manufacturers').delete().eq('id', id);
+    const { data: gone, error } = await supabase.from('manufacturers').delete().eq('id', id).select('id');
     if (error) fail(error);
+    // Sin permiso la base de datos no borra nada (no da error): solo un administrador puede borrar referencias
+    if (!gone?.length) throw new Error('Solo un administrador puede eliminar referencias de pedido.');
     setManufacturers(prev => prev.filter(m => m.id !== id));
     return true;
   }, [setManufacturers]);

@@ -22,6 +22,7 @@ import { canvas, cardShadow, webInputReset } from '@/constants/theme';
 import SelectSheet from '@/components/SelectSheet';
 import { useTheme } from '@/contexts/ThemeContext';
 import { useData } from '@/contexts/DataContext';
+import { useAuth } from '@/contexts/AuthContext';
 import { Manufacturer } from '@/types';
 import { formatCurrency, formatDate } from '@/utils/calculations';
 import * as Haptics from 'expo-haptics';
@@ -31,6 +32,7 @@ const fold = (t: string) => t.normalize('NFD').replace(/[\u0300-\u036f]/g, '').t
 
 export default function ManufacturersScreen() {
   const { manufacturers, years, orders, addManufacturer, updateManufacturer, deleteManufacturer, duplicateManufacturer } = useData();
+  const { isAdmin } = useAuth();
   const { colors, isDark } = useTheme();
   const { width, pad, content, bottomSpace } = usePageLayout();
   // Ordenador: rejilla de tarjetas (2-4 columnas de ~300 px); móvil: lista agrupada como en iOS
@@ -451,7 +453,8 @@ export default function ManufacturersScreen() {
           { value: 'edit', label: 'Editar nombre y código' },
           { value: 'years', label: 'Asignar años' },
           { value: 'duplicate', label: 'Duplicar referencia' },
-          { value: 'delete', label: 'Eliminar referencia', destructive: true },
+          // Borrar referencias es solo de administrador (también lo impide la base de datos)
+          ...(isAdmin ? [{ value: 'delete', label: 'Eliminar referencia', destructive: true }] : []),
         ]}
         onSelect={v => {
           const m = menuFor;
