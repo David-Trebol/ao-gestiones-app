@@ -172,11 +172,12 @@ export function buildReview(doc: ParsedDoc, form: OrderFormData, currentManufact
     priceAs: 'tpv',
     vatRate: vat !== null ? String(vat).replace('.', ',') : '',
     vatFromDoc: vat !== null,
-    applyManufacturer: !!docManufacturer(doc) && !currentManufacturerId,
+    // La referencia escrita (AO-1087) manda aunque hubiera otra elegida; el parecido por nombre solo si no había ninguna
+    applyManufacturer: doc.ownRef ? doc.ownRef.id !== currentManufacturerId : !!doc.manufacturerMatch && !currentManufacturerId,
     manufacturerId: docManufacturer(doc)?.id,
     manufacturerName: docManufacturer(doc)?.name,
     ownRef: doc.ownRef ? `${doc.ownRef.code}-${doc.ownRef.number}` : undefined,
-    applyOwnRef: !!doc.ownRef && !form.custom_reference.trim() && (!currentManufacturerId || currentManufacturerId === doc.ownRef.id),
+    applyOwnRef: !!doc.ownRef && !form.custom_reference.trim(),
   };
 }
 

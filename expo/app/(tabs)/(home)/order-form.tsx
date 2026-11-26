@@ -113,7 +113,7 @@ export default function OrderFormScreen() {
 
   const [formData, setFormData] = useState<OrderFormData>({
     customer: { ...emptyCustomer },
-    manufacturer_id: manufacturerId || '',
+    manufacturer_id: '', // siempre empieza en «Seleccionar referencia» (también desde una carpeta)
     year: year ? parseInt(year) : new Date().getFullYear(),
     status: 'pending' as OrderStatus,
     shipping_cost: 0,
@@ -207,10 +207,6 @@ export default function OrderFormScreen() {
       const sIdx = STATUS_OPTIONS.findIndex(s => s.value === editingOrder.status);
       setSelectedStatusIndex(sIdx >= 0 ? sIdx : 0);
     } else {
-      if (manufacturerId) {
-        const mIdx = manufacturers.findIndex(m => m.id === manufacturerId);
-        setSelectedManufacturerIndex(mIdx);
-      }
     }
     if (!editingOrder && manufacturers.length > 0) initializedRef.current = initKey;
   }, [editingOrder, manufacturerId, manufacturers]);
@@ -301,7 +297,7 @@ export default function OrderFormScreen() {
         .filter(c => (c.name || c.nif) && !seen.has(c.name + c.nif) && seen.add(c.name + c.nif));
       const { read, parsed } = await readDocument(
         input,
-        { manufacturers: manufacturers.map(m => ({ id: m.id, name: m.name, code: m.code })), knownCustomers, ownNames: ['AO Gestiones'] },
+        { manufacturers: manufacturers.map(m => ({ id: m.id, name: m.name, code: m.code })), knownCustomers, ownNames: ['AO Gestiones'], fileName: input.name },
         prog => {
           if (!signal.aborted) setScan(prev => (prev ? { ...prev, step: prog.step, fraction: prog.fraction } : prev));
         },

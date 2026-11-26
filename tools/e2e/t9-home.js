@@ -9,7 +9,7 @@ const check = (n, ok, x = '') => results.push((ok ? 'OK  ' : 'FAIL') + ' ' + n +
   for (const vp of [{ width: 1440, height: 900 }, { width: 390, height: 844 }]) {
     const tag = vp.width > 1000 ? '[escritorio]' : '[móvil]';
     const ctx = await b.newContext({ viewport: vp });
-    const mock = createMock(); seed(mock.db);
+    const mock = createMock(); seed(mock.db); mock.db.orders.forEach(o => { o.custom_reference = ''; }); // la lista enseña la referencia automática
     await ctx.route('https://ixsosbtieclihoizmszq.supabase.co/**', mock.handler);
     await ctx.route('wss://**', r => r.abort());
     const p = await ctx.newPage(); const errs = []; p.on('pageerror', e => errs.push(e.message));

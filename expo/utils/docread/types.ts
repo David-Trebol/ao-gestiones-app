@@ -130,4 +130,6 @@ export interface ParseContext {
   manufacturers?: { id: string; name: string; code?: string }[];
   knownCustomers?: { name: string; nif: string }[];
   ownNames?: string[];
+  /** Nombre del archivo: si el texto no trae la referencia propia, se busca ahí («… (ONS-901378).pdf») */
+  fileName?: string;
 }

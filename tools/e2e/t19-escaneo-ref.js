@@ -31,9 +31,10 @@ const HTML = `<html><body style="font-family:Arial;font-size:13px;padding:40px">
     await p.getByTestId('login-username').fill('dvdtrebol3@gmail.com');
     await p.getByTestId('login-password').fill(PASSWORD);
     await p.getByTestId('login-submit').click(); await wt(2500);
-    await p.goto(base + '/order-form', { waitUntil: 'networkidle' }); await wt(1800);
+    // Como en el caso real: «Nuevo pedido» desde dentro de la carpeta ESP
+    await p.goto(base + '/order-form?manufacturerId=mesp&year=2026', { waitUntil: 'networkidle' }); await wt(1800);
     const sel = await p.getByTestId('manufacturer-select').innerText();
-    check(`[${tag}] empieza en «Seleccionar referencia»`, /Seleccionar referencia/.test(sel), sel);
+    check(`[${tag}] empieza en «Seleccionar referencia» (también desde la carpeta ESP)`, /Seleccionar referencia/.test(sel), sel);
     const [fc] = await Promise.all([p.waitForEvent('filechooser'), p.getByTestId('scan-document-btn').click()]);
     await fc.setFiles(pdf);
     await p.getByText('Revisar datos del documento').waitFor({ timeout: 120000 }); await wt(800);

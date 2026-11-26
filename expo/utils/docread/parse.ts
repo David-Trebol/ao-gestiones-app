@@ -814,7 +814,9 @@ export function parseDocument(lines: DocLine[], ctx: ParseContext = {}): ParsedD
   const tableTop = table.tableStart >= 0 ? table.tableStart : lines.length;
   for (let i = 0; i < lines.length; i++) {
     const l = lines[i];
-    if (i >= tableTop && i < table.tableEnd) continue;
+    // Dentro de la tabla solo valen líneas sueltas «Etiqueta: valor» (p. ej. «Factura: F260991» bajo los productos)
+    const inTable = i >= tableTop && i < table.tableEnd;
+    if (inTable && !/^\s*[\p{L} .ºo°/]{3,30}:\s*\S+\s*$/u.test(l.text)) continue;
     for (const p of refPatterns) {
       if (doc.refs[p.key]) continue;
       if (p.key === 'numero_factura' && /pro-?\s?forma/i.test(l.text)) continue;
@@ -1001,6 +1003,10 @@ export function parseDocument(lines: DocLine[], ctx: ParseContext = {}): ParsedD
     if (doc.manufacturerMatch) break;
   }
   doc.ownRef = findOwnRef(lines.map(l => l.text), ctx.manufacturers ?? []);
+  if (!doc.ownRef && ctx.fileName) {
+    const r = findOwnRef([ctx.fileName.replace(/\.[a-z0-9]{2,4}$/i, '')], ctx.manufacturers ?? []);
+    if (r) doc.ownRef = { ...r, source: `nombre del archivo: ${ctx.fileName}` };
+  }
   // Si el «Su pedido / Su ref.» es justo nuestra referencia, no es el nº de pedido del cliente
   if (doc.ownRef && doc.refs.numero_pedido_cliente) {
     const v = doc.refs.numero_pedido_cliente.value.toUpperCase().replace(/[^A-Z0-9]/g, '');
