@@ -35,10 +35,13 @@ export function PageHeader({ title, subtitle, actions, topInset = true }: Props)
   const { colors } = useTheme();
   const insets = useSafeAreaInsets();
   const { pad, short } = usePageLayout();
+  const { width } = useWindowDimensions();
+  // En móvil el título largo baja a dos líneas en vez de cortarse («Referencias de…»)
+  const narrow = width < 520 && !short;
   return (
     <View style={[styles.wrap, enter(0, 'fade', { duration: 380 }), { paddingTop: (topInset ? insets.top : 0) + (short ? 12 : pad > 16 ? 28 : 16) }]}>
       <View style={{ flex: 1, minWidth: 0 }}>
-        <Text style={[styles.title, { color: colors.text }, short && { fontSize: 22, lineHeight: 28 }]} accessibilityRole="header" numberOfLines={1}>
+        <Text style={[styles.title, { color: colors.text }, short && { fontSize: 22, lineHeight: 28 }, narrow && title.length > 14 && { fontSize: 28, lineHeight: 33 }]} accessibilityRole="header" numberOfLines={narrow ? 2 : 1}>
           {title}
         </Text>
         {!!subtitle && (

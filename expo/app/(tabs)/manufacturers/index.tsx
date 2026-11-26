@@ -339,7 +339,7 @@ export default function ManufacturersScreen() {
       <View style={[styles.tileIcon, { backgroundColor: colors.brand }]}>
         <t.Icon size={17} color={colors.onPrimary} strokeWidth={2.3} />
       </View>
-      <Text style={[styles.tileValue, { color: colors.text }]} numberOfLines={1}>{t.value}</Text>
+      <Text style={[styles.tileValue, { color: colors.text }, !grid && { fontSize: 20 }]} numberOfLines={1}>{t.value}</Text>
       <Text style={[styles.tileLabel, { color: colors.textSecondary }]} numberOfLines={2}>
         {t.label}
         {t.hint ? <Text style={{ fontSize: 12 }}>{'\n'}{t.hint}</Text> : null}
@@ -423,9 +423,8 @@ export default function ManufacturersScreen() {
             {grid ? (
               <View style={styles.tiles}>{summaryTiles}</View>
             ) : (
-              <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={[styles.tilesScroll, { paddingHorizontal: pad }]} style={{ marginHorizontal: -pad, marginBottom: 16 }}>
-                {summaryTiles}
-              </ScrollView>
+              // En móvil, 2 × 2 en vez de una fila que se corta por la derecha
+              <View style={styles.tilesWrap}>{summaryTiles}</View>
             )}
 
             <SearchField value={query} onChangeText={setQuery} placeholder="Buscar referencia por nombre o código" testID="search-manufacturers" style={{ marginBottom: 12 }} />
@@ -513,9 +512,9 @@ const styles = StyleSheet.create({
   container: { flex: 1, alignItems: 'center' },
   // resumen
   tiles: { flexDirection: 'row', gap: 16, marginBottom: 20 },
-  tilesScroll: { flexDirection: 'row', gap: 10, paddingVertical: 2 },
+  tilesWrap: { flexDirection: 'row', flexWrap: 'wrap', gap: 10, marginBottom: 16 },
   tile: { borderRadius: 16, padding: 16, gap: 4 },
-  tileScroll: { width: 170 },
+  tileScroll: { flexGrow: 1, flexBasis: '40%' as unknown as number, minWidth: 0, padding: 14 },
   tileIcon: { width: 32, height: 32, borderRadius: 16, alignItems: 'center', justifyContent: 'center', marginBottom: 6 },
   tileValue: { fontSize: 24, fontWeight: '800' as const, letterSpacing: -0.5, fontVariant: ['tabular-nums'] },
   tileLabel: { fontSize: 14, fontWeight: '600' as const },

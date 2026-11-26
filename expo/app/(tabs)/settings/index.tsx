@@ -416,11 +416,19 @@ export default function SettingsScreen() {
     'Datos',
     <>
       {Platform.OS === 'web' && row({ icon: Download, tint: SystemTint.green, title: 'Descargar copia completa', detail: 'Excel con pedidos, líneas, envíos y fabricantes', onPress: () => void handleExportAll(), testID: 'export-all-btn', first: true, disabled: exporting || orders.length === 0 })}
-      {isAdmin && row({ icon: Trash2, tint: SystemTint.red, title: 'Eliminar todos los datos', detail: 'Borra pedidos, referencias de pedido y años para todos los usuarios', onPress: openDeleteAll, destructive: true, testID: 'delete-all-btn', first: Platform.OS !== 'web', disabled: deleting })}
-      {!isAdmin && Platform.OS !== 'web' && <Text style={[styles.rowDetail, { color: colors.textSecondary, padding: 16 }]}>Solo los administradores pueden borrar datos.</Text>}
+      {Platform.OS !== 'web' && <Text style={[styles.rowDetail, { color: colors.textSecondary, padding: 16 }]}>La copia completa se descarga desde la web en el ordenador.</Text>}
     </>,
     isAdmin ? undefined : 'Solo los administradores pueden borrar datos o gestionar usuarios.',
   );
+
+  // Separado del resto y al final de la pantalla, para no pulsarlo por error
+  const peligro = isAdmin
+    ? group(
+        'Zona peligrosa',
+        row({ icon: Trash2, tint: SystemTint.red, title: 'Eliminar todos los datos', detail: 'Borra pedidos, referencias de pedido y años para todos los usuarios', onPress: openDeleteAll, destructive: true, testID: 'delete-all-btn', first: true, disabled: deleting }),
+        'No se puede deshacer. Descarga antes la copia completa.',
+      )
+    : null;
 
   return (
     <View style={[styles.outerContainer, { backgroundColor: canvas(colors) }]}>
@@ -434,6 +442,7 @@ export default function SettingsScreen() {
               {apariencia}
               {cuenta}
               {datos}
+              {peligro && <View style={styles.dangerZone}>{peligro}</View>}
             </View>
             <View style={styles.colRight}>
               {resumen}
@@ -447,6 +456,7 @@ export default function SettingsScreen() {
             {usuarios}
             {cuenta}
             {datos}
+            {peligro && <View style={styles.dangerZone}>{peligro}</View>}
           </>
         )}
       </ScrollView>
@@ -931,6 +941,7 @@ const styles = StyleSheet.create({
   modalCancelText: { fontSize: 15, fontWeight: '600' as const, },
   modalConfirmBtn: { paddingHorizontal: 22, paddingVertical: 11, borderRadius: 999, },
   modalConfirmText: { fontSize: 15, fontWeight: '600' as const, color: '#FFFFFF', },
+  dangerZone: { marginTop: 28 },
   group: { marginBottom: 28 },
   groupTitle: { fontSize: 20, fontWeight: '700' as const, letterSpacing: -0.4, marginBottom: 8, paddingHorizontal: 4 },
   groupCard: { borderRadius: 14, overflow: 'hidden' },

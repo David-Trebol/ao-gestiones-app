@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Platform, Pressable, StyleSheet, Text, View, ViewStyle, useWindowDimensions } from 'react-native';
+import { Image, Platform, Pressable, StyleSheet, Text, View, ViewStyle, useWindowDimensions } from 'react-native';
 import type { BottomTabBarProps } from '@react-navigation/bottom-tabs';
 import { useRouter, usePathname } from 'expo-router';
 import { StackActions } from '@react-navigation/native';
@@ -9,6 +9,8 @@ import { useTheme } from '@/contexts/ThemeContext';
 import { useAuth } from '@/contexts/AuthContext';
 import { liquidGlass } from '@/constants/theme';
 import { enter } from '@/constants/motion';
+
+const LOGO = require('@/assets/images/logo.png');
 
 /** Transición del indicador de la pestaña activa: se desliza con un pequeño rebote */
 const slide = (Platform.OS === 'web'
@@ -38,20 +40,15 @@ const pointer = web ? ({ cursor: 'pointer' } as ViewStyle) : null;
 
 /** Icono de la app: degradado de color, como el icono de una app de Apple */
 export function AppIcon({ size = 34 }: { size?: number }) {
+  // Logo de AO Gestiones (el mismo que el icono de la web y del móvil)
   return (
-    <View
-      style={[
-        styles.appIcon,
-        { width: size, height: size, borderRadius: size * 0.2237 },
-        web
-          ? ({ backgroundImage: 'linear-gradient(145deg, #FFA24A 0%, #FF8718 45%, #E5600A 100%)', boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.35), 0 2px 8px rgba(255,135,24,0.35)' } as ViewStyle)
-          : { backgroundColor: '#FF8718' },
-      ]}
+    <Image
+      source={LOGO}
+      style={{ width: size, height: size }}
+      resizeMode="contain"
       accessibilityElementsHidden
       importantForAccessibility="no-hide-descendants"
-    >
-      <Text style={[styles.appIconText, { fontSize: size * 0.5 }]}>Ω</Text>
-    </View>
+    />
   );
 }
 
@@ -253,8 +250,6 @@ export default function AppNav({ state, navigation }: BottomTabBarProps) {
 }
 
 const styles = StyleSheet.create({
-  appIcon: { alignItems: 'center', justifyContent: 'center' },
-  appIconText: { color: '#002A39', fontWeight: '800', letterSpacing: -0.3, marginTop: -2 },
   chip: { alignItems: 'center', justifyContent: 'center' },
   bottomWrap: { position: 'absolute', left: 0, right: 0, bottom: 0, alignItems: 'center', paddingHorizontal: 16 },
   bottom: { flexDirection: 'row', alignItems: 'center', gap: 4, padding: 6, borderRadius: 32, width: '100%', maxWidth: 420 },

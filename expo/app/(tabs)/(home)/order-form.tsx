@@ -15,7 +15,7 @@ import {
   useWindowDimensions,
 } from 'react-native';
 import { useLocalSearchParams, useRouter, Stack } from 'expo-router';
-import { Building2, CalendarClock, ChevronDown, ChevronUp, ClipboardList, Euro, FileText, Package, Plus, Trash2, ScanLine, Truck, X } from 'lucide-react-native';
+import { Building2, CalendarClock, ChevronDown, ChevronRight, ChevronUp, ClipboardList, Euro, FileText, Package, Plus, Trash2, ScanLine, Truck, X } from 'lucide-react-native';
 import SelectSheet from '@/components/SelectSheet';
 import { LightColors as StaticColors } from '@/constants/colors';
 import { PAGE_MAX, usePageLayout } from '@/components/Page';
@@ -532,7 +532,7 @@ export default function OrderFormScreen() {
           >
             <Text style={[styles.topBtnText, { color: colors.primary }]}>Cancelar</Text>
           </Pressable>
-          <View style={[styles.topTitleWrap, compact && { left: 120, right: 230 }]} pointerEvents="none">
+          <View style={[styles.topTitleWrap, width < 360 && { left: 92, right: 56 }, compact && { left: 120, right: 230 }]} pointerEvents="none">
             <Text style={[styles.topTitleText, { color: colors.text }]} numberOfLines={1} accessibilityRole="header">
               {editingOrder ? orderRefLabel(editingOrder) : 'Nuevo pedido'}
             </Text>
@@ -613,9 +613,27 @@ export default function OrderFormScreen() {
             </View>
           )}
 
+          {DOC_READ_SUPPORTED && !editingOrder && !scan && !docPreview && (
+            <Pressable
+              onPress={handleScanAction}
+              style={({ hovered, pressed }: { pressed: boolean; hovered?: boolean }) => [styles.scanBtn, { backgroundColor: hovered || pressed ? colors.primarySoftAlt : colors.primarySoft }]}
+              accessibilityRole="button"
+              accessibilityLabel="Rellenar desde PDF o foto"
+              testID="scan-document-big"
+            >
+              <View style={[styles.scanBtnIconWrap, { backgroundColor: colors.primary }]}>
+                <ScanLine size={20} color="#FFFFFF" />
+              </View>
+              <View style={styles.scanBtnTextWrap}>
+                <Text style={[styles.scanBtnTitle, { color: colors.text }]}>Rellenar desde PDF o foto</Text>
+                <Text style={[styles.scanBtnSubtitle, { color: colors.textSecondary }]}>Sube la oferta, proforma o factura y se rellena solo. Se lee en tu dispositivo.</Text>
+              </View>
+              <ChevronRight size={18} color={colors.primary} />
+            </Pressable>
+          )}
+
           <Text style={[styles.legend, { color: colors.textSecondary }]}>
-            Los campos con <Text style={{ color: colors.error }}>*</Text> son obligatorios. Los importes marcados como «calculado» se rellenan solos.
-            {DOC_READ_SUPPORTED ? ' Con «Leer documento» puedes rellenarlo desde un PDF o una foto; se lee en tu dispositivo.' : ''}
+            Los campos con <Text style={{ color: colors.error }}>*</Text> son obligatorios.
           </Text>
 
           {docPreview && <DocPreviewPanel doc={docPreview} onRemove={() => setDocPreview(null)} />}
@@ -650,7 +668,9 @@ export default function OrderFormScreen() {
                 {!!err('manufacturer') && <Text style={[styles.errorText, { color: colors.error }]}>{err('manufacturer')}</Text>}
 
                 <View style={[styles.fieldRow, { flexWrap: 'wrap', columnGap: 12, rowGap: 0 }]}>
-                  <NumberFormField label="Año" required value={formData.year} onChangeValue={(n) => setFormData(prev => ({ ...prev, year: n }))} integer half error={err('year')} />
+                  <View style={styles.yearField}>
+                    <NumberFormField label="Año" required value={formData.year} onChangeValue={(n) => setFormData(prev => ({ ...prev, year: n }))} integer half error={err('year')} />
+                  </View>
                   <ManualRefField
                     code={refCode}
                     year={formData.year}
@@ -1562,6 +1582,7 @@ const styles = StyleSheet.create({
     color: StaticColors.white,
   },
   refField: { flexGrow: 1, flexBasis: 170, minWidth: 170, marginBottom: 12 },
+  yearField: { flexBasis: 84, flexGrow: 1, minWidth: 84, maxWidth: 160, flexDirection: 'row' },
   fieldRow: {
     flexDirection: 'row',
     gap: 12,

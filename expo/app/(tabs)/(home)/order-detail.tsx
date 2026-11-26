@@ -224,7 +224,7 @@ export default function OrderDetailScreen() {
     <View style={[s.tile, panel(colors, isDark), mobileTiles && s.tileHalf, enter(++tileN, 'pop', { base: 120, step: 70 })]} {...fx('lift')}>
       <View style={s.tileHead}>
         <View style={[s.tileIcon, { backgroundColor: tint }]}><Icon size={15} color="#FFFFFF" strokeWidth={2.4} /></View>
-        <Text style={[s.tileLabel, tiny && { fontSize: 12 }]} numberOfLines={1}>{label}</Text>
+        <Text style={[s.tileLabel, tiny && { fontSize: 12 }]} numberOfLines={mobileTiles ? 2 : 1}>{label}</Text>
       </View>
       <Text style={[s.tileValue, mobileTiles && { fontSize: value.length > 12 ? 16 : 19, letterSpacing: -0.3 }, valueColor ? { color: valueColor } : null]} numberOfLines={1} adjustsFontSizeToFit>{value}</Text>
       <Text style={[s.tileSub, tiny && { fontSize: 11 }]} numberOfLines={1}>{sub}</Text>

@@ -1,5 +1,5 @@
 import React, { useMemo, useState } from 'react';
-import { Alert, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View, type TextStyle } from 'react-native';
+import { Alert, Platform, Pressable, StyleSheet, Text, TextInput, View, type TextStyle } from 'react-native';
 import { useRouter } from 'expo-router';
 import { AlertTriangle, ChevronDown, ChevronRight, Hourglass, Download, Factory, FileText, Mail, Tags, Package, Phone, Search, SlidersHorizontal, X } from 'lucide-react-native';
 import { useTheme } from '@/contexts/ThemeContext';
@@ -53,7 +53,7 @@ type SheetKind = 'manufacturer' | 'owner' | 'year' | 'period' | 'sort' | null;
 export default function OrdersDashboard() {
   const router = useRouter();
   const { colors, isDark } = useTheme();
-  const { pad, width } = usePageLayout();
+  const { width } = usePageLayout();
   const { orders, manufacturers, years } = useData();
   const table = width >= 1100; // tabla cuando cabe sin apretar (con la barra lateral)
   const twoCols = width >= 700 && !table;
@@ -236,9 +236,9 @@ export default function OrdersDashboard() {
                 <View style={[s.counterIcon, { backgroundColor: sel ? '#FFFFFF' : tint }]}>
                   <Icon size={17} color={sel ? tint : '#FFFFFF'} strokeWidth={2.4} />
                 </View>
-                <CountText style={[s.counterValue, sel && { color: '#FFFFFF' }]} value={counts[st].n} />
+                <CountText style={[s.counterValue, width < 700 && { fontSize: 22 }, sel && { color: '#FFFFFF' }]} value={counts[st].n} />
               </View>
-              <Text style={[s.counterLabel, sel && { color: '#FFFFFF' }]} numberOfLines={1}>
+              <Text style={[s.counterLabel, width < 700 && { fontSize: 13 }, sel && { color: '#FFFFFF' }]} numberOfLines={1}>
                 {cfg.label}
               </Text>
               <Text style={[s.counterSub, sel && { color: 'rgba(255,255,255,0.85)' }]} numberOfLines={1}>
@@ -247,13 +247,8 @@ export default function OrdersDashboard() {
             </Pressable>
           );
         });
-        return width < 700 ? (
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={[s.countersScroll, { paddingHorizontal: pad }]} style={{ marginHorizontal: -pad }}>
-            {tiles}
-          </ScrollView>
-        ) : (
-          <View style={s.counters}>{tiles}</View>
-        );
+        // En móvil, cuadrícula (3 + 2) en vez de una fila que se corta por la derecha
+        return <View style={[s.counters, width < 700 && { gap: 8 }]}>{tiles}</View>;
       })()}
 
       {/* Incidencias por resolver: resumen y filtro */}
@@ -692,10 +687,9 @@ function makeStyles(c: ThemeColors) {
     searchInput: { flex: 1, minWidth: 0, fontSize: 17, color: c.text, height: 44, letterSpacing: -0.2, ...webInputReset },
     clearBtn: { width: 36, height: 36, alignItems: 'center', justifyContent: 'center' },
     counters: { flexDirection: 'row', flexWrap: 'wrap', gap: 12 },
-    countersScroll: { flexDirection: 'row', gap: 10, paddingVertical: 2 },
     counter: { borderRadius: 18, padding: 12, backgroundColor: c.surface, gap: 6 },
     counterGrid: { flexGrow: 1, flexBasis: '17%' as unknown as number },
-    counterScroll: { width: 148 },
+    counterScroll: { flexGrow: 1, flexBasis: '30%' as unknown as number, minWidth: 88, padding: 10, gap: 4 },
     counterTop: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
     counterIcon: { width: 32, height: 32, borderRadius: 16, alignItems: 'center', justifyContent: 'center' },
     counterLabel: { fontSize: 15, color: c.textSecondary, fontWeight: '600', letterSpacing: -0.2, marginTop: 2 },
