@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Platform, Pressable, StyleSheet, Text, TextInput, View, type StyleProp, type ViewStyle } from 'react-native';
-import { ArrowRight } from 'lucide-react-native';
+import { AlertTriangle, ArrowRight } from 'lucide-react-native';
 import { useTheme } from '@/contexts/ThemeContext';
 import { webInputReset } from '@/constants/theme';
 import { manualRefSuffix } from '@/utils/references';
@@ -14,6 +14,8 @@ type Props = {
   onChange: (v: string) => void;
   /** Siguiente número propuesto y última referencia usada. */
   suggestion: { number: number; last: string } | null;
+  /** Aviso si otro pedido ya tiene esta referencia (no impide guardar). */
+  duplicateOf?: string | null;
   label?: string;
   style?: StyleProp<ViewStyle>;
   testID?: string;
@@ -25,7 +27,7 @@ type Props = {
  * Referencia propia del pedido: «ESP-» fijo delante y el número detrás, con un botón
  * «Continuar con ESP-629» que rellena el siguiente. Siempre se puede escribir a mano.
  */
-export default function ManualRefField({ code, year, value, onChange, suggestion, label = 'Referencia', style, testID = 'manual-ref', autoFocus, onSubmit }: Props) {
+export default function ManualRefField({ code, year, value, onChange, suggestion, duplicateOf, label = 'Referencia', style, testID = 'manual-ref', autoFocus, onSubmit }: Props) {
   const { colors } = useTheme();
   const [focused, setFocused] = useState(false);
   const prefix = code ? `${code.toUpperCase()}-` : '';
@@ -36,7 +38,7 @@ export default function ManualRefField({ code, year, value, onChange, suggestion
   return (
     <View style={style}>
       {!!label && <Text style={[st.label, { color: colors.textSecondary }]}>{label}</Text>}
-      <View style={[st.box, { backgroundColor: colors.fill, borderColor: focused ? colors.primary : 'transparent' }]}>
+      <View style={[st.box, { backgroundColor: colors.fill, borderColor: duplicateOf ? colors.error : focused ? colors.primary : 'transparent' }]}>
         {!!prefix && (
           <View style={[st.prefix, { backgroundColor: colors.primarySoft }]}>
             <Text style={[st.prefixText, { color: colors.primary }]} testID={`${testID}-prefix`}>{prefix}</Text>
@@ -58,6 +60,12 @@ export default function ManualRefField({ code, year, value, onChange, suggestion
         />
         {!!year && !!shown && <Text style={[st.year, { color: colors.textSecondary }]}>({year})</Text>}
       </View>
+      {duplicateOf ? (
+        <View style={st.dup} testID={`${testID}-dup`} accessibilityRole="alert">
+          <AlertTriangle size={14} color={colors.error} />
+          <Text style={[st.dupText, { color: colors.error }]}>{duplicateOf}</Text>
+        </View>
+      ) : null}
       {offer ? (
         <Pressable
           onPress={() => onChange(String(offer.number))}
@@ -88,4 +96,6 @@ const st = StyleSheet.create({
   suggestText: { fontSize: 13, fontWeight: '600' },
   suggestStrong: { fontWeight: '800' },
   suggestLast: { fontSize: 12 },
+  dup: { flexDirection: 'row', alignItems: 'flex-start', gap: 6, marginTop: 6 },
+  dupText: { flex: 1, fontSize: 12.5, lineHeight: 17, fontWeight: '600' },
 });

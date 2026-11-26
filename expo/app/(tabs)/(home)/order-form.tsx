@@ -30,7 +30,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import DocumentReview from '@/components/DocumentReview';
 import DateField from '@/components/DateField';
 import ManualRefField from '@/components/ManualRefField';
-import { nextManualRef, normalizeManualRef, orderRefLabel } from '@/utils/references';
+import { manualRefOwner, nextManualRef, normalizeManualRef, orderRefLabel } from '@/utils/references';
 import { useAuth } from '@/contexts/AuthContext';
 import { formatISODate, todayISO } from '@/utils/orderFilters';
 import { DOC_READ_SUPPORTED, DocReadError, readDocument, releaseReader, type ReadInput } from '@/utils/docread/read';
@@ -125,6 +125,8 @@ export default function OrderFormScreen() {
   });
   const refCode = useMemo(() => manufacturers.find(m => m.id === formData.manufacturer_id)?.code ?? '', [manufacturers, formData.manufacturer_id]);
   const refSuggestion = useMemo(() => nextManualRef(orders, refCode, editingOrder?.id), [orders, refCode, editingOrder?.id]);
+  const editingId = editingOrder?.id;
+  const refDuplicate = useMemo(() => { const o = manualRefOwner(orders, formData.custom_reference, refCode, editingId); return o ? `${orderRefLabel(o)} ya existe (pedido de ${o.customer?.nombre_empresa || 'otro cliente'}). Revisa el número antes de guardar.` : null; }, [orders, formData.custom_reference, refCode, editingId]);
 
   const [selectedManufacturerIndex, setSelectedManufacturerIndex] = useState<number>(-1);
   const [mfSheetOpen, setMfSheetOpen] = useState(false);
@@ -647,6 +649,7 @@ export default function OrderFormScreen() {
                     value={formData.custom_reference}
                     onChange={(v) => setFormData(prev => ({ ...prev, custom_reference: v }))}
                     suggestion={refSuggestion}
+                    duplicateOf={refDuplicate}
                     style={styles.refField}
                   />
                 </View>

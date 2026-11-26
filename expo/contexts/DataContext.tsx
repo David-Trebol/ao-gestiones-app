@@ -340,7 +340,7 @@ export const [DataProvider, useData] = createContextHook(() => {
     const created = await insertOrderWithReference({
       ...rest,
       id: generateId(),
-      custom_reference: original.custom_reference ? `${original.custom_reference} (copia)` : '',
+      custom_reference: '', // la copia se numera aparte (Continuar con…)
       year,
       // Una copia empieza como pedido nuevo: pendiente y sin factura/recibo
       status: 'pending',

@@ -16,7 +16,7 @@ import SupplierLogSheet from '@/components/SupplierLogSheet';
 import { SUPPLIER_EVENT_SHORT, SUPPLIER_EVENT_TINT, SUPPLIER_PENDING_TINT, SUPPLIER_STEPS, SUPPLIER_TINT, dmy, isPaymentPending, nextSupplierStep, orderSupplierNames, supplierSteps } from '@/constants/supplierLog';
 import type { ItemStatus, OrderItem, OrderStatus } from '@/types';
 import { formatCurrency, formatDate } from '@/utils/calculations';
-import { nextManualRef, normalizeManualRef, orderRef, orderRefLabel } from '@/utils/references';
+import { manualRefOwner, nextManualRef, normalizeManualRef, orderRef, orderRefLabel } from '@/utils/references';
 import ManualRefField from '@/components/ManualRefField';
 import { addressLine, formatISODate, itemsSummary, overdueDays } from '@/utils/orderFilters';
 
@@ -48,6 +48,9 @@ export default function OrderDetailScreen() {
   const [itemSheet, setItemSheet] = useState<number | 'all' | null>(null);
   const [editingRef, setEditingRef] = useState(false);
   const [refValue, setRefValue] = useState('');
+  const refCode = order?.manufacturer_code ?? '';
+  const refOrderId = order?.id;
+  const refDuplicate = useMemo(() => { const o = manualRefOwner(orders, refValue, refCode, refOrderId); return o ? `${orderRefLabel(o)} ya existe (pedido de ${o.customer?.nombre_empresa || 'otro cliente'}). Revisa el número antes de guardar.` : null; }, [orders, refValue, refCode, refOrderId]);
   const [busy, setBusy] = useState(false);
 
   const goBack = useCallback(() => (router.canGoBack() ? router.back() : router.replace('/')), [router]);
@@ -581,6 +584,7 @@ export default function OrderDetailScreen() {
           value={refValue}
           onChange={setRefValue}
           suggestion={refSuggestion}
+          duplicateOf={refDuplicate}
           label=""
           style={s.refField}
           testID="ref"

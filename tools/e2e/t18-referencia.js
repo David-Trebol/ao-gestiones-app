@@ -67,7 +67,13 @@ const check = (name, ok, extra = '') => { console.log(`${ok ? 'OK  ' : 'FAIL'} $
     // Escribir a mano otra cosa
     await p.goto(base + '/order-form', { waitUntil: 'networkidle' }); await wt(1800);
     await p.getByTestId('manufacturer-select').click(); await wt(500); await p.getByText('Acme Industries (ACM)').last().click(); await wt(500);
+    await p.getByTestId('manual-ref-input').fill('628'); await wt(300);
+    const dup = await p.getByTestId('manual-ref-dup').innerText().catch(() => '');
+    check(`[${tag}] aviso si la referencia ya existe (ACM-628)`, /ACM-628 \(2026\) ya existe \(pedido de Construcciones García S\.A\.\)\. Revisa/.test(dup), dup);
+    await shot('form-duplicada');
     await p.getByTestId('manual-ref-input').fill('700');
+    await wt(300);
+    check(`[${tag}] sin aviso con un número libre`, (await p.getByTestId('manual-ref-dup').count()) === 0);
     await f('Empresa', 'Cliente Manual SL'); await f('Producto', 'Bomba prueba');
     await p.getByTestId('submit-order-btn').click(); await wt(2500);
     const nm = mock.db.orders.find(o => o.customer?.nombre_empresa === 'Cliente Manual SL');

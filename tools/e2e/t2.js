@@ -75,7 +75,7 @@ const check = (name, ok, extra = '') => { results.push((ok ? 'OK  ' : 'FAIL') + 
   await p.getByTestId('duplicate-order-btn').click(); await wait(900); await shot('25-dup');
   await p.getByText('Duplicar', { exact: true }).last().click(); await wait(2000);
   const d2 = db().orders.find(x => x.id !== o.id);
-  check('duplicar crea TPG-2026-002 pendiente sin factura', d2 && d2.reference_number === 'TPG-2026-002' && d2.status === 'pending' && d2.customer.numero_factura === '', d2 && `${d2.reference_number} ${d2.status}`);
+  check('duplicar crea TPG-2026-002 pendiente sin factura', d2 && d2.reference_number === 'TPG-2026-002' && d2.status === 'pending' && d2.customer.numero_factura === '' && d2.custom_reference === '', d2 && `${d2.reference_number} ${d2.status}`);
   const seguir = p.getByText('Seguir aquí', { exact: true }); if (await seguir.count()) { await seguir.last().click(); await wait(500); }
   // 6. Borrar original y crear otro: no repetir referencia
   await p.getByTestId('more-actions-btn').click(); await wait(600);

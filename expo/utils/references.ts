@@ -56,3 +56,10 @@ export function orderRefLabel(o: Pick<Order, 'reference_number' | 'custom_refere
   const r = orderRef(o);
   return r.manual && o.year ? `${r.ref} (${o.year})` : r.ref;
 }
+
+/** Otro pedido que ya usa esa referencia propia (mismo código y número, o mismo texto libre). */
+export function manualRefOwner<T extends Pick<Order, 'id' | 'manufacturer_code' | 'custom_reference'>>(orders: T[], value: string, code: string, excludeId?: string): T | null {
+  const v = normalizeManualRef(value, code);
+  if (!v) return null;
+  return orders.find(o => o.id !== excludeId && (o.custom_reference || '').trim() !== '' && normalizeManualRef(o.custom_reference, o.manufacturer_code || '') === v) ?? null;
+}
