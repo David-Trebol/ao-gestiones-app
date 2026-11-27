@@ -38,4 +38,5 @@ npx expo export --platform web --output-dir ../tools/out/dist     # compilación
 - `docs/formulas.md` — fórmulas de importes; antes de tocar `utils/calculations.ts` o importes.
 - `docs/lectura-documentos.md` — lector PDF/OCR; al tocar `utils/docread` o `DocumentReview`.
 - `docs/pruebas.md` — e2e con Supabase simulado, capturas y tests unitarios; al probar.
+- `docs/hostinger.md` — paquete y pasos para publicar también en Hostinger; al subir allí.
 - `docs/riesgos.md` — riesgos abiertos (pausa de Supabase, copias, etc.); al planificar o desplegar.
